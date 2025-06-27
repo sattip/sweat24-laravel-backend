@@ -43,12 +43,50 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        // Check if it's an API request
+        if ($request->expectsJson()) {
+            $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully',
+            return response()->json([
+                'success' => true,
+                'message' => 'Logged out successfully',
+            ]);
+        }
+        
+        // Web logout
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        
+        return redirect('/admin/login')->with('success', 'Logged out successfully');
+    }
+    
+    public function adminLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
+
+        $credentials = $request->only('email', 'password');
+        
+        if (Auth::attempt($credentials, $request->filled('remember'))) {
+            $user = Auth::user();
+            
+            // Check if user is admin
+            if ($user->membership_type !== 'Admin') {
+                Auth::logout();
+                return redirect()->back()->with('error', 'Unauthorized. Admin access only.');
+            }
+            
+            $request->session()->regenerate();
+            
+            return redirect()->intended(route('admin.dashboard'));
+        }
+
+        return redirect()->back()
+            ->withInput($request->only('email'))
+            ->with('error', 'Invalid credentials.');
     }
 
     public function me(Request $request)
