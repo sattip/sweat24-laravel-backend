@@ -62,7 +62,30 @@
             <a href="{{ url('/') }}" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
                 <i class="fas fa-home mr-2"></i>View Frontend
             </a>
+            <a href="{{ route('admin.activity.index') }}" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 transition">
+                <i class="fas fa-chart-line mr-2"></i>Activity Dashboard
+            </a>
         </div>
     </div>
+
+    @if(config('app.env') === 'local')
+    <!-- Development Tools (Only in Local Environment) -->
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg shadow p-6 mt-6">
+        <h2 class="text-xl font-semibold text-yellow-800 mb-4">
+            <i class="fas fa-wrench mr-2"></i>Development Tools
+        </h2>
+        <p class="text-sm text-yellow-700 mb-4">
+            These tools are only available in development mode for testing and debugging.
+        </p>
+        <div class="flex flex-wrap gap-4">
+            <a href="{{ route('admin.notifications.test.index') }}" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition">
+                <i class="fas fa-bell mr-2"></i>Test Notifications
+            </a>
+            <a href="{{ route('admin.settings.test.index') }}" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition">
+                <i class="fas fa-cogs mr-2"></i>Development Settings
+            </a>
+        </div>
+    </div>
+    @endif
 </div>
 @endsection

@@ -51,7 +51,7 @@
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ $admin->created_at->format('M d, Y') }}
+                        {{ $admin->created_at->setTimezone(config('app.timezone'))->format('M d, Y') }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <a href="{{ route('admin.users.edit', $admin->id) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">

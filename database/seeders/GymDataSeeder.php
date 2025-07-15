@@ -179,35 +179,55 @@ class GymDataSeeder extends Seeder
             User::create($userData);
         }
 
-        // Create Classes
-        $classes = [
-            [
-                'name' => 'HIIT Blast',
-                'type' => 'group',
-                'instructor' => 'Άλεξ Ροδρίγκεζ',
-                'date' => today()->addDay(),
-                'time' => '09:00:00',
-                'duration' => 45,
-                'max_participants' => 12,
-                'current_participants' => 8,
-                'location' => 'Main Floor',
-                'description' => 'Υψηλή ένταση καρδιοαγγειακής προπόνησης',
-                'status' => 'active'
-            ],
-            [
-                'name' => 'Yoga Flow',
-                'type' => 'group',
-                'instructor' => 'Εμιλι Τσεν',
-                'date' => today()->addDay(),
-                'time' => '18:00:00',
-                'duration' => 60,
-                'max_participants' => 15,
-                'current_participants' => 12,
-                'location' => 'Studio A',
-                'description' => 'Ρελακσάρισμα και ευελιξία',
-                'status' => 'active'
-            ]
+        // Create Classes for the next 7 days
+        $classes = [];
+        $classTemplates = [
+            ['name' => 'HIIT Blast', 'type' => 'group', 'instructor' => 'Άλεξ Ροδρίγκεζ', 'time' => '09:00:00', 'duration' => 45, 'max' => 12],
+            ['name' => 'Yoga Flow', 'type' => 'group', 'instructor' => 'Εμιλι Τσεν', 'time' => '07:30:00', 'duration' => 60, 'max' => 15],
+            ['name' => 'Power Training', 'type' => 'group', 'instructor' => 'Τζέιμς Τέιλορ', 'time' => '18:00:00', 'duration' => 60, 'max' => 10],
+            ['name' => 'Morning Yoga', 'type' => 'group', 'instructor' => 'Εμιλι Τσεν', 'time' => '08:00:00', 'duration' => 45, 'max' => 20],
+            ['name' => 'Strength Circuit', 'type' => 'group', 'instructor' => 'Άλεξ Ροδρίγκεζ', 'time' => '17:30:00', 'duration' => 50, 'max' => 12],
+            ['name' => 'Personal Training', 'type' => 'personal', 'instructor' => 'Τζέιμς Τέιλορ', 'time' => '10:00:00', 'duration' => 60, 'max' => 1],
+            ['name' => 'Evening HIIT', 'type' => 'group', 'instructor' => 'Άλεξ Ροδρίγκεζ', 'time' => '19:00:00', 'duration' => 45, 'max' => 15],
+            ['name' => 'Core & Abs', 'type' => 'group', 'instructor' => 'Τζέιμς Τέιλορ', 'time' => '12:00:00', 'duration' => 30, 'max' => 20],
         ];
+        
+        // Generate classes for next 7 days
+        for ($day = 0; $day < 7; $day++) {
+            // Add 2-4 classes per day
+            $numClasses = rand(2, 4);
+            $usedTemplates = [];
+            
+            for ($i = 0; $i < $numClasses; $i++) {
+                do {
+                    $templateIndex = rand(0, count($classTemplates) - 1);
+                } while (in_array($templateIndex, $usedTemplates));
+                
+                $usedTemplates[] = $templateIndex;
+                $template = $classTemplates[$templateIndex];
+                
+                // Make some classes full for testing waitlist
+                $participants = rand(0, $template['max']);
+                // 30% chance of class being full
+                if (rand(1, 100) <= 30) {
+                    $participants = $template['max'];
+                }
+                
+                $classes[] = [
+                    'name' => $template['name'],
+                    'type' => $template['type'],
+                    'instructor' => $template['instructor'],
+                    'date' => today()->addDays($day),
+                    'time' => $template['time'],
+                    'duration' => $template['duration'],
+                    'max_participants' => $template['max'],
+                    'current_participants' => $participants,
+                    'location' => $template['type'] === 'personal' ? 'Personal Training Area' : 'Main Floor',
+                    'description' => 'Προπόνηση ' . $template['name'],
+                    'status' => 'active'
+                ];
+            }
+        }
 
         foreach ($classes as $class) {
             GymClass::create($class);

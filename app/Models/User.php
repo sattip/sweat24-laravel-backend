@@ -22,13 +22,21 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'address',
+        'date_of_birth',
         'membership_type',
+        'role',
         'join_date',
         'remaining_sessions',
         'total_sessions',
         'status',
         'last_visit',
         'medical_history',
+        'emergency_contact',
+        'emergency_phone',
+        'notes',
+        'notification_preferences',
+        'privacy_settings',
         'avatar',
         'password',
     ];
@@ -54,7 +62,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'join_date' => 'date',
+            'date_of_birth' => 'date',
             'last_visit' => 'datetime',
+            'notification_preferences' => 'array',
+            'privacy_settings' => 'array',
         ];
     }
 
@@ -71,5 +82,61 @@ class User extends Authenticatable
     public function activityLogs()
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function signatures()
+    {
+        return $this->hasMany(Signature::class);
+    }
+    
+    public function userPackages()
+    {
+        return $this->hasMany(UserPackage::class);
+    }
+    
+    public function notifications()
+    {
+        return $this->hasMany(NotificationRecipient::class);
+    }
+    
+    public function unreadNotifications()
+    {
+        return $this->notifications()->unread();
+    }
+    
+    public function createdNotifications()
+    {
+        return $this->hasMany(Notification::class, 'created_by');
+    }
+    
+    public function chatConversation()
+    {
+        return $this->hasOne(ChatConversation::class);
+    }
+    
+    // Role check methods
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+    
+    public function isTrainer(): bool
+    {
+        return $this->role === 'trainer';
+    }
+    
+    public function isMember(): bool
+    {
+        return $this->role === 'member';
+    }
+    
+    public function canAccessFinancials(): bool
+    {
+        return $this->isAdmin();
+    }
+    
+    public function canAccessLimitedFinancials(): bool
+    {
+        return $this->isAdmin() || $this->isTrainer();
     }
 }

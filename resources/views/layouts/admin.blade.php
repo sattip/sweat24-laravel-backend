@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @if(auth()->user() && auth()->user()->currentAccessToken())
+        <meta name="api-token" content="{{ auth()->user()->currentAccessToken()->plainTextToken }}">
+    @endif
     <title>@yield('title', 'Admin Panel') - SWEAT24</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -31,21 +34,51 @@
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url('/api/v1/users') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800">
+                    <a href="{{ route('admin.members.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.members.*') ? 'bg-gray-800' : '' }}">
                         <i class="fas fa-users"></i>
-                        <span>All Users</span>
+                        <span>Members</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url('/api/v1/classes') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800">
+                    <a href="{{ route('admin.trainers.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.trainers.*') ? 'bg-gray-800' : '' }}">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Trainers</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('admin.classes.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.classes.*') ? 'bg-gray-800' : '' }}">
                         <i class="fas fa-calendar"></i>
                         <span>Classes</span>
                     </a>
                 </li>
                 <li>
+                    <a href="{{ route('admin.bookings.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.bookings.*') ? 'bg-gray-800' : '' }}">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Bookings</span>
+                    </a>
+                </li>
+                <li>
                     <a href="{{ url('/api/v1/packages') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800">
                         <i class="fas fa-box"></i>
-                        <span>Packages</span>
+                        <span>Package Types</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('admin.packages.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.packages.*') ? 'bg-gray-800' : '' }}">
+                        <i class="fas fa-id-card"></i>
+                        <span>User Packages</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('admin.activity.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.activity.*') ? 'bg-gray-800' : '' }}">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Activity Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('admin.settings.index') }}" class="flex items-center space-x-3 py-2 px-4 rounded hover:bg-gray-800 {{ request()->routeIs('admin.settings.index') ? 'bg-gray-800' : '' }}">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
                     </a>
                 </li>
             </ul>
@@ -87,5 +120,7 @@
             @yield('content')
         </main>
     </div>
+    
+    @yield('scripts')
 </body>
 </html>

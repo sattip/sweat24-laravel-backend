@@ -25,7 +25,7 @@ class UserController extends Controller
             $query->where('status', $request->status);
         }
         
-        $users = $query->with('packages', 'activityLogs')->paginate(15);
+        $users = $query->with('packages', 'activityLogs')->paginate(20);
         
         return response()->json($users);
     }
@@ -63,11 +63,31 @@ class UserController extends Controller
             'membership_type' => 'nullable|string',
             'status' => 'sometimes|in:active,inactive,expired',
             'medical_history' => 'nullable|string',
+            'emergency_contact' => 'nullable|string',
+            'emergency_phone' => 'nullable|string',
+            'address' => 'nullable|string',
+            'date_of_birth' => 'nullable|date',
+            'notes' => 'nullable|string',
         ]);
+
+        // Handle password update if provided
+        if ($request->filled('password')) {
+            $request->validate([
+                'password' => 'string|min:8|confirmed',
+            ]);
+            $validated['password'] = Hash::make($request->password);
+        }
 
         $user->update($validated);
         
-        return response()->json($user);
+        // Log the update activity
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties(['changes' => $validated])
+            ->log('updated user profile');
+        
+        return response()->json($user->load('packages', 'bookings'));
     }
 
     public function destroy(User $user)

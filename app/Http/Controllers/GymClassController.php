@@ -14,6 +14,16 @@ class GymClassController extends Controller
     {
         $query = GymClass::with('instructor');
         
+        // Filter to show only future classes (from current date and time)
+        $now = now();
+        $query->where(function($q) use ($now) {
+            $q->where('date', '>', $now->toDateString())
+              ->orWhere(function($subQuery) use ($now) {
+                  $subQuery->where('date', '=', $now->toDateString())
+                           ->whereRaw("CONCAT(date, ' ', time) > ?", [$now->toDateTimeString()]);
+              });
+        });
+        
         if ($request->has('date')) {
             $query->whereDate('date', $request->date);
         }
