@@ -17,10 +17,18 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         
+        // Use custom CSRF middleware that excludes API routes
+        $middleware->web(replace: [
+            \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class => \App\Http\Middleware\VerifyCsrfToken::class,
+        ]);
+        
         // Register admin middleware alias
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'role' => \App\Http\Middleware\CheckRole::class,
+            'debug' => \App\Http\Middleware\DebugMiddleware::class,
         ]);
+        
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

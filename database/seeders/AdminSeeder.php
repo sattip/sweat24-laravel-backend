@@ -21,6 +21,7 @@ class AdminSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'phone' => '+30 210 1234567',
                 'membership_type' => 'Admin',
+                'role' => 'admin',
                 'status' => 'active',
                 'join_date' => now(),
             ]
@@ -47,6 +48,7 @@ class AdminSeeder extends Seeder
                 ['email' => $adminData['email']],
                 array_merge($adminData, [
                     'membership_type' => 'Admin',
+                    'role' => 'admin',
                     'status' => 'active',
                     'join_date' => now(),
                 ])

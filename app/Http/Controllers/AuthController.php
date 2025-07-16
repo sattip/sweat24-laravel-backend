@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -28,6 +29,9 @@ class AuthController extends Controller
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        // Log the login activity
+        ActivityLogger::logLogin($user);
+
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
@@ -36,6 +40,12 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'membership_type' => $user->membership_type,
+                'role' => $user->role,
+                'phone' => $user->phone,
+                'status' => $user->status,
+                'remaining_sessions' => $user->remaining_sessions,
+                'join_date' => $user->join_date,
+                'last_visit' => $user->last_visit,
             ],
             'token' => $token,
         ]);
@@ -43,6 +53,13 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+        
+        // Log the logout activity
+        if ($user) {
+            ActivityLogger::logLogout($user);
+        }
+        
         // Check if it's an API request
         if ($request->expectsJson()) {
             $request->user()->currentAccessToken()->delete();
@@ -81,6 +98,9 @@ class AuthController extends Controller
             
             $request->session()->regenerate();
             
+            // Log the admin login activity
+            ActivityLogger::logLogin($user);
+            
             return redirect()->intended(route('admin.dashboard'));
         }
 
@@ -91,13 +111,21 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        $user = $request->user();
+        
         return response()->json([
             'success' => true,
             'user' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
-                'membership_type' => $request->user()->membership_type,
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'membership_type' => $user->membership_type,
+                'role' => $user->role,
+                'phone' => $user->phone,
+                'status' => $user->status,
+                'remaining_sessions' => $user->remaining_sessions,
+                'join_date' => $user->join_date,
+                'last_visit' => $user->last_visit,
             ],
         ]);
     }
@@ -121,6 +149,9 @@ class AuthController extends Controller
             'join_date' => now(),
             'status' => 'active',
         ]);
+
+        // Log the registration activity
+        ActivityLogger::logRegistration($user);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

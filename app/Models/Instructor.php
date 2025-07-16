@@ -11,7 +11,13 @@ class Instructor extends Model
 
     protected $fillable = [
         'name',
+        'slug',
+        'title',
+        'image_url',
+        'bio',
         'specialties',
+        'certifications',
+        'services',
         'email',
         'phone',
         'hourly_rate',
@@ -22,12 +28,16 @@ class Instructor extends Model
         'join_date',
         'total_revenue',
         'completed_sessions',
+        'display_order',
+        'experience',
     ];
 
     protected function casts(): array
     {
         return [
             'specialties' => 'json',
+            'certifications' => 'json',
+            'services' => 'json',
             'hourly_rate' => 'decimal:2',
             'monthly_bonus' => 'decimal:2',
             'commission_rate' => 'decimal:4',

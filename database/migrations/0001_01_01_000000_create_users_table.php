@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->nullable();
             $table->string('membership_type')->default('Basic');
+            $table->enum('role', ['admin', 'trainer', 'member'])->default('member');
             $table->date('join_date');
             $table->integer('remaining_sessions')->default(0);
             $table->integer('total_sessions')->default(0);

@@ -86,4 +86,25 @@ class CashRegisterEntryController extends Controller
         $cashRegister->delete();
         return response()->json(['message' => 'Cash register entry deleted successfully']);
     }
+    
+    /**
+     * Display limited cash register entries for trainers (last 7 days only)
+     */
+    public function limitedIndex(Request $request)
+    {
+        $query = CashRegisterEntry::query()
+            ->where('created_at', '>=', now()->subDays(7));
+        
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
+        }
+        
+        $entries = $query->orderBy('created_at', 'desc')->get();
+        
+        return response()->json([
+            'data' => $entries,
+            'limited' => true,
+            'message' => 'Εμφανίζονται μόνο οι εγγραφές των τελευταίων 7 ημερών'
+        ]);
+    }
 }
