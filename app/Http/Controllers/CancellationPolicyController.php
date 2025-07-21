@@ -191,10 +191,10 @@ class CancellationPolicyController extends Controller
         }
 
         if (!$applicablePolicy) {
-            // Default policy: 6 hours for cancellation, 3 hours for reschedule
+            // Default policy: 3 hours for cancellation, 6 hours for reschedule (CORRECTED)
             return response()->json([
-                'can_cancel' => $hoursUntilClass >= 6,
-                'can_reschedule' => $hoursUntilClass >= 3,
+                'can_cancel' => $hoursUntilClass >= 3,  // FIXED: έως 3 ώρες πριν
+                'can_reschedule' => $hoursUntilClass >= 6, // FIXED: έως 6 ώρες πριν  
                 'penalty_percentage' => 0,
                 'hours_until_class' => max(0, $hoursUntilClass),
                 'message' => 'Χρησιμοποιείται η προεπιλεγμένη πολιτική ακύρωσης'
