@@ -113,11 +113,11 @@ class CancellationPolicyController extends Controller
             $now = Carbon::now();
             $hoursUntilClass = $now->diffInHours($classDateTime, false);
             
-            // Policy logic - CORRECT RULES
+            // Policy logic - CORRECT RULES (no penalty logic)
             $canCancel = $hoursUntilClass >= 3; // Ακύρωση: έως 3 ώρες πριν
             $canReschedule = $hoursUntilClass >= 6; // Αλλαγή ώρας: έως 6 ώρες πριν  
-            $canCancelWithoutPenalty = $hoursUntilClass >= 24; // Χωρίς ποινή: 24+ ώρες πριν
-            $penaltyPercentage = $hoursUntilClass >= 24 ? 0 : ($hoursUntilClass >= 3 ? 25 : 50);
+            $canCancelWithoutPenalty = true; // No penalty system implemented
+            $penaltyPercentage = 0; // No penalties
             
             return response()->json([
                 'can_cancel' => $canCancel,

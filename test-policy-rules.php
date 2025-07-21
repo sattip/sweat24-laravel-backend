@@ -36,8 +36,8 @@ foreach ($testScenarios as $test) {
     // Apply same logic as in CancellationPolicyController
     $canCancel = $hours >= 3;
     $canReschedule = $hours >= 6;
-    $canCancelWithoutPenalty = $hours >= 24;
-    $penaltyPercentage = $hours >= 24 ? 0 : ($hours >= 3 ? 25 : 50);
+    $canCancelWithoutPenalty = true; // No penalty system
+    $penaltyPercentage = 0; // No penalties
     
     echo "⏰ $scenario:\n";
     echo "   Cancel: " . ($canCancel ? "✅ ΝΑΙ" : "❌ ΟΧΙ") . "\n";
