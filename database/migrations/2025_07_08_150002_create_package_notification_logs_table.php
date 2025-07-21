@@ -22,8 +22,8 @@ return new class extends Migration
             $table->integer('days_until_expiry')->nullable();
             $table->timestamps();
             
-            $table->index(['user_package_id', 'notification_type']);
-            $table->index(['created_at']);
+            $table->index(['user_package_id', 'notification_type'], 'pnl_user_package_notification_type_idx');
+            $table->index(['created_at'], 'pnl_created_at_idx');
         });
     }
 

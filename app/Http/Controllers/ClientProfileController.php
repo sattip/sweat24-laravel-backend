@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use App\Services\ActivityLogger;
 
 class ClientProfileController extends Controller
 {
@@ -59,11 +60,12 @@ class ClientProfileController extends Controller
         $user->update($validated);
 
         // Log the update activity
-        activity()
-            ->causedBy($user)
-            ->performedOn($user)
-            ->withProperties(['changes' => $validated])
-            ->log('updated own profile');
+        ActivityLogger::log(
+            'user_profile',
+            'updated own profile',
+            $user,
+            ['changes' => $validated]
+        );
 
         return response()->json([
             'message' => 'Profile updated successfully',
@@ -88,10 +90,11 @@ class ClientProfileController extends Controller
         ]);
 
         // Log the password change
-        activity()
-            ->causedBy($user)
-            ->performedOn($user)
-            ->log('changed password');
+        ActivityLogger::log(
+            'user_profile',
+            'changed password',
+            $user
+        );
 
         return response()->json([
             'message' => 'Password updated successfully'
@@ -120,10 +123,11 @@ class ClientProfileController extends Controller
         $user->update(['avatar' => $path]);
 
         // Log the avatar update
-        activity()
-            ->causedBy($user)
-            ->performedOn($user)
-            ->log('updated profile picture');
+        ActivityLogger::log(
+            'user_profile',
+            'updated profile picture',
+            $user
+        );
 
         return response()->json([
             'message' => 'Avatar uploaded successfully',
@@ -228,14 +232,15 @@ class ClientProfileController extends Controller
         ]);
 
         // Log deactivation request
-        activity()
-            ->causedBy($user)
-            ->performedOn($user)
-            ->withProperties([
+        ActivityLogger::log(
+            'user_profile',
+            'requested account deactivation',
+            $user,
+            [
                 'reason' => $validated['reason'],
                 'feedback' => $validated['feedback'] ?? null
-            ])
-            ->log('requested account deactivation');
+            ]
+        );
 
         // Create notification for admin
         \App\Models\Notification::create([

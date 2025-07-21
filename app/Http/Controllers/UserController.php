@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use App\Services\ActivityLogger;
 
 class UserController extends Controller
 {
@@ -81,11 +82,12 @@ class UserController extends Controller
         $user->update($validated);
         
         // Log the update activity
-        activity()
-            ->causedBy(auth()->user())
-            ->performedOn($user)
-            ->withProperties(['changes' => $validated])
-            ->log('updated user profile');
+        ActivityLogger::log(
+            'user_management',
+            'updated user profile',
+            $user,
+            ['changes' => $validated]
+        );
         
         return response()->json($user->load('packages', 'bookings'));
     }

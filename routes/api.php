@@ -122,6 +122,33 @@ Route::prefix('v1')->group(function () {
             'upcoming_classes' => \App\Models\GymClass::whereDate('date', '>=', today())->take(5)->get()
         ]);
     });
+
+    // Public dashboard activities (recent activity logs)
+    Route::get('dashboard/activities', function () {
+        $activities = \App\Models\ActivityLog::with(['user:id,name,email'])
+            ->select(['id', 'user_id', 'activity_type', 'action', 'created_at', 'properties'])
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'user' => $activity->user ? [
+                        'id' => $activity->user->id,
+                        'name' => $activity->user->name
+                    ] : null,
+                    'activity_type' => $activity->activity_type,
+                    'action' => $activity->action,
+                    'created_at' => $activity->created_at,
+                    'properties' => $activity->properties
+                ];
+            });
+
+        return response()->json([
+            'activities' => $activities,
+            'total_count' => \App\Models\ActivityLog::count()
+        ]);
+    });
 });
 
 // Remove temporary public booking routes - will add at end
