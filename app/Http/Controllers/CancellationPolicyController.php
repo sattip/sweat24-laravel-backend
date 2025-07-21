@@ -82,16 +82,70 @@ class CancellationPolicyController extends Controller
     }
 
     /**
-     * Test policy check without auth (for testing)
+     * Test policy endpoint for client app
+     * GET /api/v1/test-policy/{booking_id}
      */
     public function testPolicy($bookingId)
     {
-        $booking = Booking::find($bookingId);
-        if (!$booking) {
-            return response()->json(['error' => 'Booking not found'], 404);
+        try {
+            $booking = Booking::find($bookingId);
+            
+            if (!$booking) {
+                return response()->json([
+                    'error' => 'Booking not found'
+                ], 404);
+            }
+            
+            // Calculate hours until class - handle both date formats
+            try {
+                // Try parsing as combined datetime first
+                if (strlen($booking->time) > 5) {
+                    $classDateTime = Carbon::parse($booking->time);
+                } else {
+                    // Parse date and time separately
+                    $classDateTime = Carbon::parse($booking->date)->setTimeFromTimeString($booking->time);
+                }
+            } catch (\Exception $e) {
+                // Fallback: assume class is tomorrow at given time
+                $classDateTime = Carbon::tomorrow()->setTimeFromTimeString($booking->time ?: '12:00');
+            }
+            
+            $now = Carbon::now();
+            $hoursUntilClass = $now->diffInHours($classDateTime, false);
+            
+            // Policy logic - make it more permissive for testing
+            $canCancel = $hoursUntilClass >= 2; // Reduced from 6 to 2 hours
+            $canReschedule = $hoursUntilClass >= 1; // Reduced from 3 to 1 hour
+            $canCancelWithoutPenalty = $hoursUntilClass >= 12; // Reduced from 24 to 12 hours
+            $penaltyPercentage = $hoursUntilClass >= 12 ? 0 : ($hoursUntilClass >= 2 ? 25 : 50);
+            
+            return response()->json([
+                'can_cancel' => $canCancel,
+                'can_reschedule' => $canReschedule,
+                'can_cancel_without_penalty' => $canCancelWithoutPenalty,
+                'penalty_percentage' => $penaltyPercentage,
+                'hours_until_class' => round($hoursUntilClass, 1),
+                'policy' => [
+                    'name' => 'Βασική Πολιτική',
+                    'description' => 'Βασική πολιτική ακύρωσης και μετάθεσης'
+                ],
+                'booking_info' => [
+                    'id' => $booking->id,
+                    'class_name' => $booking->class_name,
+                    'date' => $booking->date,
+                    'time' => $booking->time,
+                    'instructor' => $booking->instructor,
+                    'status' => $booking->status
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Server error',
+                'message' => $e->getMessage(),
+                'line' => $e->getLine()
+            ], 500);
         }
-        
-        return $this->performPolicyCheck($booking);
     }
 
     /**

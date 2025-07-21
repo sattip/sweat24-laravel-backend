@@ -243,6 +243,31 @@ class BookingController extends Controller
             $user = \App\Models\User::find($validated['user_id']);
         }
         
+        // Check for duplicate booking - PREVENT DOUBLE BOOKINGS
+        if ($user && !empty($validated['class_id'])) {
+            $existingBooking = Booking::where('user_id', $user->id)
+                ->where('class_id', $validated['class_id'])
+                ->whereDate('date', $validated['date']) // Use whereDate for proper date comparison
+                ->where('time', $validated['time']) // Add time check for extra safety
+                ->whereIn('status', ['confirmed', 'waitlist'])
+                ->first();
+                
+            if ($existingBooking) {
+                \Log::info('Duplicate booking attempt blocked', [
+                    'user_id' => $user->id,
+                    'class_id' => $validated['class_id'],
+                    'date' => $validated['date'],
+                    'time' => $validated['time'],
+                    'existing_booking_id' => $existingBooking->id
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Έχετε ήδη κράτηση για αυτό το μάθημα.'
+                ], 409); // 409 Conflict
+            }
+        }
+        
         // Check if user has available sessions before booking
         if ($user) {
             $hasAvailableSessions = \App\Models\UserPackage::where('user_id', $user->id)

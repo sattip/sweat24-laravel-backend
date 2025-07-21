@@ -446,6 +446,12 @@ Route::prefix('v1')->group(function () {
 
 // Direct route outside all middleware
 Route::get('/test-history', [BookingController::class, 'testHistory']);
+
+// Add policy endpoint under v1 prefix for client app
+Route::prefix('v1')->group(function () {
+    Route::get('test-policy/{booking_id}', [CancellationPolicyController::class, 'testPolicy'])->name('public.test.policy');
+});
+
 Route::get('/test-policy/{bookingId}', [CancellationPolicyController::class, 'testPolicy']);
 Route::get('/test-order-notification', [TestController::class, 'createTestOrderNotification']);
 
