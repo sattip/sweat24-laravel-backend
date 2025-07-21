@@ -28,8 +28,9 @@ class GymClassController extends Controller
             $query->whereDate('date', $request->date);
         }
         
-        if ($request->has('instructor')) {
-            $query->where('instructor_id', $request->instructor);
+        if ($request->has('instructor') && $request->instructor) {
+            // Handle both string and integer instructor IDs
+            $query->where('instructor', '=', (string)$request->instructor);
         }
         
         $classes = $query->orderBy('date')->orderBy('time')->get();
