@@ -59,18 +59,19 @@ class BookingRequestController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        // Set user_id if authenticated
-        if (Auth::check()) {
-            $validated['user_id'] = Auth::id();
+        // Set user_id if authenticated (check both guard methods)
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+        if ($user) {
+            $validated['user_id'] = $user->id;
         }
 
         $bookingRequest = DB::transaction(function () use ($validated) {
             $bookingRequest = BookingRequest::create($validated);
 
             // Log activity only if user is authenticated
-            if (Auth::check()) {
+            if ($user) {
                 ActivityLog::create([
-                    'user_id' => Auth::id(),
+                    'user_id' => $user->id,
                     'activity_type' => 'booking_request',
                     'action' => 'created',
                     'model_type' => BookingRequest::class,
@@ -100,7 +101,9 @@ class BookingRequestController extends Controller
     public function show(BookingRequest $bookingRequest)
     {
         // Check authorization
-        if (!Auth::user()->isAdmin() && $bookingRequest->user_id !== Auth::id()) {
+        if (!Auth::user()->isAdmin() && 
+            $bookingRequest->user_id !== Auth::id() && 
+            $bookingRequest->client_email !== Auth::user()->email) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -218,7 +221,9 @@ class BookingRequestController extends Controller
     public function cancel(Request $request, BookingRequest $bookingRequest)
     {
         // Check authorization
-        if (!Auth::user()->isAdmin() && $bookingRequest->user_id !== Auth::id()) {
+        if (!Auth::user()->isAdmin() && 
+            $bookingRequest->user_id !== Auth::id() && 
+            $bookingRequest->client_email !== Auth::user()->email) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
