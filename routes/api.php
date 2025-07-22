@@ -129,6 +129,7 @@ Route::prefix('v1')->group(function () {
     Route::get('specialized-services', [SpecializedServiceController::class, 'index']);
     Route::get('specialized-services/{specializedService}', [SpecializedServiceController::class, 'show']);
     Route::post('appointment-requests', [AppointmentRequestController::class, 'store']);
+    Route::get('appointment-requests', [AppointmentRequestController::class, 'index']); // Public listing for admin panel
     
     // Public booking request routes (EMS/Personal)
     Route::post('booking-requests', [BookingRequestController::class, 'store']);
@@ -215,7 +216,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('instructors', InstructorController::class);
     Route::apiResource('specialized-services', SpecializedServiceController::class)->except(['show', 'index']);
     Route::get('admin/specialized-services', [SpecializedServiceController::class, 'adminIndex']);
-    Route::apiResource('appointment-requests', AppointmentRequestController::class)->except(['store']);
+    Route::apiResource('appointment-requests', AppointmentRequestController::class)->except(['store', 'index']); // index moved to public routes
     
     // Booking Request routes (EMS/Personal) - authenticated access
     Route::get('booking-requests/my-requests', [BookingRequestController::class, 'userRequests']);
@@ -447,6 +448,8 @@ Route::post('v1/bookings/simple', function(\Illuminate\Http\Request $request) {
         'data' => $request->all()
     ]);
 });
+
+
 
 // Debug authentication endpoint
 Route::get('v1/debug/auth', function(\Illuminate\Http\Request $request) {
