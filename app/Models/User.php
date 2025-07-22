@@ -30,6 +30,11 @@ class User extends Authenticatable
         'remaining_sessions',
         'total_sessions',
         'status',
+        'registration_status',
+        'terms_accepted_at',
+        'registration_completed_at',
+        'approved_at',
+        'approved_by',
         'last_visit',
         'medical_history',
         'emergency_contact',
@@ -64,6 +69,9 @@ class User extends Authenticatable
             'join_date' => 'date',
             'date_of_birth' => 'date',
             'last_visit' => 'datetime',
+            'terms_accepted_at' => 'datetime',
+            'registration_completed_at' => 'datetime',
+            'approved_at' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
         ];
@@ -77,6 +85,11 @@ class User extends Authenticatable
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+    
+    public function bookingRequests()
+    {
+        return $this->hasMany(BookingRequest::class);
     }
 
     public function activityLogs()
@@ -138,5 +151,57 @@ class User extends Authenticatable
     public function canAccessLimitedFinancials(): bool
     {
         return $this->isAdmin() || $this->isTrainer();
+    }
+    
+    // Registration status check methods
+    public function isPendingApproval(): bool
+    {
+        return $this->registration_status === 'pending_approval';
+    }
+    
+    public function isPendingTerms(): bool
+    {
+        return $this->registration_status === 'pending_terms';
+    }
+    
+    public function isPendingSignature(): bool
+    {
+        return $this->registration_status === 'pending_signature';
+    }
+    
+    public function isRegistrationCompleted(): bool
+    {
+        return $this->registration_status === 'completed';
+    }
+    
+    public function canBeApproved(): bool
+    {
+        return $this->isPendingApproval();
+    }
+    
+    public function canAcceptTerms(): bool
+    {
+        return $this->isPendingTerms();
+    }
+    
+    public function canCompleteRegistration(): bool
+    {
+        return $this->isPendingSignature();
+    }
+    
+    public function getLatestSignature()
+    {
+        return $this->signatures()->latest()->first();
+    }
+    
+    // Approval relationship
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+    
+    public function approvedUsers()
+    {
+        return $this->hasMany(User::class, 'approved_by');
     }
 }

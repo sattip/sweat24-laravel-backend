@@ -27,9 +27,32 @@ use App\Http\Controllers\TestController;
 use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\SpecializedServiceController;
 use App\Http\Controllers\AppointmentRequestController;
+use App\Http\Controllers\BookingRequestController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\AdminController;
+
+// Two-Phase Registration routes (public)
+Route::prefix('v1/registration')->group(function () {
+    Route::post('/initial', [RegistrationController::class, 'initialRegistration']);
+    Route::post('/accept-terms', [RegistrationController::class, 'acceptTerms']);
+    Route::post('/complete', [RegistrationController::class, 'completeRegistration']);
+    Route::get('/status', [RegistrationController::class, 'getRegistrationStatus']);
+});
+
+// Admin-only registration management routes
+Route::prefix('v1/admin')->middleware(['auth:sanctum'])->group(function () {
+    Route::post('/users/{id}/approve', [RegistrationController::class, 'approveUser']);
+    Route::post('/users/{id}/reject', [RegistrationController::class, 'rejectUser']);
+});
+
+// Admin Panel specific routes (simplified path as requested)
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
+    Route::post('/users/{id}/reject', [AdminController::class, 'rejectUser']);
+});
 
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
@@ -106,6 +129,10 @@ Route::prefix('v1')->group(function () {
     Route::get('specialized-services', [SpecializedServiceController::class, 'index']);
     Route::get('specialized-services/{specializedService}', [SpecializedServiceController::class, 'show']);
     Route::post('appointment-requests', [AppointmentRequestController::class, 'store']);
+    
+    // Public booking request routes (EMS/Personal)
+    Route::post('booking-requests', [BookingRequestController::class, 'store']);
+    Route::get('booking-requests/instructors', [BookingRequestController::class, 'getAvailableInstructors']);
 
     // Public partner businesses routes
     Route::get('partners', [PartnerController::class, 'index']);
@@ -189,6 +216,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('specialized-services', SpecializedServiceController::class)->except(['show', 'index']);
     Route::get('admin/specialized-services', [SpecializedServiceController::class, 'adminIndex']);
     Route::apiResource('appointment-requests', AppointmentRequestController::class)->except(['store']);
+    
+    // Booking Request routes (EMS/Personal) - authenticated access
+    Route::get('booking-requests/my-requests', [BookingRequestController::class, 'userRequests']);
+    Route::get('booking-requests/{bookingRequest}', [BookingRequestController::class, 'show']);
+    Route::post('booking-requests/{bookingRequest}/cancel', [BookingRequestController::class, 'cancel']);
     
     // Referral routes
     Route::get('referral/data', [ReferralController::class, 'getUserReferralData']);
@@ -274,6 +306,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('admin/partner-offers/{offer}', [PartnerController::class, 'adminUpdateOffer']);
         Route::delete('admin/partner-offers/{offer}', [PartnerController::class, 'adminDeleteOffer']);
         Route::get('admin/partner-redemptions', [PartnerController::class, 'adminGetRedemptions']);
+        
+        // Admin Booking Request Management (EMS/Personal)
+        Route::get('admin/booking-requests', [BookingRequestController::class, 'index']);
+        Route::get('admin/booking-requests/statistics', [BookingRequestController::class, 'statistics']);
+        Route::post('admin/booking-requests/{bookingRequest}/confirm', [BookingRequestController::class, 'confirm']);
+        Route::post('admin/booking-requests/{bookingRequest}/reject', [BookingRequestController::class, 'reject']);
+        Route::post('admin/booking-requests/{bookingRequest}/complete', [BookingRequestController::class, 'markCompleted']);
     });
     
     // Referral Program Routes (authenticated access)
@@ -334,6 +373,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('signatures', [SignatureController::class, 'store']);
     Route::get('signatures/{id}', [SignatureController::class, 'show']);
     Route::get('users/{userId}/signatures', [SignatureController::class, 'userSignatures']);
+    Route::get('users/{id}/signatures', [SignatureController::class, 'getUserSignatures']); // Admin Panel endpoint
     
     Route::middleware(['role:admin'])->group(function () {
         Route::get('signatures', [SignatureController::class, 'index']);

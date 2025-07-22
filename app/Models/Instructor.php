@@ -55,4 +55,9 @@ class Instructor extends Model
     {
         return $this->hasMany(PayrollAgreement::class);
     }
+    
+    public function bookingRequests()
+    {
+        return $this->hasMany(BookingRequest::class);
+    }
 }
