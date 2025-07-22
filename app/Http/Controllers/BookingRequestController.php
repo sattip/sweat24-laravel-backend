@@ -65,7 +65,7 @@ class BookingRequestController extends Controller
             $validated['user_id'] = $user->id;
         }
 
-        $bookingRequest = DB::transaction(function () use ($validated) {
+        $bookingRequest = DB::transaction(function () use ($validated, $user) {
             $bookingRequest = BookingRequest::create($validated);
 
             // Log activity only if user is authenticated
