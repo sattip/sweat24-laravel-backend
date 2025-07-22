@@ -13,3 +13,6 @@ Schedule::command('packages:check-expiry')->dailyAt('09:00');
 
 // Schedule class evaluation emails daily at 10 AM
 Schedule::command('evaluations:send')->dailyAt('10:00');
+
+// Schedule data consistency check daily at 2 AM
+Schedule::command('data:check-consistency --fix')->dailyAt('02:00');

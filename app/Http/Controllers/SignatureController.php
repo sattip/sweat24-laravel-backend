@@ -28,7 +28,7 @@ class SignatureController extends Controller
             $signature = Signature::create([
                 'user_id' => $validated['user_id'],
                 'signature_data' => $validated['signature_data'],
-                'ip_address' => $request->ip(),
+                'ip_address' => $request->ip() ?: '127.0.0.1', // Fallback for testing
                 'signed_at' => now(),
                 'document_type' => $validated['document_type'] ?? 'terms_and_conditions',
                 'document_version' => $validated['document_version'] ?? '1.0',
@@ -64,6 +64,50 @@ class SignatureController extends Controller
             'user' => $user,
             'signatures' => $signatures
         ]);
+    }
+
+    /**
+     * Get signatures for a specific user (Admin Panel format)
+     */
+    public function getUserSignatures($id): JsonResponse
+    {
+        try {
+            $user = User::findOrFail($id);
+            
+            $signatures = $user->signatures()
+                ->orderBy('signed_at', 'desc')
+                ->get()
+                ->map(function ($signature) {
+                    return [
+                        'id' => $signature->id,
+                        'document_type' => $signature->document_type,
+                        'signed_at' => $signature->signed_at->toISOString(),
+                        'document_version' => $signature->document_version,
+                        'signature_data' => $signature->signature_data,
+                        'ip_address' => $signature->ip_address,
+                    ];
+                });
+
+            return response()->json([
+                'data' => [
+                    'signatures' => $signatures
+                ]
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'data' => [
+                    'signatures' => []
+                ]
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Σφάλμα κατά την ανάκτηση των υπογραφών',
+                'data' => [
+                    'signatures' => []
+                ]
+            ], 500);
+        }
     }
 
     /**

@@ -11,9 +11,14 @@ use App\Http\Controllers\WaitlistController;
 use App\Models\CancellationPolicy;
 use App\Models\BookingReschedule;
 use Carbon\Carbon;
+use App\Events\BookingCreated;
+use App\Events\BookingCancelled;
+use App\Traits\ApiResponseTrait;
 
 class BookingController extends Controller
 {
+    use ApiResponseTrait;
+    
     // Remove middleware for testing
     /**
      * Display a listing of the resource.
@@ -212,12 +217,7 @@ class BookingController extends Controller
                 'request_data' => $request->all(),
                 'errors' => $e->errors()
             ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-                'request_data' => $request->all()
-            ], 422);
+            return $this->validationErrorResponse($e->errors(), 'Validation failed');
         }
         
         // Try to detect the authenticated user using multiple methods
@@ -261,10 +261,7 @@ class BookingController extends Controller
                     'existing_booking_id' => $existingBooking->id
                 ]);
                 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Έχετε ήδη κράτηση για αυτό το μάθημα.'
-                ], 409); // 409 Conflict
+                return $this->conflictResponse('Έχετε ήδη κράτηση για αυτό το μάθημα.');
             }
         }
         
@@ -276,10 +273,7 @@ class BookingController extends Controller
                 ->exists();
             
             if (!$hasAvailableSessions) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Δεν έχετε διαθέσιμες συνεδρίες στο πακέτο σας.'
-                ], 403);
+                return $this->forbiddenResponse('Δεν έχετε διαθέσιμες συνεδρίες στο πακέτο σας.');
             }
         }
         
@@ -312,14 +306,17 @@ class BookingController extends Controller
                         $validated['status'] = 'waitlist';
                         $booking = Booking::create($validated);
                         
-                        return response()->json([
-                            'success' => true,
-                            'message' => 'Μπήκατε στη λίστα αναμονής. Θα ενημερωθείτε αυτόματα αν υπάρξει διαθέσιμη θέση.',
+                        // Dispatch BookingCreated event for waitlist booking too
+                        BookingCreated::dispatch($booking);
+                        
+                        return $this->createdResponse([
                             'booking' => $booking->load('user'),
                             'waitlist' => true
-                        ], 201);
+                        ], 'Μπήκατε στη λίστα αναμονής. Θα ενημερωθείτε αυτόματα αν υπάρξει διαθέσιμη θέση.');
                     }
-                    $gymClass->increment('current_participants');
+                    
+                    // Store the gym class for later update (after booking creation)
+                    $gymClassToUpdate = $gymClass;
                 }
             } catch (\Exception $e) {
                 // Continue without class validation if there's an error
@@ -328,31 +325,13 @@ class BookingController extends Controller
         
         $booking = Booking::create($validated);
         
-        // Deduct session from user's active package if booking is confirmed
-        if ($booking->status === 'confirmed' && $user) {
-            $activePackage = \App\Models\UserPackage::where('user_id', $user->id)
-                ->where('status', 'active')
-                ->where('remaining_sessions', '>', 0)
-                ->first();
-            
-            if ($activePackage) {
-                $activePackage->decrement('remaining_sessions');
-                
-                // Log the session usage
-                \Log::info('Session deducted for booking', [
-                    'booking_id' => $booking->id,
-                    'user_id' => $user->id,
-                    'package_id' => $activePackage->id,
-                    'remaining_sessions' => $activePackage->remaining_sessions
-                ]);
-            }
-        }
+        // Dispatch BookingCreated event (handles participants count & session deduction)
+        BookingCreated::dispatch($booking);
         
-        return response()->json([
-            'success' => true,
-            'message' => 'Η κράτηση πραγματοποιήθηκε επιτυχώς.',
-            'booking' => $booking->load('user')
-        ], 201);
+        return $this->createdResponse(
+            ['booking' => $booking->load('user')],
+            'Η κράτηση πραγματοποιήθηκε επιτυχώς.'
+        );
     }
 
     /**
@@ -422,11 +401,11 @@ class BookingController extends Controller
         }
         
         if ($userId && $booking->user_id != $userId) {
-            return response()->json(['message' => 'Unauthorized to cancel this booking'], 403);
+            return $this->forbiddenResponse('Unauthorized to cancel this booking');
         }
         
         if ($booking->status === 'cancelled') {
-            return response()->json(['message' => 'Booking already cancelled'], 400);
+            return $this->errorResponse('Booking already cancelled', 400);
         }
         
         $validated = $request->validate([
@@ -444,59 +423,33 @@ class BookingController extends Controller
                 'cancellation_reason' => $validated['cancellation_reason'] ?? null,
             ]);
             
-            // Refund session if booking was confirmed
-            if ($booking->status === 'confirmed' && $booking->user_id) {
-                $activePackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
-                    ->where('status', 'active')
-                    ->orderBy('expires_at', 'desc')
-                    ->first();
-                
-                if ($activePackage) {
-                    $activePackage->increment('remaining_sessions');
-                    
-                    \Log::info('Session refunded for cancelled booking', [
-                        'booking_id' => $booking->id,
-                        'user_id' => $booking->user_id,
-                        'package_id' => $activePackage->id,
-                        'remaining_sessions' => $activePackage->remaining_sessions
-                    ]);
-                }
-            }
+            // Dispatch BookingCancelled event (handles session refund & participants count)
+            BookingCancelled::dispatch($booking);
             
             // Log the cancellation activity
             // ActivityLogger::logBookingCancellation($booking);
             
-            // Update class participants count
+            // Process waitlist if there's now a spot available
             if ($booking->class_id) {
                 $gymClass = GymClass::find($booking->class_id);
-                if ($gymClass) {
-                    $gymClass->decrement('current_participants');
-                    
-                    // Process waitlist if there's now a spot available
-                    if ($gymClass->hasAvailableSpots()) {
-                        $waitlistController = new WaitlistController();
-                        $waitlistController->processNextInLine($gymClass);
-                    }
+                if ($gymClass && $gymClass->hasAvailableSpots()) {
+                    $waitlistController = new WaitlistController();
+                    $waitlistController->processNextInLine($gymClass);
                 }
             }
             
             DB::commit();
             
-            return response()->json([
-                'success' => true,
-                'message' => $penaltyAmount > 0 
-                    ? "Η κράτηση ακυρώθηκε με χρέωση {$penaltyAmount}%" 
-                    : 'Η κράτηση ακυρώθηκε επιτυχώς',
+            return $this->successResponse([
                 'booking' => $booking->load('user'),
                 'penalty_percentage' => $penaltyAmount
-            ]);
+            ], $penaltyAmount > 0 
+                ? "Η κράτηση ακυρώθηκε με χρέωση {$penaltyAmount}%" 
+                : 'Η κράτηση ακυρώθηκε επιτυχώς');
             
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Σφάλμα κατά την ακύρωση'
-            ], 500);
+            return $this->serverErrorResponse('Σφάλμα κατά την ακύρωση');
         }
     }
 }

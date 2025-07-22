@@ -37,6 +37,10 @@ class DatabaseSeeder extends Seeder
             ComprehensiveBookingsSeeder::class,
             ComprehensiveUserPackagesSeeder::class,
             
+            // Store & Products
+            ComprehensiveStoreProductsSeeder::class,
+            ComprehensiveCashRegisterSeeder::class,
+            
             // Advanced features
             CancellationPoliciesSeeder::class,
             ComprehensiveNotificationsSeeder::class,
@@ -70,6 +74,7 @@ class DatabaseSeeder extends Seeder
             'gym_classes' => \App\Models\GymClass::count(),
             'bookings' => \App\Models\Booking::count(),
             'user_packages' => \App\Models\UserPackage::count(),
+            'store_products' => \App\Models\StoreProduct::count(),
             'cancellation_policies' => \App\Models\CancellationPolicy::count(),
             'notifications' => \App\Models\Notification::count(),
             'class_evaluations' => \App\Models\ClassEvaluation::count(),

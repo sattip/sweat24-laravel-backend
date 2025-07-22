@@ -284,9 +284,16 @@ class CancellationPolicyController extends Controller
                     'time' => $newClass->time,
                 ]);
 
-                // Update class participants
-                $originalClass->decrement('current_participants');
-                $newClass->increment('current_participants');
+                // Update class participants - CALCULATE FROM LIVE DATA (NO MORE NEGATIVE COUNTS!)
+                $originalActualCount = Booking::where('class_id', $booking->class_id)
+                    ->whereNotIn('status', ['cancelled'])
+                    ->count();
+                $newActualCount = Booking::where('class_id', $validated['new_class_id'])
+                    ->whereNotIn('status', ['cancelled'])
+                    ->count();
+                
+                $originalClass->update(['current_participants' => $originalActualCount]);
+                $newClass->update(['current_participants' => $newActualCount]);
             }
 
             DB::commit();
@@ -376,9 +383,16 @@ class CancellationPolicyController extends Controller
                     'time' => $newClass->time,
                 ]);
 
-                // Update class participants
-                $originalClass->decrement('current_participants');
-                $newClass->increment('current_participants');
+                // Update class participants - CALCULATE FROM LIVE DATA (NO MORE NEGATIVE COUNTS!)
+                $originalActualCount = Booking::where('class_id', $reschedule->original_class_id)
+                    ->whereNotIn('status', ['cancelled'])
+                    ->count();
+                $newActualCount = Booking::where('class_id', $reschedule->new_class_id)
+                    ->whereNotIn('status', ['cancelled'])
+                    ->count();
+                
+                $originalClass->update(['current_participants' => $originalActualCount]);
+                $newClass->update(['current_participants' => $newActualCount]);
             }
 
             DB::commit();

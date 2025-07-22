@@ -26,6 +26,20 @@ class AuthController extends Controller
             ]);
         }
 
+        // Check if user is still pending approval
+        if ($user->status === 'pending_approval') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
+            ]);
+        }
+
+        // Check if user is inactive
+        if ($user->status === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
+            ]);
+        }
+
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -43,9 +57,12 @@ class AuthController extends Controller
                 'role' => $user->role,
                 'phone' => $user->phone,
                 'status' => $user->status,
+                'registration_status' => $user->registration_status,
                 'remaining_sessions' => $user->remaining_sessions,
                 'join_date' => $user->join_date,
                 'last_visit' => $user->last_visit,
+                'has_signed_terms' => $user->signatures()->where('document_type', 'terms_and_conditions')->exists(),
+                'terms_accepted_at' => $user->terms_accepted_at,
             ],
             'token' => $token,
         ]);
@@ -123,9 +140,12 @@ class AuthController extends Controller
                 'role' => $user->role,
                 'phone' => $user->phone,
                 'status' => $user->status,
+                'registration_status' => $user->registration_status,
                 'remaining_sessions' => $user->remaining_sessions,
                 'join_date' => $user->join_date,
                 'last_visit' => $user->last_visit,
+                'has_signed_terms' => $user->signatures()->where('document_type', 'terms_and_conditions')->exists(),
+                'terms_accepted_at' => $user->terms_accepted_at,
             ],
         ]);
     }
@@ -146,25 +166,30 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'membership_type' => $request->membership_type ?? 'Basic',
+            'role' => 'member',
             'join_date' => now(),
-            'status' => 'active',
+            'status' => 'pending_approval',
+            'registration_status' => 'pending_approval',
+            'remaining_sessions' => 0,
+            'total_sessions' => 0,
         ]);
 
         // Log the registration activity
         ActivityLogger::logRegistration($user);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
-
+        // Don't provide auth token for pending approval users
         return response()->json([
             'success' => true,
-            'message' => 'Registration successful',
+            'message' => 'Η εγγραφή σας υποβλήθηκε επιτυχώς. Περιμένετε την έγκριση από τον διαχειριστή.',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'membership_type' => $user->membership_type,
+                'registration_status' => $user->registration_status,
+                'status' => $user->status,
+                'next_step' => 'Waiting for admin approval',
             ],
-            'token' => $token,
         ], 201);
     }
 }
