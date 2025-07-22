@@ -16,8 +16,7 @@ class BookingRequest extends Model
         'client_name',
         'client_email',
         'client_phone',
-        'preferred_dates',
-        'preferred_times',
+        'preferred_time_slots',
         'notes',
         'status',
         'admin_notes',
@@ -29,8 +28,7 @@ class BookingRequest extends Model
     ];
 
     protected $casts = [
-        'preferred_dates' => 'array',
-        'preferred_times' => 'array',
+        'preferred_time_slots' => 'array',
         'confirmed_date' => 'date',
         'processed_at' => 'datetime',
     ];

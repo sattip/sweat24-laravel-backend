@@ -52,10 +52,10 @@ class BookingRequestController extends Controller
             'client_name' => 'required|string|max:255',
             'client_email' => 'required|email|max:255',
             'client_phone' => 'required|string|max:20',
-            'preferred_dates' => 'required|array|min:1|max:3',
-            'preferred_dates.*' => 'required|date|after:today',
-            'preferred_times' => 'required|array|min:1|max:3',
-            'preferred_times.*' => 'required|string|in:morning,afternoon,evening',
+            'preferred_time_slots' => 'required|array|min:1|max:3',
+            'preferred_time_slots.*.date' => 'required|date|after:today',
+            'preferred_time_slots.*.start_time' => 'required|date_format:H:i',
+            'preferred_time_slots.*.end_time' => 'required|date_format:H:i|after:preferred_time_slots.*.start_time',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -75,10 +75,11 @@ class BookingRequestController extends Controller
                     'action' => 'created',
                     'model_type' => BookingRequest::class,
                     'model_id' => $bookingRequest->id,
-                    'properties' => [
-                        'service_type' => $bookingRequest->service_type,
-                        'client_name' => $bookingRequest->client_name,
-                    ],
+                                    'properties' => [
+                    'service_type' => $bookingRequest->service_type,
+                    'client_name' => $bookingRequest->client_name,
+                    'time_slots_count' => count($bookingRequest->preferred_time_slots ?? []),
+                ],
                     'ip_address' => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ]);
