@@ -192,6 +192,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Bookings (authenticated routes)
     Route::apiResource('bookings', BookingController::class)->except(['index', 'store']);
     
+    // Booking Requests (authenticated routes)
+    Route::get('booking-requests/my-requests', [BookingRequestController::class, 'userRequests']);
+    Route::get('booking-requests/{bookingRequest}', [BookingRequestController::class, 'show']);
+    Route::post('booking-requests/{bookingRequest}/cancel', [BookingRequestController::class, 'cancel']);
+    Route::post('booking-requests', [BookingRequestController::class, 'store']); // Also allow authenticated submission
+    
     // User Packages (Package Lifecycle Management)
     Route::prefix('user-packages')->group(function () {
         Route::get('/', [UserPackageController::class, 'index']);
@@ -218,10 +224,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('admin/specialized-services', [SpecializedServiceController::class, 'adminIndex']);
     Route::apiResource('appointment-requests', AppointmentRequestController::class)->except(['store', 'index']); // index moved to public routes
     
-    // Booking Request routes (EMS/Personal) - authenticated access
-    Route::get('booking-requests/my-requests', [BookingRequestController::class, 'userRequests']);
-    Route::get('booking-requests/{bookingRequest}', [BookingRequestController::class, 'show']);
-    Route::post('booking-requests/{bookingRequest}/cancel', [BookingRequestController::class, 'cancel']);
+    // Booking Request routes moved up in this file
     
     // Referral routes
     Route::get('referral/data', [ReferralController::class, 'getUserReferralData']);
