@@ -8,6 +8,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Notification extends Model
 {
+    // Notification type constants
+    const TYPE_INFO = 'info';
+    const TYPE_WARNING = 'warning';
+    const TYPE_SUCCESS = 'success';
+    const TYPE_ERROR = 'error';
+    const TYPE_OFFER = 'offer';           // Προσφορά
+    const TYPE_PARTY_EVENT = 'party_event'; // Πάρτι/Εκδήλωση
+    
+    // Priority constants
+    const PRIORITY_LOW = 'low';
+    const PRIORITY_MEDIUM = 'medium';
+    const PRIORITY_HIGH = 'high';
+
     protected $fillable = [
         'title',
         'message',
@@ -30,6 +43,51 @@ class Notification extends Model
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
     ];
+
+    /**
+     * Get all available notification types
+     */
+    public static function getTypes(): array
+    {
+        return [
+            self::TYPE_INFO => 'Πληροφορία',
+            self::TYPE_WARNING => 'Προειδοποίηση',
+            self::TYPE_SUCCESS => 'Επιτυχία',
+            self::TYPE_ERROR => 'Σφάλμα',
+            self::TYPE_OFFER => 'Προσφορά',
+            self::TYPE_PARTY_EVENT => 'Πάρτι/Εκδήλωση',
+        ];
+    }
+
+    /**
+     * Get notification type icons
+     */
+    public static function getTypeIcons(): array
+    {
+        return [
+            self::TYPE_INFO => 'info-circle',
+            self::TYPE_WARNING => 'exclamation-triangle',
+            self::TYPE_SUCCESS => 'check-circle',
+            self::TYPE_ERROR => 'times-circle',
+            self::TYPE_OFFER => 'tag',
+            self::TYPE_PARTY_EVENT => 'calendar-star',
+        ];
+    }
+
+    /**
+     * Get notification type colors
+     */
+    public static function getTypeColors(): array
+    {
+        return [
+            self::TYPE_INFO => 'blue',
+            self::TYPE_WARNING => 'yellow',
+            self::TYPE_SUCCESS => 'green',
+            self::TYPE_ERROR => 'red',
+            self::TYPE_OFFER => 'purple',
+            self::TYPE_PARTY_EVENT => 'pink',
+        ];
+    }
 
     /**
      * Get the user who created the notification.
@@ -80,6 +138,14 @@ class Notification extends Model
     }
 
     /**
+     * Scope by notification type
+     */
+    public function scopeByType($query, $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    /**
      * Check if notification is scheduled.
      */
     public function isScheduled(): bool
@@ -88,14 +154,42 @@ class Notification extends Model
     }
 
     /**
-     * Check if notification is ready to send.
+     * Check if notification is an offer
      */
-    public function isReadyToSend(): bool
+    public function isOffer(): bool
     {
-        if ($this->status !== 'scheduled') {
-            return false;
-        }
+        return $this->type === self::TYPE_OFFER;
+    }
 
-        return $this->scheduled_at <= now();
+    /**
+     * Check if notification is a party/event
+     */
+    public function isPartyEvent(): bool
+    {
+        return $this->type === self::TYPE_PARTY_EVENT;
+    }
+
+    /**
+     * Get the notification type label
+     */
+    public function getTypeLabel(): string
+    {
+        return self::getTypes()[$this->type] ?? 'Άγνωστος';
+    }
+
+    /**
+     * Get the notification type icon
+     */
+    public function getTypeIcon(): string
+    {
+        return self::getTypeIcons()[$this->type] ?? 'bell';
+    }
+
+    /**
+     * Get the notification type color
+     */
+    public function getTypeColor(): string
+    {
+        return self::getTypeColors()[$this->type] ?? 'gray';
     }
 }

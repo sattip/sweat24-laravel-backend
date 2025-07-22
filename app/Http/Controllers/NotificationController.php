@@ -64,7 +64,7 @@ class NotificationController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'message' => 'required|string',
-            'type' => 'in:info,warning,success,error',
+            'type' => 'in:info,warning,success,error,offer,party_event',
             'priority' => 'in:low,medium,high',
             'channels' => 'array',
             'channels.*' => 'in:in_app,email,sms',
@@ -102,7 +102,7 @@ class NotificationController extends Controller
         $validated = $request->validate([
             'title' => 'string|max:255',
             'message' => 'string',
-            'type' => 'in:info,warning,success,error',
+            'type' => 'in:info,warning,success,error,offer,party_event',
             'priority' => 'in:low,medium,high',
             'channels' => 'array',
             'channels.*' => 'in:in_app,email,sms',
@@ -230,7 +230,19 @@ class NotificationController extends Controller
     }
 
     /**
-     * Get notification statistics for dashboard.
+     * Get available notification types with their metadata
+     */
+    public function getTypes(): JsonResponse
+    {
+        return response()->json([
+            'types' => Notification::getTypes(),
+            'icons' => Notification::getTypeIcons(),
+            'colors' => Notification::getTypeColors(),
+        ]);
+    }
+
+    /**
+     * Get notification statistics for admin dashboard.
      */
     public function statistics(): JsonResponse
     {
@@ -238,7 +250,9 @@ class NotificationController extends Controller
             'total_sent' => Notification::sent()->count(),
             'total_scheduled' => Notification::where('status', 'scheduled')->count(),
             'total_draft' => Notification::where('status', 'draft')->count(),
-            'sent_today' => Notification::sent()->whereDate('sent_at', today())->count(),
+            'sent_today' => Notification::sent()
+                ->whereDate('sent_at', today())
+                ->count(),
             'average_read_rate' => Notification::sent()
                 ->where('delivered_count', '>', 0)
                 ->selectRaw('AVG(read_count * 100.0 / delivered_count) as avg_rate')

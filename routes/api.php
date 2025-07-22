@@ -393,6 +393,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('notifications/{notification}/send', [NotificationController::class, 'send']);
         Route::post('notifications/preview-recipients', [NotificationController::class, 'previewRecipients']);
         Route::get('notifications/statistics', [NotificationController::class, 'statistics']);
+        Route::get('notifications/types', [NotificationController::class, 'getTypes']);
         
         // Notification filters
         Route::apiResource('notification-filters', NotificationFilterController::class);
