@@ -1,16 +1,17 @@
 import './bootstrap';
-import { createApp } from 'vue';
 
-// Client Components
-import ClientDashboard from './components/client/ClientDashboard.vue';
-import ProfileEdit from './components/client/ProfileEdit.vue';
-import BookingManagement from './components/client/BookingManagement.vue';
+// Simple app.js for Laravel API backend
+console.log('Laravel API Backend Ready');
 
-const app = createApp({});
-
-// Register client components
-app.component('client-dashboard', ClientDashboard);
-app.component('profile-edit', ProfileEdit);
-app.component('booking-management', BookingManagement);
-
-app.mount('#app');
+// If you need Echo for WebSocket connections, uncomment below:
+// import Echo from 'laravel-echo';
+// import Pusher from 'pusher-js';
+// window.Pusher = Pusher;
+// 
+// window.Echo = new Echo({
+//     broadcaster: 'reverb',
+//     key: import.meta.env.VITE_REVERB_APP_KEY,
+//     wsHost: import.meta.env.VITE_REVERB_HOST,
+//     wsPort: import.meta.env.VITE_REVERB_PORT,
+//     forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
+// });
