@@ -11,6 +11,7 @@ use App\Events\UserNearSessionsEnd;
 use App\Events\ChatMessageReceived;
 use App\Events\EventCreated;
 use App\Events\BookingRequestStatusChanged;
+use App\Events\WaitlistSpotAvailable;
 use App\Listeners\UpdateClassParticipants;
 use App\Listeners\ProcessSessionDeduction;
 use App\Listeners\SendOrderReadyNotification;
@@ -18,6 +19,7 @@ use App\Listeners\SendSessionsEndingNotification;
 use App\Listeners\SendChatMessageNotification;
 use App\Listeners\SendNewEventNotification;
 use App\Listeners\SendBookingRequestStatusNotification;
+use App\Listeners\SendWaitlistSpotNotification;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -47,6 +49,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         BookingRequestStatusChanged::class => [
             SendBookingRequestStatusNotification::class,
+        ],
+        WaitlistSpotAvailable::class => [
+            SendWaitlistSpotNotification::class,
         ],
     ];
 

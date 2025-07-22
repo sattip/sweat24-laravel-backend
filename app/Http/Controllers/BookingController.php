@@ -306,6 +306,20 @@ class BookingController extends Controller
                         $validated['status'] = 'waitlist';
                         $booking = Booking::create($validated);
                         
+                        // ΔΙΟΡΘΩΣΗ: Προσθήκη στον class_waitlists πίνακα επίσης
+                        if ($user) {
+                            // Get next position in waitlist
+                            $lastPosition = \App\Models\ClassWaitlist::where('class_id', $gymClass->id)
+                                ->max('position') ?? 0;
+                            
+                            \App\Models\ClassWaitlist::create([
+                                'class_id' => $gymClass->id,
+                                'user_id' => $user->id,
+                                'position' => $lastPosition + 1,
+                                'status' => 'waiting'
+                            ]);
+                        }
+                        
                         // Dispatch BookingCreated event for waitlist booking too
                         BookingCreated::dispatch($booking);
                         

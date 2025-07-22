@@ -191,16 +191,59 @@ class WaitlistController extends Controller
             return null;
         }
         
-        // Update waitlist entry
-        $nextUser->update([
-            'status' => 'notified',
-            'notified_at' => now(),
-            'expires_at' => now()->addHours(2) // 2 hours to confirm
-        ]);
-        
-        // TODO: Send notification to user (email/push)
-        // This would be implemented with your notification system
-        
-        return $nextUser;
+        DB::beginTransaction();
+        try {
+            // Update waitlist entry
+            $nextUser->update([
+                'status' => 'notified',
+                'notified_at' => now(),
+                'expires_at' => now()->addHours(2) // 2 hours to confirm
+            ]);
+            
+            // ΔΙΟΡΘΩΣΗ: Ενημερώνουμε και το waitlist booking στον bookings πίνακα
+            $waitlistBooking = \App\Models\Booking::where('class_id', $class->id)
+                ->where('user_id', $nextUser->user_id)
+                ->where('status', 'waitlist')
+                ->first();
+                
+            if ($waitlistBooking) {
+                // Μετατρέπουμε το waitlist booking σε confirmed
+                $waitlistBooking->update(['status' => 'confirmed']);
+                
+                // Ενημερώνουμε τους συμμετέχοντες της τάξης
+                $confirmedCount = \App\Models\Booking::where('class_id', $class->id)
+                    ->whereNotIn('status', ['cancelled', 'waitlist'])
+                    ->count();
+                $class->update(['current_participants' => $confirmedCount]);
+                
+                // Αφαιρούμε από το waitlist
+                $nextUser->delete();
+                
+                // Ενημερώνουμε τις θέσεις των υπολοίπων
+                ClassWaitlist::where('class_id', $class->id)
+                    ->where('position', '>', $nextUser->position)
+                    ->decrement('position');
+                
+                // ΔΙΟΡΘΩΣΗ: Εκπέμπουμε event για notification
+                \App\Events\WaitlistSpotAvailable::dispatch(
+                    $nextUser->user, 
+                    $class, 
+                    $waitlistBooking, 
+                    now()->addHours(2)
+                );
+            }
+            
+            DB::commit();
+            
+            // TODO: Send notification to user (email/push)
+            // This would be implemented with your notification system
+            
+            return $nextUser;
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            \Log::error('Error processing waitlist: ' . $e->getMessage());
+            return null;
+        }
     }
 }
