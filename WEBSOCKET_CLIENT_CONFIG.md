@@ -15,7 +15,7 @@ npm install laravel-echo pusher-js
 ```env
 VITE_REVERB_APP_KEY=sweat24appkey
 VITE_REVERB_HOST=sweat93laravel.obs.com.gr
-VITE_REVERB_PORT=8080
+VITE_REVERB_PORT=443
 VITE_REVERB_SCHEME=https
 ```
 
@@ -33,8 +33,8 @@ export const echo = new Echo({
     broadcaster: 'reverb',
     key: import.meta.env.VITE_REVERB_APP_KEY,
     wsHost: import.meta.env.VITE_REVERB_HOST,
-    wsPort: import.meta.env.VITE_REVERB_PORT,
-    forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
+    wsPort: import.meta.env.VITE_REVERB_PORT || 443,
+    forceTLS: true,
     enabledTransports: ['ws', 'wss'],
     authorizer: (channel, options) => {
         return {
@@ -177,10 +177,10 @@ function cleanupWebSocket() {
 
 ## 6. Notification History API Endpoint
 
-Το endpoint για το ιστορικό των notifications:
+**ΣΗΜΑΝΤΙΚΟ**: Το σωστό endpoint για το ιστορικό των notifications είναι:
 
 ```
-GET /api/v1/notifications
+GET /api/v1/notifications/user
 ```
 
 Headers:
@@ -230,12 +230,20 @@ Response:
 ## 7. Mark Notifications as Read
 
 ```
-PATCH /api/v1/notifications/{notification}/read
+POST /api/v1/notifications/{recipient}/read
 ```
 
 Headers:
 ```
 Authorization: Bearer {user_token}
+Content-Type: application/json
+```
+
+Body:
+```json
+{
+    "notification_id": "notification-uuid"
+}
 ```
 
 Response:
@@ -266,6 +274,10 @@ location /app {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_connect_timeout 60s;
+    proxy_buffering off;
 }
 ```
 
