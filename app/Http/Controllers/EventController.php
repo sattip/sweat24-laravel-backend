@@ -53,6 +53,9 @@ class EventController extends Controller
 
         $event = Event::create($validated);
         
+        // Dispatch event for push notification to all members
+        \App\Events\EventCreated::dispatch($event);
+        
         return response()->json($event, 201);
     }
 

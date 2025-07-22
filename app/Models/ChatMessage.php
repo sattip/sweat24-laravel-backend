@@ -46,8 +46,19 @@ class ChatMessage extends Model
             // Update unread counts
             if ($message->sender_type === 'user') {
                 $message->conversation->increment('admin_unread_count');
+                
+                // Send notification to admins
+                $admins = \App\Models\User::where('role', 'admin')->get();
+                foreach ($admins as $admin) {
+                    \App\Events\ChatMessageReceived::dispatch($message, $admin, false);
+                }
             } else {
                 $message->conversation->increment('unread_count');
+                
+                // Send notification to user
+                if ($message->conversation->user) {
+                    \App\Events\ChatMessageReceived::dispatch($message, $message->conversation->user, true);
+                }
             }
         });
     }

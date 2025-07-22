@@ -42,11 +42,22 @@ class ProcessSessionDeduction
         if ($activePackage && $activePackage->remaining_sessions > 0) {
             $activePackage->decrement('remaining_sessions');
             
+            // Check if user is near to end of sessions (2 or 1 sessions left after deduction)
+            $remainingSessions = $activePackage->fresh()->remaining_sessions;
+            if ($remainingSessions <= 2 && $remainingSessions > 0) {
+                // Dispatch event for sessions ending notification
+                \App\Events\UserNearSessionsEnd::dispatch(
+                    $booking->user, 
+                    $activePackage->fresh(), 
+                    $remainingSessions
+                );
+            }
+            
             Log::info('Session deducted for booking', [
                 'booking_id' => $booking->id,
                 'user_id' => $booking->user_id,
                 'package_id' => $activePackage->id,
-                'remaining_sessions' => $activePackage->remaining_sessions - 1,
+                'remaining_sessions' => $remainingSessions,
             ]);
         }
     }

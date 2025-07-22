@@ -169,22 +169,8 @@ class OrderController extends Controller
             case 'ready_for_pickup':
                 $order->markAsReady();
                 
-                // Create notification for customer
-                $notification = Notification::create([
-                    'title' => 'Παραγγελία Έτοιμη!',
-                    'message' => "Η παραγγελία σας #{$order->order_number} είναι έτοιμη για παραλαβή από το γυμναστήριο!",
-                    'type' => 'order_ready',
-                    'priority' => 'high',
-                    'sender_id' => auth()->id(),
-                    'sender_type' => 'admin'
-                ]);
-                
-                // Create recipient
-                NotificationRecipient::create([
-                    'notification_id' => $notification->id,
-                    'user_id' => $order->user_id,
-                    'delivered_at' => now()
-                ]);
+                // Dispatch event for push notification
+                \App\Events\OrderReadyForPickup::dispatch($order);
                 break;
 
             case 'completed':

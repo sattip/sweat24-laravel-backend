@@ -145,6 +145,8 @@ class BookingRequestController extends Controller
         ]);
 
         DB::transaction(function () use ($bookingRequest, $validated) {
+            $previousStatus = $bookingRequest->status;
+            
             $bookingRequest->confirm(
                 $validated['confirmed_date'],
                 $validated['confirmed_time'],
@@ -165,7 +167,8 @@ class BookingRequestController extends Controller
                 ],
             ]);
 
-            // TODO: Send notification email to client
+            // Dispatch event for push notification
+            \App\Events\BookingRequestStatusChanged::dispatch($bookingRequest, $previousStatus, 'confirmed');
         });
 
         return response()->json([
@@ -189,6 +192,8 @@ class BookingRequestController extends Controller
         ]);
 
         DB::transaction(function () use ($bookingRequest, $validated) {
+            $previousStatus = $bookingRequest->status;
+            
             $bookingRequest->reject(
                 $validated['rejection_reason'],
                 $validated['admin_notes'] ?? null
@@ -206,7 +211,8 @@ class BookingRequestController extends Controller
                 ],
             ]);
 
-            // TODO: Send notification email to client
+            // Dispatch event for push notification
+            \App\Events\BookingRequestStatusChanged::dispatch($bookingRequest, $previousStatus, 'rejected');
         });
 
         return response()->json([
