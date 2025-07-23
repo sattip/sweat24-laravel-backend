@@ -15,6 +15,7 @@ class Notification extends Model
     const TYPE_ERROR = 'error';
     const TYPE_OFFER = 'offer';           // Προσφορά
     const TYPE_PARTY_EVENT = 'party_event'; // Πάρτι/Εκδήλωση
+    const TYPE_ORDER_STATUS = 'order_status'; // Κατάσταση Παραγγελίας
     
     // Priority constants
     const PRIORITY_LOW = 'low';
@@ -56,6 +57,7 @@ class Notification extends Model
             self::TYPE_ERROR => 'Σφάλμα',
             self::TYPE_OFFER => 'Προσφορά',
             self::TYPE_PARTY_EVENT => 'Πάρτι/Εκδήλωση',
+            self::TYPE_ORDER_STATUS => 'Κατάσταση Παραγγελίας',
         ];
     }
 
@@ -71,6 +73,7 @@ class Notification extends Model
             self::TYPE_ERROR => 'times-circle',
             self::TYPE_OFFER => 'tag',
             self::TYPE_PARTY_EVENT => 'calendar-star',
+            self::TYPE_ORDER_STATUS => 'shopping-bag',
         ];
     }
 
@@ -86,6 +89,7 @@ class Notification extends Model
             self::TYPE_ERROR => 'red',
             self::TYPE_OFFER => 'purple',
             self::TYPE_PARTY_EVENT => 'pink',
+            self::TYPE_ORDER_STATUS => 'orange',
         ];
     }
 

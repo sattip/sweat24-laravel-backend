@@ -133,6 +133,15 @@ class UserPackageController extends Controller
             $this->notificationService->sendPackagePurchaseNotification($userPackage);
         });
 
+        // Dispatch payment event for loyalty points (outside transaction)
+        \App\Events\PaymentProcessed::dispatch(
+            $user,
+            $package->price,
+            "Πληρωμή πακέτου: {$package->name}",
+            $userPackage,
+            $request->get('payment_method', 'cash')
+        );
+
         return response()->json([
             'message' => 'Package assigned successfully',
             'user_package' => $userPackage->load(['user', 'package']),

@@ -125,6 +125,9 @@ Route::prefix('v1')->group(function () {
     // Public order routes (for checkout without authentication)
     Route::post('orders', [\App\Http\Controllers\OrderController::class, 'store']);
 
+    // Order history endpoint (accessible with user_id parameter or auth token)
+    Route::get('orders/history', [\App\Http\Controllers\OrderController::class, 'orderHistory']);
+
     // Public specialized services routes
     Route::get('specialized-services', [SpecializedServiceController::class, 'index']);
     Route::get('specialized-services/{specializedService}', [SpecializedServiceController::class, 'show']);
@@ -507,4 +510,70 @@ Route::prefix('v1/chat')->middleware('auth:sanctum')->group(function () {
     Route::get('/conversation', [ChatController::class, 'getConversation']);
     Route::post('/messages', [ChatController::class, 'sendMessage']);
     Route::put('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
+});
+
+// ============ LOYALTY SYSTEM ROUTES ============
+
+// Admin Loyalty Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(function () {
+    // Loyalty Rewards CRUD
+    Route::apiResource('loyalty-rewards', \App\Http\Controllers\Api\LoyaltyRewardController::class);
+    Route::post('loyalty-rewards/{loyaltyReward}/toggle-status', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'toggleStatus']);
+    Route::get('loyalty-rewards/{loyaltyReward}/redemptions', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'redemptions']);
+    
+    // Loyalty Statistics
+    Route::get('loyalty/stats', [\App\Http\Controllers\Api\LoyaltyController::class, 'stats']);
+});
+
+// User Loyalty Routes (Protected)
+Route::middleware(['auth:sanctum'])->prefix('v1/loyalty')->group(function () {
+    // Dashboard & Balance
+    Route::get('dashboard', [\App\Http\Controllers\Api\LoyaltyController::class, 'dashboard']);
+    Route::get('points/history', [\App\Http\Controllers\Api\LoyaltyController::class, 'pointsHistory']);
+    
+    // Available Rewards & Redemption
+    Route::get('rewards/available', [\App\Http\Controllers\Api\LoyaltyController::class, 'availableRewards']);
+    Route::post('rewards/{loyaltyReward}/redeem', [\App\Http\Controllers\Api\LoyaltyController::class, 'redeemReward']);
+    
+    // My Redemptions
+    Route::get('redemptions', [\App\Http\Controllers\Api\LoyaltyController::class, 'myRedemptions']);
+    Route::get('redemptions/{redemptionCode}/check', [\App\Http\Controllers\Api\LoyaltyController::class, 'checkRedemption']);
+});
+
+// ============ REFERRAL SYSTEM ROUTES ============
+
+// Admin Referral Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(function () {
+    // Referral Reward Tiers CRUD
+    Route::apiResource('referral-reward-tiers', \App\Http\Controllers\Api\ReferralRewardTierController::class);
+    Route::post('referral-reward-tiers/{referralRewardTier}/toggle-status', [\App\Http\Controllers\Api\ReferralRewardTierController::class, 'toggleStatus']);
+    
+    // Enhanced Referral Management (extending existing)
+    Route::get('referral-stats', [ReferralController::class, 'adminGetStats']);
+});
+
+// User Referral Routes (extending existing)
+Route::middleware(['auth:sanctum'])->prefix('v1/referrals')->group(function () {
+    // Enhanced referral dashboard
+    Route::get('dashboard', [ReferralController::class, 'enhancedDashboard']);
+    Route::get('available-tiers', [ReferralController::class, 'getAvailableTiers']);
+});
+
+// ============ ENHANCED STATISTICS ROUTES ============
+
+// Admin Statistics (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/statistics')->group(function () {
+    // Dashboard overview
+    Route::get('dashboard', [\App\Http\Controllers\Api\StatisticsController::class, 'dashboard']);
+    
+    // Booking type statistics
+    Route::get('booking-types', [\App\Http\Controllers\Api\StatisticsController::class, 'bookingTypes']);
+    Route::get('monthly-trends', [\App\Http\Controllers\Api\StatisticsController::class, 'monthlyTrends']);
+    
+    // Reward system statistics
+    Route::get('loyalty-program', [\App\Http\Controllers\Api\StatisticsController::class, 'loyaltyProgram']);
+    Route::get('referral-program', [\App\Http\Controllers\Api\StatisticsController::class, 'referralProgram']);
+    
+    // Export functionality
+    Route::get('export', [\App\Http\Controllers\Api\StatisticsController::class, 'export']);
 });

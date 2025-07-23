@@ -191,6 +191,9 @@ class WaitlistController extends Controller
             return null;
         }
         
+        // Store data before transaction for event dispatch
+        $eventData = null;
+        
         DB::beginTransaction();
         try {
             // Update waitlist entry
@@ -224,19 +227,26 @@ class WaitlistController extends Controller
                     ->where('position', '>', $nextUser->position)
                     ->decrement('position');
                 
-                // ΔΙΟΡΘΩΣΗ: Εκπέμπουμε event για notification
-                \App\Events\WaitlistSpotAvailable::dispatch(
-                    $nextUser->user, 
-                    $class, 
-                    $waitlistBooking, 
-                    now()->addHours(2)
-                );
+                // Prepare event data for dispatch after transaction
+                $eventData = [
+                    'user' => $nextUser->user,
+                    'class' => $class,
+                    'booking' => $waitlistBooking->fresh(), // Fresh copy after update
+                    'expires_at' => now()->addHours(2)
+                ];
             }
             
             DB::commit();
             
-            // TODO: Send notification to user (email/push)
-            // This would be implemented with your notification system
+            // ΔΙΟΡΘΩΣΗ: Εκπέμπουμε event ΕΚΤΟΣ transaction για να αποφύγουμε duplicates
+            if ($eventData) {
+                \App\Events\WaitlistSpotAvailable::dispatch(
+                    $eventData['user'], 
+                    $eventData['class'], 
+                    $eventData['booking'], 
+                    $eventData['expires_at']
+                );
+            }
             
             return $nextUser;
             

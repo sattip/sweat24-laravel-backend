@@ -20,6 +20,7 @@ class Booking extends Model
         'time',
         'status',
         'type',
+        'booking_type',
         'attended',
         'booking_time',
         'location',

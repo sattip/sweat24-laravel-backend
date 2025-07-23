@@ -204,4 +204,75 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'approved_by');
     }
+    
+    // ============ LOYALTY SYSTEM RELATIONSHIPS ============
+    
+    /**
+     * Λίστα πόντων του χρήστη
+     */
+    public function loyaltyPoints()
+    {
+        return $this->hasMany(LoyaltyPoint::class);
+    }
+    
+    /**
+     * Εξαργυρώσεις loyalty rewards
+     */
+    public function loyaltyRedemptions()
+    {
+        return $this->hasMany(LoyaltyRedemption::class);
+    }
+    
+    /**
+     * Υπολογισμός τρέχοντος υπολοίπου πόντων
+     */
+    public function getLoyaltyPointsBalanceAttribute()
+    {
+        return $this->loyaltyPoints()
+                   ->where(function($query) {
+                       $query->whereNull('expires_at')
+                             ->orWhere('expires_at', '>', now());
+                   })
+                   ->sum('amount');
+    }
+    
+    /**
+     * Πόντοι που λήγουν σύντομα
+     */
+    public function getExpiringPointsAttribute()
+    {
+        return $this->loyaltyPoints()
+                   ->where('type', 'earned')
+                   ->where('expires_at', '<=', now()->addDays(30))
+                   ->where('expires_at', '>', now())
+                   ->sum('amount');
+    }
+    
+    /**
+     * Προσθήκη πόντων στον χρήστη
+     */
+    public function addLoyaltyPoints($amount, $description, $source = 'manual', $reference = null, $expiresAt = null)
+    {
+        $currentBalance = $this->loyalty_points_balance;
+        $newBalance = $currentBalance + $amount;
+        
+        return $this->loyaltyPoints()->create([
+            'amount' => $amount,
+            'type' => $amount > 0 ? 'earned' : 'redeemed',
+            'source' => $source,
+            'description' => $description,
+            'reference_type' => $reference ? get_class($reference) : null,
+            'reference_id' => $reference?->id,
+            'balance_after' => $newBalance,
+            'expires_at' => $expiresAt,
+        ]);
+    }
+    
+    /**
+     * Έλεγχος αν ο χρήστης έχει αρκετούς πόντους
+     */
+    public function hasEnoughLoyaltyPoints($amount)
+    {
+        return $this->loyalty_points_balance >= $amount;
+    }
 }

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Event;
 use App\Events\BookingCreated;
 use App\Events\BookingCancelled;
 use App\Events\OrderReadyForPickup;
+use App\Events\OrderStatusChanged;
 use App\Events\UserNearSessionsEnd;
 use App\Events\ChatMessageReceived;
 use App\Events\EventCreated;
@@ -15,6 +16,7 @@ use App\Events\WaitlistSpotAvailable;
 use App\Listeners\UpdateClassParticipants;
 use App\Listeners\ProcessSessionDeduction;
 use App\Listeners\SendOrderReadyNotification;
+use App\Listeners\SendOrderStatusNotification;
 use App\Listeners\SendSessionsEndingNotification;
 use App\Listeners\SendChatMessageNotification;
 use App\Listeners\SendNewEventNotification;
@@ -34,10 +36,15 @@ class EventServiceProvider extends ServiceProvider
             ProcessSessionDeduction::class,
         ],
         
-        // New push notification events
+        // Order notification events
         OrderReadyForPickup::class => [
             SendOrderReadyNotification::class,
         ],
+        OrderStatusChanged::class => [
+            SendOrderStatusNotification::class,
+        ],
+        
+        // Other push notification events
         UserNearSessionsEnd::class => [
             SendSessionsEndingNotification::class,
         ],
@@ -52,6 +59,11 @@ class EventServiceProvider extends ServiceProvider
         ],
         WaitlistSpotAvailable::class => [
             SendWaitlistSpotNotification::class,
+        ],
+        
+        // Loyalty System Events
+        \App\Events\PaymentProcessed::class => [
+            \App\Listeners\ProcessLoyaltyPoints::class,
         ],
     ];
 

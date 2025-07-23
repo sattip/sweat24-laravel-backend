@@ -163,14 +163,21 @@ class OrderController extends Controller
         ]);
 
         $oldStatus = $order->status;
+        $newStatus = $validated['status'];
+
+        // Skip if status hasn't changed
+        if ($oldStatus === $newStatus) {
+            return response()->json([
+                'success' => true,
+                'order' => $order->load(['items.product', 'user']),
+                'message' => 'Η κατάσταση της παραγγελίας δεν άλλαξε'
+            ]);
+        }
 
         // Update order based on status
-        switch ($validated['status']) {
+        switch ($newStatus) {
             case 'ready_for_pickup':
                 $order->markAsReady();
-                
-                // Dispatch event for push notification
-                \App\Events\OrderReadyForPickup::dispatch($order);
                 break;
 
             case 'completed':
@@ -189,13 +196,16 @@ class OrderController extends Controller
                 break;
 
             default:
-                $order->update(['status' => $validated['status']]);
+                $order->update(['status' => $newStatus]);
         }
+
+        // Dispatch the OrderStatusChanged event for notifications
+        \App\Events\OrderStatusChanged::dispatch($order, $oldStatus, $newStatus);
 
         return response()->json([
             'success' => true,
             'order' => $order->fresh()->load(['items.product', 'user']),
-            'message' => 'Η κατάσταση της παραγγελίας ενημερώθηκε'
+            'message' => 'Η κατάσταση της παραγγελίας ενημερώθηκε και στάλθηκε ειδοποίηση στον πελάτη'
         ]);
     }
 
@@ -216,5 +226,102 @@ class OrderController extends Controller
             ->get();
 
         return response()->json($orders);
+    }
+
+    /**
+     * Get order history for authenticated user (client app)
+     */
+    public function orderHistory(Request $request)
+    {
+        // Check for authentication first (from bearer token if available)
+        $user = $request->user();
+        $userId = null;
+
+        if ($user) {
+            // User is authenticated via Sanctum
+            $userId = $user->id;
+        } else {
+            // Fallback to query parameter for client app compatibility
+            $userId = $request->query('user_id');
+            
+            if (!$userId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Ο χρήστης πρέπει να είναι συνδεδεμένος ή να παρέχει user_id'
+                ], 401);
+            }
+        }
+
+        try {
+            $orders = Order::with(['items.product'])
+                ->where('user_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'status' => $order->status,
+                        'status_display' => $this->getStatusDisplay($order->status),
+                        'subtotal' => $order->subtotal,
+                        'tax' => $order->tax,
+                        'total' => $order->total,
+                        'customer_name' => $order->customer_name,
+                        'customer_email' => $order->customer_email,
+                        'customer_phone' => $order->customer_phone,
+                        'notes' => $order->notes,
+                        'ready_at' => $order->ready_at,
+                        'completed_at' => $order->completed_at,
+                        'created_at' => $order->created_at,
+                        'items' => $order->items->map(function ($item) {
+                            return [
+                                'id' => $item->id,
+                                'product_id' => $item->product_id,
+                                'product_name' => $item->product_name,
+                                'price' => $item->price,
+                                'quantity' => $item->quantity,
+                                'subtotal' => $item->subtotal,
+                                'product' => $item->product ? [
+                                    'id' => $item->product->id,
+                                    'name' => $item->product->name,
+                                    'image_url' => $item->product->image_url,
+                                    'category' => $item->product->category,
+                                    'slug' => $item->product->slug,
+                                ] : null
+                            ];
+                        })
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $orders,
+                'count' => $orders->count(),
+                'message' => 'Το ιστορικό παραγγελιών ανακτήθηκε επιτυχώς'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Σφάλμα κατά την ανάκτηση του ιστορικού παραγγελιών',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get display text for order status
+     */
+    private function getStatusDisplay($status)
+    {
+        $statusMap = [
+            'pending' => 'Εκκρεμής',
+            'processing' => 'Σε Επεξεργασία',
+            'ready_for_pickup' => 'Έτοιμη για Παραλαβή',
+            'completed' => 'Ολοκληρωμένη',
+            'cancelled' => 'Ακυρωμένη'
+        ];
+
+        return $statusMap[$status] ?? $status;
     }
 }
