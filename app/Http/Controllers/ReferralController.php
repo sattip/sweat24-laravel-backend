@@ -227,75 +227,104 @@ class ReferralController extends Controller
      */
     public function enhancedDashboard(Request $request)
     {
-        $user = $request->user();
-        
-        // Get or create referral code with user relationship
-        $referralCode = ReferralCode::with('user')->firstOrCreate(
-            ['user_id' => $user->id],
-            ['user_id' => $user->id]
-        );
+        try {
+            $user = $request->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found',
+                    'error' => 'UNAUTHENTICATED'
+                ], 401);
+            }
+            
+            // Get or create referral code with user relationship
+            $referralCode = ReferralCode::with('user')->firstOrCreate(
+                ['user_id' => $user->id],
+                ['user_id' => $user->id]
+            );
 
-        // Get total confirmed referrals
-        $totalReferrals = Referral::where('referrer_id', $user->id)
-            ->where('status', 'confirmed')
-            ->count();
+            // Get total confirmed referrals
+            $totalReferrals = Referral::where('referrer_id', $user->id)
+                ->where('status', 'confirmed')
+                ->count();
 
-        // Get referred friends
-        $referredFriends = Referral::where('referrer_id', $user->id)
-            ->where('status', 'confirmed')
-            ->with('referredUser')
-            ->orderBy('joined_at', 'desc')
-            ->get()
-            ->map(function ($referral) {
-                return [
-                    'name' => $referral->referredUser->name,
-                    'email' => $referral->referredUser->email,
-                    'join_date' => $referral->joined_at ? $referral->joined_at->format('Y-m-d') : $referral->created_at->format('Y-m-d'),
-                ];
-            });
+            // Get referred friends
+            $referredFriends = Referral::where('referrer_id', $user->id)
+                ->where('status', 'confirmed')
+                ->with('referredUser')
+                ->orderBy('joined_at', 'desc')
+                ->get()
+                ->map(function ($referral) {
+                    return [
+                        'name' => $referral->referredUser->name,
+                        'email' => $referral->referredUser->email,
+                        'join_date' => $referral->joined_at ? $referral->joined_at->format('Y-m-d') : $referral->created_at->format('Y-m-d'),
+                    ];
+                });
 
-        // Get next tier από το νέο ReferralRewardTier system
-        $nextTier = \App\Models\ReferralRewardTier::where('referrals_required', '>', $totalReferrals)
-            ->where('is_active', true)
-            ->orderBy('referrals_required', 'asc')
-            ->first();
+            // Get next tier από το νέο ReferralRewardTier system
+            $nextTier = \App\Models\ReferralRewardTier::where('referrals_required', '>', $totalReferrals)
+                ->where('is_active', true)
+                ->orderBy('referrals_required', 'asc')
+                ->first();
 
-        // Get earned rewards from ReferralReward
-        $earnedRewards = ReferralReward::where('user_id', $user->id)
-            ->orderBy('earned_at', 'desc')
-            ->get()
-            ->map(function ($reward) {
-                return [
-                    'id' => $reward->id,
-                    'name' => $reward->name,
-                    'type' => $reward->type,
-                    'status' => $reward->status,
-                    'earned_at' => $reward->earned_at->format('Y-m-d'),
-                    'expires_at' => $reward->expires_at ? $reward->expires_at->format('Y-m-d') : null,
-                    'redeemed_at' => $reward->redeemed_at ? $reward->redeemed_at->format('Y-m-d') : null,
-                ];
-            });
+            // Get earned rewards from ReferralReward
+            $earnedRewards = ReferralReward::where('user_id', $user->id)
+                ->orderBy('earned_at', 'desc')
+                ->get()
+                ->map(function ($reward) {
+                    return [
+                        'id' => $reward->id,
+                        'name' => $reward->name,
+                        'type' => $reward->type,
+                        'status' => $reward->status,
+                        'earned_at' => $reward->earned_at ? $reward->earned_at->format('Y-m-d') : null,
+                        'expires_at' => $reward->expires_at ? $reward->expires_at->format('Y-m-d') : null,
+                        'redeemed_at' => $reward->redeemed_at ? $reward->redeemed_at->format('Y-m-d') : null,
+                    ];
+                });
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'referral_code' => $referralCode->code,
-                'referral_link' => "https://sweat24.obs.com.gr/invite/" . $referralCode->code,
-                'total_referrals' => $totalReferrals,
-                'next_tier' => $nextTier ? [
-                    'name' => $nextTier->name,
-                    'referrals_required' => $nextTier->referrals_required,
-                    'reward_name' => $nextTier->reward_description ?? $nextTier->name,
-                    'reward_description' => $nextTier->description,
-                ] : null,
-                'earned_rewards' => $earnedRewards,
-                'referred_friends' => $referredFriends,
-            ]
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'referral_code' => $referralCode->code,
+                    'referral_link' => "https://sweat24.obs.com.gr/invite/" . $referralCode->code,
+                    'total_referrals' => $totalReferrals,
+                    'next_tier' => $nextTier ? [
+                        'name' => $nextTier->name,
+                        'referrals_required' => $nextTier->referrals_required,
+                        'reward_name' => $nextTier->reward_description ?? $nextTier->name,
+                        'reward_description' => $nextTier->description,
+                    ] : null,
+                    'earned_rewards' => $earnedRewards,
+                    'referred_friends' => $referredFriends,
+                    'debug_info' => [
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'code_created' => $referralCode->wasRecentlyCreated,
+                        'tiers_available' => \App\Models\ReferralRewardTier::where('is_active', true)->count(),
+                    ]
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Referral Dashboard Error: ' . $e->getMessage(), [
+                'user_id' => $request->user() ? $request->user()->id : null,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error occurred',
+                'error' => 'INTERNAL_ERROR',
+                'debug' => config('app.debug') ? $e->getMessage() : 'Check logs for details'
+            ], 500);
+        }
     }
 
     /**
-     * Get available referral tiers
+     * Get available referral tiers  
      */
     public function getAvailableTiers(Request $request)
     {

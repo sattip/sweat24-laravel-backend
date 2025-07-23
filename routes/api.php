@@ -562,6 +562,39 @@ Route::middleware(['auth:sanctum'])->prefix('v1/referrals')->group(function () {
 Route::prefix('v1/referrals')->group(function () {
     // Available tiers can be public as they don't contain sensitive info
     Route::get('available-tiers', [ReferralController::class, 'getAvailableTiers']);
+    
+    // Test endpoint για debugging (να αφαιρεθεί σε production)
+    Route::get('test-dashboard/{userId}', function($userId) {
+        $user = \App\Models\User::find($userId);
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        $referralCode = \App\Models\ReferralCode::firstOrCreate(['user_id' => $user->id], ['user_id' => $user->id]);
+        $totalReferrals = \App\Models\Referral::where('referrer_id', $user->id)->where('status', 'confirmed')->count();
+        $nextTier = \App\Models\ReferralRewardTier::where('referrals_required', '>', $totalReferrals)
+            ->where('is_active', true)
+            ->orderBy('referrals_required', 'asc')
+            ->first();
+            
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_name' => $user->name,
+                'referral_code' => $referralCode->code,
+                'referral_link' => "https://sweat24.obs.com.gr/invite/" . $referralCode->code,
+                'total_referrals' => $totalReferrals,
+                'next_tier' => $nextTier ? [
+                    'name' => $nextTier->name,
+                    'referrals_required' => $nextTier->referrals_required,
+                    'reward_name' => $nextTier->reward_description ?? $nextTier->name,
+                ] : null,
+                'earned_rewards' => [],
+                'referred_friends' => [],
+                'tiers_count' => \App\Models\ReferralRewardTier::where('is_active', true)->count(),
+            ]
+        ]);
+    });
 });
 
 // ============ ENHANCED STATISTICS ROUTES ============
