@@ -556,6 +556,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(fun
 Route::middleware(['auth:sanctum'])->prefix('v1/referrals')->group(function () {
     // Enhanced referral dashboard
     Route::get('dashboard', [ReferralController::class, 'enhancedDashboard']);
+});
+
+// Public Referral Routes (available to all)
+Route::prefix('v1/referrals')->group(function () {
+    // Available tiers can be public as they don't contain sensitive info
     Route::get('available-tiers', [ReferralController::class, 'getAvailableTiers']);
 });
 
