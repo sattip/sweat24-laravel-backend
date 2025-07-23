@@ -222,6 +222,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(LoyaltyRedemption::class);
     }
+
+    /**
+     * Referrals made by this user (as referrer)
+     */
+    public function referralsMade()
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    /**
+     * Referrals where this user was referred
+     */
+    public function referralsReceived()
+    {
+        return $this->hasMany(Referral::class, 'referred_user_id');
+    }
     
     /**
      * Υπολογισμός τρέχοντος υπολοίπου πόντων

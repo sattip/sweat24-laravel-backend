@@ -219,4 +219,143 @@ class ReferralController extends Controller
 
         return response()->json($referrals);
     }
+
+    // ============ ΝΕΕΣ ΜΕΘΟΔΟΙ ΓΙΑ CLIENT APP ============
+
+    /**
+     * Enhanced referral dashboard με νέο tier system
+     */
+    public function enhancedDashboard(Request $request)
+    {
+        $user = $request->user();
+        
+        // Get or create referral code with user relationship
+        $referralCode = ReferralCode::with('user')->firstOrCreate(
+            ['user_id' => $user->id],
+            ['user_id' => $user->id]
+        );
+
+        // Get total confirmed referrals
+        $totalReferrals = Referral::where('referrer_id', $user->id)
+            ->where('status', 'confirmed')
+            ->count();
+
+        // Get referred friends
+        $referredFriends = Referral::where('referrer_id', $user->id)
+            ->where('status', 'confirmed')
+            ->with('referredUser')
+            ->orderBy('joined_at', 'desc')
+            ->get()
+            ->map(function ($referral) {
+                return [
+                    'name' => $referral->referredUser->name,
+                    'email' => $referral->referredUser->email,
+                    'join_date' => $referral->joined_at ? $referral->joined_at->format('Y-m-d') : $referral->created_at->format('Y-m-d'),
+                ];
+            });
+
+        // Get next tier από το νέο ReferralRewardTier system
+        $nextTier = \App\Models\ReferralRewardTier::where('referrals_required', '>', $totalReferrals)
+            ->where('is_active', true)
+            ->orderBy('referrals_required', 'asc')
+            ->first();
+
+        // Get earned rewards from ReferralReward
+        $earnedRewards = ReferralReward::where('user_id', $user->id)
+            ->orderBy('earned_at', 'desc')
+            ->get()
+            ->map(function ($reward) {
+                return [
+                    'id' => $reward->id,
+                    'name' => $reward->name,
+                    'type' => $reward->type,
+                    'status' => $reward->status,
+                    'earned_at' => $reward->earned_at->format('Y-m-d'),
+                    'expires_at' => $reward->expires_at ? $reward->expires_at->format('Y-m-d') : null,
+                    'redeemed_at' => $reward->redeemed_at ? $reward->redeemed_at->format('Y-m-d') : null,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'referral_code' => $referralCode->code,
+                'referral_link' => "https://sweat24.obs.com.gr/invite/" . $referralCode->code,
+                'total_referrals' => $totalReferrals,
+                'next_tier' => $nextTier ? [
+                    'name' => $nextTier->name,
+                    'referrals_required' => $nextTier->referrals_required,
+                    'reward_name' => $nextTier->reward_description ?? $nextTier->name,
+                    'reward_description' => $nextTier->description,
+                ] : null,
+                'earned_rewards' => $earnedRewards,
+                'referred_friends' => $referredFriends,
+            ]
+        ]);
+    }
+
+    /**
+     * Get available referral tiers
+     */
+    public function getAvailableTiers(Request $request)
+    {
+        $tiers = \App\Models\ReferralRewardTier::where('is_active', true)
+            ->orderBy('referrals_required', 'asc')
+            ->get()
+            ->map(function ($tier) {
+                return [
+                    'id' => $tier->id,
+                    'name' => $tier->name,
+                    'referrals_required' => $tier->referrals_required,
+                    'reward_name' => $tier->reward_description ?? $tier->name,
+                    'reward_description' => $tier->description,
+                    'reward_type' => $tier->reward_type,
+                    'discount_percentage' => $tier->discount_percentage,
+                    'discount_amount' => $tier->discount_amount,
+                    'validity_days' => $tier->validity_days,
+                    'quarterly_only' => $tier->quarterly_only,
+                    'next_renewal_only' => $tier->next_renewal_only,
+                    'terms_conditions' => $tier->terms_conditions,
+                    'expires_at' => null, // For compatibility
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $tiers,
+        ]);
+    }
+
+    /**
+     * Admin statistics για referral program
+     */
+    public function adminGetStats()
+    {
+        $totalReferrals = Referral::where('status', 'confirmed')->count();
+        $totalRewards = ReferralReward::count();
+        $activeUsers = ReferralCode::where('is_active', true)->count();
+        
+        $rewardsByStatus = ReferralReward::selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $topReferrers = User::withCount(['referralsMade as total_referrals' => function($query) {
+                $query->where('status', 'confirmed');
+            }])
+            ->having('total_referrals', '>', 0)
+            ->orderBy('total_referrals', 'desc')
+            ->limit(10)
+            ->get(['id', 'name', 'email']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_referrals' => $totalReferrals,
+                'total_rewards' => $totalRewards,
+                'active_users' => $activeUsers,
+                'rewards_by_status' => $rewardsByStatus,
+                'top_referrers' => $topReferrers,
+            ]
+        ]);
+    }
 }
