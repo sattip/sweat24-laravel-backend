@@ -225,4 +225,56 @@ class LoyaltyController extends Controller
             'data' => $stats,
         ]);
     }
+
+    /**
+     * Get all redemptions for admin
+     */
+    public function adminGetRedemptions(Request $request)
+    {
+        // Μόνο για admins
+        if (!Auth::user()->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        $query = LoyaltyRedemption::with(['user', 'loyaltyReward']);
+
+        // Φιλτράρισμα ανά status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Φιλτράρισμα ανά χρήστη
+        if ($request->has('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        // Φιλτράρισμα ανά reward
+        if ($request->has('loyalty_reward_id')) {
+            $query->where('loyalty_reward_id', $request->loyalty_reward_id);
+        }
+
+        // Φιλτράρισμα ανά ημερομηνία
+        if ($request->has('from_date')) {
+            $query->whereDate('redeemed_at', '>=', $request->from_date);
+        }
+
+        if ($request->has('to_date')) {
+            $query->whereDate('redeemed_at', '<=', $request->to_date);
+        }
+
+        // Ταξινόμηση
+        $sortBy = $request->get('sort_by', 'redeemed_at');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortBy, $sortDirection);
+
+        $redemptions = $query->paginate($request->get('per_page', 15));
+
+        return response()->json([
+            'success' => true,
+            'data' => $redemptions,
+        ]);
+    }
 }

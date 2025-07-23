@@ -521,6 +521,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(fun
     Route::post('loyalty-rewards/{loyaltyReward}/toggle-status', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'toggleStatus']);
     Route::get('loyalty-rewards/{loyaltyReward}/redemptions', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'redemptions']);
     
+    // Loyalty Redemptions Management (MISSING ENDPOINT)
+    Route::get('loyalty/redemptions', [\App\Http\Controllers\Api\LoyaltyController::class, 'adminGetRedemptions']);
+    Route::get('loyalty-redemptions', [\App\Http\Controllers\Api\LoyaltyController::class, 'adminGetRedemptions']); // Alternative endpoint for admin panel
+    
     // Loyalty Statistics
     Route::get('loyalty/stats', [\App\Http\Controllers\Api\LoyaltyController::class, 'stats']);
 });
@@ -550,6 +554,57 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(fun
     
     // Enhanced Referral Management (extending existing)
     Route::get('referral-stats', [ReferralController::class, 'adminGetStats']);
+});
+
+// ============ PUBLIC TEST ENDPOINTS (για debugging) ============
+Route::prefix('v1/test')->group(function () {
+    // Public test endpoint για referral tiers
+    Route::get('referral-tiers', function() {
+        $tiers = \App\Models\ReferralRewardTier::all();
+        return response()->json([
+            'success' => true,
+            'count' => $tiers->count(),
+            'data' => $tiers,
+            'message' => 'Public test endpoint - no auth required'
+        ]);
+    });
+    
+    // Public test endpoint για loyalty rewards
+    Route::get('loyalty-rewards', function() {
+        $rewards = \App\Models\LoyaltyReward::all();
+        return response()->json([
+            'success' => true,
+            'count' => $rewards->count(),
+            'data' => $rewards,
+            'message' => 'Public test endpoint - no auth required'
+        ]);
+    });
+    
+    // Public test για admin authentication
+    Route::get('admin-auth', function(\Illuminate\Http\Request $request) {
+        $token = $request->bearerToken();
+        $user = null;
+        $isAdmin = false;
+        
+        if ($token) {
+            try {
+                $user = \Laravel\Sanctum\PersonalAccessToken::findToken($token)?->tokenable;
+                $isAdmin = $user && $user->hasRole('admin');
+            } catch (Exception $e) {
+                // Token invalid
+            }
+        }
+        
+        return response()->json([
+            'has_bearer_token' => !empty($token),
+            'token_preview' => $token ? substr($token, 0, 10) . '...' : null,
+            'user_found' => !empty($user),
+            'is_admin' => $isAdmin,
+            'user_id' => $user?->id,
+            'user_email' => $user?->email,
+            'headers' => $request->headers->all()
+        ]);
+    });
 });
 
 // User Referral Routes (extending existing)
@@ -614,4 +669,20 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/statistics')
     
     // Export functionality
     Route::get('export', [\App\Http\Controllers\Api\StatisticsController::class, 'export']);
+});
+// Debug endpoint to see exactly what the admin panel is sending
+Route::any('/debug/admin-requests', function(Request $request) {
+    return response()->json([
+        'method' => $request->method(),
+        'url' => $request->fullUrl(),
+        'headers' => $request->headers->all(),
+        'body' => $request->all(),
+        'bearer_token' => $request->bearerToken(),
+        'user' => $request->user() ? [
+            'id' => $request->user()->id,
+            'email' => $request->user()->email,
+            'role' => $request->user()->role
+        ] : null,
+        'timestamp' => now()
+    ]);
 });

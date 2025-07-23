@@ -50,7 +50,7 @@ class ReferralRewardTierController extends Controller
             'reward_type' => 'required|in:discount,free_month,personal_training,custom',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'discount_amount' => 'nullable|numeric|min:0',
-            'validity_days' => 'required|integer|min:1',
+            'validity_days' => 'nullable|integer|min:1',
             'quarterly_only' => 'boolean',
             'next_renewal_only' => 'boolean',
             'is_active' => 'boolean',
@@ -69,6 +69,11 @@ class ReferralRewardTierController extends Controller
         $data['is_active'] = $request->get('is_active', true);
         $data['quarterly_only'] = $request->get('quarterly_only', true);
         $data['next_renewal_only'] = $request->get('next_renewal_only', true);
+        
+        // Use the validity_days from the request, or fallback to 30 if truly not provided
+        if (!isset($data['validity_days']) || $data['validity_days'] === null) {
+            $data['validity_days'] = $request->get('validity_days', 30);
+        }
 
         $tier = ReferralRewardTier::create($data);
 
@@ -102,7 +107,7 @@ class ReferralRewardTierController extends Controller
             'reward_type' => 'required|in:discount,free_month,personal_training,custom',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'discount_amount' => 'nullable|numeric|min:0',
-            'validity_days' => 'required|integer|min:1',
+            'validity_days' => 'nullable|integer|min:1',
             'quarterly_only' => 'boolean',
             'next_renewal_only' => 'boolean',
             'is_active' => 'boolean',
