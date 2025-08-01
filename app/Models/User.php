@@ -291,4 +291,28 @@ class User extends Authenticatable
     {
         return $this->loyalty_points_balance >= $amount;
     }
+    
+    /**
+     * Medical history relationship
+     */
+    public function medicalHistories()
+    {
+        return $this->hasMany(\App\Models\MedicalHistory::class);
+    }
+    
+    /**
+     * Get the latest medical history for this user
+     */
+    public function latestMedicalHistory()
+    {
+        return $this->hasOne(\App\Models\MedicalHistory::class)->latest('submitted_at');
+    }
+    
+    /**
+     * Check if user has submitted medical history
+     */
+    public function hasMedicalHistory(): bool
+    {
+        return $this->medicalHistories()->exists();
+    }
 }

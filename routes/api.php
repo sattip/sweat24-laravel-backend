@@ -686,3 +686,25 @@ Route::any('/debug/admin-requests', function(Request $request) {
         'timestamp' => now()
     ]);
 });
+
+// ============ MEDICAL HISTORY ROUTES ============
+
+// User Medical History Routes (Protected)
+Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    // Submit medical history (for client app registration)
+    Route::post('/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'store']);
+    
+    // Get user's own medical history
+    Route::get('/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'show']);
+});
+
+// Admin Medical History Routes (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+    // Get medical history for specific user (for admin panel)
+    Route::get('/users/{userId}/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'getUserMedicalHistory']);
+});
+
+// Alternative admin route structure (in case admin panel uses different path)
+Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+    Route::get('/users/{userId}/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'getUserMedicalHistory']);
+});
