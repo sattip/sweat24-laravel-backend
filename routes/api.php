@@ -703,8 +703,3 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     // Get medical history for specific user (for admin panel)
     Route::get('/users/{userId}/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'getUserMedicalHistory']);
 });
-
-// Alternative admin route structure (in case admin panel uses different path)
-Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
-    Route::get('/users/{userId}/medical-history', [\App\Http\Controllers\MedicalHistoryController::class, 'getUserMedicalHistory']);
-});

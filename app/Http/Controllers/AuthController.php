@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\MedicalHistory;
 use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -158,38 +161,89 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'nullable|string',
             'membership_type' => 'nullable|string',
+            // Medical history validation
+            'medical_history' => 'nullable|array',
+            'medical_history.medical_conditions' => 'nullable|array',
+            'medical_history.current_health_problems' => 'nullable|array',
+            'medical_history.prescribed_medications' => 'nullable|array',
+            'medical_history.smoking' => 'nullable|array',
+            'medical_history.physical_activity' => 'nullable|array',
+            'medical_history.emergency_contact' => 'nullable|array',
+            'medical_history.liability_declaration_accepted' => 'nullable|boolean',
+            'medical_history.submitted_at' => 'nullable|string',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $request->phone,
-            'membership_type' => $request->membership_type ?? 'Basic',
-            'role' => 'member',
-            'join_date' => now(),
-            'status' => 'pending_approval',
-            'registration_status' => 'pending_approval',
-            'remaining_sessions' => 0,
-            'total_sessions' => 0,
-        ]);
+        DB::beginTransaction();
+        
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->phone,
+                'membership_type' => $request->membership_type ?? 'Basic',
+                'role' => 'member',
+                'join_date' => now(),
+                'status' => 'pending_approval',
+                'registration_status' => 'pending_approval',
+                'remaining_sessions' => 0,
+                'total_sessions' => 0,
+            ]);
 
-        // Log the registration activity
-        ActivityLogger::logRegistration($user);
+            // Save medical history if provided
+            if ($request->has('medical_history') && !empty($request->medical_history)) {
+                $medicalHistory = $request->medical_history;
+                
+                MedicalHistory::create([
+                    'user_id' => $user->id,
+                    'medical_conditions' => $medicalHistory['medical_conditions'] ?? [],
+                    'current_health_problems' => $medicalHistory['current_health_problems'] ?? [],
+                    'prescribed_medications' => $medicalHistory['prescribed_medications'] ?? [],
+                    'smoking' => $medicalHistory['smoking'] ?? [],
+                    'physical_activity' => $medicalHistory['physical_activity'] ?? [],
+                    'emergency_contact' => $medicalHistory['emergency_contact'] ?? [],
+                    'liability_declaration_accepted' => $medicalHistory['liability_declaration_accepted'] ?? false,
+                    'submitted_at' => isset($medicalHistory['submitted_at']) 
+                        ? Carbon::parse($medicalHistory['submitted_at']) 
+                        : now(),
+                ]);
+            }
 
-        // Don't provide auth token for pending approval users
-        return response()->json([
-            'success' => true,
-            'message' => 'Η εγγραφή σας υποβλήθηκε επιτυχώς. Περιμένετε την έγκριση από τον διαχειριστή.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'membership_type' => $user->membership_type,
-                'registration_status' => $user->registration_status,
-                'status' => $user->status,
-                'next_step' => 'Waiting for admin approval',
-            ],
-        ], 201);
+            DB::commit();
+
+            // Log the registration activity
+            ActivityLogger::logRegistration($user);
+
+            // Don't provide auth token for pending approval users
+            return response()->json([
+                'success' => true,
+                'message' => 'Η εγγραφή σας υποβλήθηκε επιτυχώς. Περιμένετε την έγκριση από τον διαχειριστή.',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'membership_type' => $user->membership_type,
+                    'registration_status' => $user->registration_status,
+                    'status' => $user->status,
+                    'next_step' => 'Waiting for admin approval',
+                ],
+                'medical_history_saved' => $request->has('medical_history'),
+            ], 201);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            // Log the error
+            \Log::error('Registration failed', [
+                'error' => $e->getMessage(),
+                'email' => $request->email,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Σφάλμα κατά την εγγραφή. Παρακαλώ δοκιμάστε ξανά.',
+            ], 500);
+        }
     }
 }
