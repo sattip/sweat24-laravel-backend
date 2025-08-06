@@ -44,6 +44,12 @@ class User extends Authenticatable
         'privacy_settings',
         'avatar',
         'password',
+        'found_us_via',
+        'referrer_id',
+        'social_platform',
+        'referral_code_or_name',
+        'referral_validated',
+        'referral_validated_at',
     ];
 
     /**
@@ -74,6 +80,8 @@ class User extends Authenticatable
             'approved_at' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
+            'referral_validated' => 'boolean',
+            'referral_validated_at' => 'datetime',
         ];
     }
 
@@ -240,6 +248,22 @@ class User extends Authenticatable
     }
     
     /**
+     * Users referred by this user (direct relationship)
+     */
+    public function referredUsers()
+    {
+        return $this->hasMany(User::class, 'referrer_id');
+    }
+    
+    /**
+     * The user who referred this user
+     */
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referrer_id');
+    }
+    
+    /**
      * Υπολογισμός τρέχοντος υπολοίπου πόντων
      */
     public function getLoyaltyPointsBalanceAttribute()
@@ -290,5 +314,47 @@ class User extends Authenticatable
     public function hasEnoughLoyaltyPoints($amount)
     {
         return $this->loyalty_points_balance >= $amount;
+    }
+    
+    /**
+     * Get the display name for how the user found us
+     */
+    public function getHowFoundUsDisplayAttribute()
+    {
+        $options = [
+            'facebook' => 'Facebook',
+            'instagram' => 'Instagram',
+            'google' => 'Google Search',
+            'friend' => 'Friend Referral',
+            'member' => 'Member Referral',
+            'website' => 'Website',
+            'walk_in' => 'Walk In',
+            'flyer' => 'Flyer/Poster',
+            'event' => 'Event',
+            'other' => 'Other'
+        ];
+        
+        return $options[$this->found_us_via] ?? $this->found_us_via;
+    }
+    
+    /**
+     * Check if user was referred by someone
+     */
+    public function wasReferred()
+    {
+        return $this->referrer_id !== null || 
+               in_array($this->found_us_via, ['friend', 'member']);
+    }
+    
+    /**
+     * Get referral statistics
+     */
+    public function getReferralStats()
+    {
+        return [
+            'total_referrals' => $this->referredUsers()->count(),
+            'active_referrals' => $this->referredUsers()->where('status', 'active')->count(),
+            'validated_referrals' => $this->referredUsers()->where('referral_validated', true)->count(),
+        ];
     }
 }
