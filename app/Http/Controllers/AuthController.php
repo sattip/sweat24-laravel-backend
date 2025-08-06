@@ -155,21 +155,51 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * @deprecated Use registerWithConsent() instead to ensure proper age verification
+     * This endpoint is maintained for backward compatibility but should not be used for new registrations
+     */
     public function register(Request $request)
     {
+        // Log deprecation warning
+        Log::warning('Deprecated registration endpoint used', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'nullable|string',
             'membership_type' => 'nullable|string',
+            'date_of_birth' => 'required|date|before:today', // Now required to check age
         ]);
+
+        // Check if user is minor - if so, redirect to proper endpoint
+        if ($request->has('date_of_birth')) {
+            $birthDate = Carbon::parse($request->date_of_birth);
+            $age = $birthDate->age;
+            
+            if ($age < 18) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Minor registration requires parent consent. Please use the /register-with-consent endpoint.',
+                    'requires_parent_consent' => true,
+                    'age' => $age
+                ], 422);
+            }
+        }
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
+            'date_of_birth' => $request->date_of_birth ?? null,
+            'is_minor' => false,
+            'age_at_registration' => isset($birthDate) ? $birthDate->age : null,
             'membership_type' => $request->membership_type ?? 'Basic',
             'role' => 'member',
             'join_date' => now(),
@@ -263,8 +293,8 @@ class AuthController extends Controller
         $age = $birthDate->age;
         $isMinor = $age < 18;
         
-        // Add parent consent validation if minor
-        if ($isMinor && $request->has('parentConsent')) {
+        // Add parent consent validation if minor - REQUIRED for minors
+        if ($isMinor) {
             $rules['parentConsent'] = 'required|array';
             $rules['parentConsent.parentFullName'] = 'required|string|max:255';
             $rules['parentConsent.fatherFirstName'] = 'required|string|max:100';
@@ -277,7 +307,7 @@ class AuthController extends Controller
             $rules['parentConsent.parentLocation'] = 'required|string|max:100';
             $rules['parentConsent.parentStreet'] = 'required|string|max:255';
             $rules['parentConsent.parentStreetNumber'] = 'required|string|max:20';
-            $rules['parentConsent.parentPostalCode'] = 'required|string|size:5';
+            $rules['parentConsent.parentPostalCode'] = 'required|string|max:10';
             $rules['parentConsent.parentEmail'] = 'required|email|max:255';
             $rules['parentConsent.consentAccepted'] = 'required|boolean|accepted';
             $rules['parentConsent.signature'] = 'required|string';
