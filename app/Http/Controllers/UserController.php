@@ -52,7 +52,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        return response()->json($user->load('packages', 'bookings', 'activityLogs'));
+        return response()->json($user->load('packages', 'bookings', 'activityLogs', 'parentConsent'));
     }
 
     public function update(Request $request, User $user)

@@ -13,7 +13,7 @@ class MemberController extends Controller
                     ->orWhereNull('membership_type')
                     ->with(['packages' => function($q) {
                         $q->where('status', 'active');
-                    }]);
+                    }, 'parentConsent']);
         
         if ($request->has('search')) {
             $search = $request->search;
