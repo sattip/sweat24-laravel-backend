@@ -86,6 +86,8 @@ Route::prefix('admin')->group(function () {
         // Member management
         Route::prefix('members')->name('admin.members.')->group(function () {
             Route::get('/', [App\Http\Controllers\MemberController::class, 'index'])->name('index');
+            Route::get('/export-ems', [App\Http\Controllers\MemberController::class, 'exportEmsData'])->name('export.ems');
+            Route::get('/ems-statistics', [App\Http\Controllers\MemberController::class, 'emsStatistics'])->name('ems.statistics');
         });
         
         // Trainer management

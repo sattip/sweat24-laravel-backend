@@ -37,6 +37,9 @@ class User extends Authenticatable
         'approved_by',
         'last_visit',
         'medical_history',
+        'ems_interest',
+        'ems_contraindications',
+        'ems_liability_accepted',
         'emergency_contact',
         'emergency_phone',
         'notes',
@@ -74,6 +77,9 @@ class User extends Authenticatable
             'approved_at' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
+            'ems_interest' => 'boolean',
+            'ems_contraindications' => 'array',
+            'ems_liability_accepted' => 'boolean',
         ];
     }
 
@@ -290,5 +296,53 @@ class User extends Authenticatable
     public function hasEnoughLoyaltyPoints($amount)
     {
         return $this->loyalty_points_balance >= $amount;
+    }
+    
+    /**
+     * EMS-related helper methods
+     */
+    public function hasEmsInterest(): bool
+    {
+        return $this->ems_interest === true;
+    }
+    
+    public function hasEmsContraindications(): bool
+    {
+        if (!$this->ems_contraindications || !is_array($this->ems_contraindications)) {
+            return false;
+        }
+        
+        foreach ($this->ems_contraindications as $contraindication) {
+            if (isset($contraindication['has_condition']) && $contraindication['has_condition'] === true) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    public function getEmsContraindicationsList(): array
+    {
+        $list = [];
+        
+        if (!$this->ems_contraindications || !is_array($this->ems_contraindications)) {
+            return $list;
+        }
+        
+        foreach ($this->ems_contraindications as $name => $data) {
+            if (isset($data['has_condition']) && $data['has_condition'] === true) {
+                $list[] = [
+                    'name' => $name,
+                    'year_of_onset' => $data['year_of_onset'] ?? null
+                ];
+            }
+        }
+        
+        return $list;
+    }
+    
+    public function hasAcceptedEmsLiability(): bool
+    {
+        return $this->ems_liability_accepted === true;
     }
 }
