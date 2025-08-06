@@ -24,6 +24,8 @@ class User extends Authenticatable
         'phone',
         'address',
         'date_of_birth',
+        'is_minor',
+        'age_at_registration',
         'membership_type',
         'role',
         'join_date',
@@ -74,6 +76,8 @@ class User extends Authenticatable
             'approved_at' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
+            'is_minor' => 'boolean',
+            'age_at_registration' => 'integer',
         ];
     }
 
@@ -290,5 +294,45 @@ class User extends Authenticatable
     public function hasEnoughLoyaltyPoints($amount)
     {
         return $this->loyalty_points_balance >= $amount;
+    }
+    
+    /**
+     * Parent consent relationship
+     */
+    public function parentConsent()
+    {
+        return $this->hasOne(ParentConsent::class);
+    }
+    
+    /**
+     * Check if user is currently a minor
+     */
+    public function isCurrentlyMinor()
+    {
+        if (!$this->date_of_birth) {
+            return false;
+        }
+        
+        return $this->date_of_birth->age < 18;
+    }
+    
+    /**
+     * Check if user was minor at registration
+     */
+    public function wasMinorAtRegistration()
+    {
+        return $this->is_minor === true;
+    }
+    
+    /**
+     * Get current age
+     */
+    public function getCurrentAge()
+    {
+        if (!$this->date_of_birth) {
+            return null;
+        }
+        
+        return $this->date_of_birth->age;
     }
 }
