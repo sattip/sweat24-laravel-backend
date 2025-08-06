@@ -158,9 +158,13 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'nullable|string',
             'membership_type' => 'nullable|string',
+            'found_us_via' => 'nullable|string|in:facebook,instagram,google,friend,member,website,walk_in,flyer,event,other',
+            'social_platform' => 'nullable|string|required_if:found_us_via,facebook,instagram',
+            'referral_code_or_name' => 'nullable|string',
+            'referrer_id' => 'nullable|exists:users,id',
         ]);
 
-        $user = User::create([
+        $userData = [
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -172,10 +176,41 @@ class AuthController extends Controller
             'registration_status' => 'pending_approval',
             'remaining_sessions' => 0,
             'total_sessions' => 0,
-        ]);
+            'found_us_via' => $request->found_us_via,
+            'social_platform' => $request->social_platform,
+            'referral_code_or_name' => $request->referral_code_or_name,
+        ];
+
+        // Handle referral validation
+        if ($request->referrer_id) {
+            $userData['referrer_id'] = $request->referrer_id;
+            $userData['referral_validated'] = true;
+            $userData['referral_validated_at'] = now();
+        } elseif ($request->found_us_via === 'member' && $request->referral_code_or_name) {
+            // Try to find the referrer by name or email
+            $referrer = User::where(function ($query) use ($request) {
+                $query->where('name', 'LIKE', '%' . $request->referral_code_or_name . '%')
+                      ->orWhere('email', $request->referral_code_or_name);
+            })
+            ->where('status', 'active')
+            ->first();
+
+            if ($referrer) {
+                $userData['referrer_id'] = $referrer->id;
+                $userData['referral_validated'] = true;
+                $userData['referral_validated_at'] = now();
+            }
+        }
+
+        $user = User::create($userData);
 
         // Log the registration activity
         ActivityLogger::logRegistration($user);
+
+        // Log referral activity if applicable
+        if ($user->referrer_id) {
+            ActivityLogger::log($user->referrer_id, 'referral_made', 'Referred new member: ' . $user->name);
+        }
 
         // Don't provide auth token for pending approval users
         return response()->json([
@@ -188,6 +223,8 @@ class AuthController extends Controller
                 'membership_type' => $user->membership_type,
                 'registration_status' => $user->registration_status,
                 'status' => $user->status,
+                'found_us_via' => $user->found_us_via,
+                'referral_validated' => $user->referral_validated,
                 'next_step' => 'Waiting for admin approval',
             ],
         ], 201);
