@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\ReferralService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -187,13 +188,8 @@ class AuthController extends Controller
             $userData['referral_validated'] = true;
             $userData['referral_validated_at'] = now();
         } elseif ($request->found_us_via === 'member' && $request->referral_code_or_name) {
-            // Try to find the referrer by name or email
-            $referrer = User::where(function ($query) use ($request) {
-                $query->where('name', 'LIKE', '%' . $request->referral_code_or_name . '%')
-                      ->orWhere('email', $request->referral_code_or_name);
-            })
-            ->where('status', 'active')
-            ->first();
+            // Use the service to find the referrer
+            $referrer = ReferralService::findReferrer($request->referral_code_or_name);
 
             if ($referrer) {
                 $userData['referrer_id'] = $referrer->id;
@@ -209,7 +205,13 @@ class AuthController extends Controller
 
         // Log referral activity if applicable
         if ($user->referrer_id) {
-            ActivityLogger::log($user->referrer_id, 'referral_made', 'Referred new member: ' . $user->name);
+            ActivityLogger::log(
+                'referral', // The type of activity
+                'made_referral', // The action
+                $user, // The new user is the subject of this log
+                ['referred_user_name' => $user->name],
+                $user->referrer_id // The ID of the user who made the referral
+            );
         }
 
         // Don't provide auth token for pending approval users

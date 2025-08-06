@@ -226,7 +226,12 @@ export const ParentConsentForm: React.FC<ParentConsentFormProps> = ({
     if (formData.parentBirthDate) {
       const birthDate = new Date(formData.parentBirthDate);
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
       if (age < 18) {
         newErrors.parentBirthDate = 'Ο γονέας/κηδεμόνας πρέπει να είναι άνω των 18 ετών';
       }

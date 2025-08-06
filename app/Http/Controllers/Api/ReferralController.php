@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ReferralService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,14 +24,8 @@ class ReferralController extends Controller
         $referralValue = trim($request->referral_value);
 
         if ($referralType === 'member') {
-            // Search for member by name or email
-            $member = User::where(function ($query) use ($referralValue) {
-                $query->where('name', 'LIKE', '%' . $referralValue . '%')
-                      ->orWhere('email', $referralValue);
-            })
-            ->where('status', 'active')
-            ->where('role', '!=', 'admin')
-            ->first();
+            // Use the service to find the referrer
+            $member = ReferralService::findReferrer($referralValue);
 
             if ($member) {
                 return response()->json([
@@ -39,6 +34,17 @@ class ReferralController extends Controller
                     'referrer_name' => $member->name,
                     'message' => "Referral validated: {$member->name}"
                 ]);
+            }
+
+            // If no exact match, try to find potential matches
+            $potentialMatches = ReferralService::findPotentialReferrers($referralValue);
+            
+            if ($potentialMatches->isNotEmpty()) {
+                return response()->json([
+                    'valid' => false,
+                    'potential_matches' => $potentialMatches,
+                    'message' => 'No exact match found. Did you mean one of these members?'
+                ], 404);
             }
 
             return response()->json([
@@ -88,7 +94,7 @@ class ReferralController extends Controller
             'stats' => $stats,
             'referrals' => $referrals,
             'referral_link' => url('/register?ref=' . $user->id),
-            'referral_code' => 'REF' . str_pad($user->id, 6, '0', STR_PAD_LEFT)
+            'referral_code' => ReferralService::generateReferralCode($user->id)
         ]);
     }
 

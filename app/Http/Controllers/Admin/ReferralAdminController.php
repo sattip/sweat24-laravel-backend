@@ -81,27 +81,36 @@ class ReferralAdminController extends Controller
             $query->where('created_at', '<=', $request->date_to);
         }
 
-        $data = $query->get();
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="referral_data_' . date('Y-m-d') . '.csv"',
+        ];
 
-        // Generate CSV
-        $csv = "Name,Email,Registration Date,Source,Social Platform,Referrer,Referral Validated,Status\n";
-        
-        foreach ($data as $user) {
-            $csv .= sprintf(
-                '"%s","%s","%s","%s","%s","%s","%s","%s"' . "\n",
-                $user->name,
-                $user->email,
-                $user->created_at->format('Y-m-d'),
-                $user->found_us_via ?? 'Not specified',
-                $user->social_platform ?? '-',
-                $user->referrer ? $user->referrer->name : ($user->referral_code_or_name ?? '-'),
-                $user->referral_validated ? 'Yes' : 'No',
-                $user->status
-            );
-        }
+        $callback = function() use ($query) {
+            $file = fopen('php://output', 'w');
+            
+            // Add CSV headers
+            fputcsv($file, ["Name", "Email", "Registration Date", "Source", "Social Platform", "Referrer", "Referral Validated", "Status"]);
 
-        return response($csv)
-            ->header('Content-Type', 'text/csv')
-            ->header('Content-Disposition', 'attachment; filename="referral_data_' . date('Y-m-d') . '.csv"');
+            // Process users in chunks to keep memory usage low
+            $query->chunk(500, function ($users) use ($file) {
+                foreach ($users as $user) {
+                    fputcsv($file, [
+                        $user->name,
+                        $user->email,
+                        $user->created_at->format('Y-m-d'),
+                        $user->found_us_via ?? 'Not specified',
+                        $user->social_platform ?? '-',
+                        $user->referrer ? $user->referrer->name : ($user->referral_code_or_name ?? '-'),
+                        $user->referral_validated ? 'Yes' : 'No',
+                        $user->status
+                    ]);
+                }
+            });
+            
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

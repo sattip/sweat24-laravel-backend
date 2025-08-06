@@ -78,7 +78,7 @@
                     <div class="flex items-center">
                         <span class="text-sm text-gray-600 mr-2">{{ $source->total }}</span>
                         <div class="w-32 bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ ($source->total / $totalMembers) * 100 }}%"></div>
+                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ $totalMembers > 0 ? ($source->total / $totalMembers) * 100 : 0 }}%"></div>
                         </div>
                     </div>
                 </div>
