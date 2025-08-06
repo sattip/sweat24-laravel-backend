@@ -108,6 +108,12 @@ Route::prefix('admin')->group(function () {
             Route::get('/', [App\Http\Controllers\SettingsController::class, 'index'])->name('index');
         });
         
+        // Referral Analytics
+        Route::prefix('referrals')->name('admin.referrals.')->group(function () {
+            Route::get('/', [App\Http\Controllers\Admin\ReferralAdminController::class, 'index'])->name('index');
+            Route::get('/export', [App\Http\Controllers\Admin\ReferralAdminController::class, 'exportReferralData'])->name('export');
+        });
+        
         // Package management
         Route::prefix('packages')->name('admin.packages.')->group(function () {
             Route::get('/', [App\Http\Controllers\AdminPackageController::class, 'index'])->name('index');

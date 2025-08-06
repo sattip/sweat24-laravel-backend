@@ -29,6 +29,7 @@ use App\Http\Controllers\SpecializedServiceController;
 use App\Http\Controllers\AppointmentRequestController;
 use App\Http\Controllers\BookingRequestController;
 use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\Api\ReferralController as ApiReferralController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -104,6 +105,11 @@ Route::prefix('v1/auth')->group(function () {
 Route::prefix('v1/evaluations')->group(function () {
     Route::get('/{token}', [EvaluationController::class, 'getByToken']);
     Route::post('/{token}/submit', [EvaluationController::class, 'submit']);
+});
+
+// Public Referral Validation Routes
+Route::prefix('v1/referrals')->group(function () {
+    Route::post('validate', [ApiReferralController::class, 'validateReferral']);
 });
 
 // Public classes routes (for browsing without authentication)
@@ -236,6 +242,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('referral/redeem/{reward}', [ReferralController::class, 'redeemReward']);
     Route::post('referral/process', [ReferralController::class, 'processReferral']);
     
+    // How Found Us Referral Routes
+    Route::get('referrals/my-referrals', [ApiReferralController::class, 'myReferrals']);
+    
     // Partner business routes
     Route::post('partners/offers/{offer}/redeem', [PartnerController::class, 'generateRedemptionCode']);
     Route::post('partners/redemptions/{redemption}/use', [PartnerController::class, 'useRedemption']);
@@ -304,6 +313,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('admin/referral-rewards/{reward}', [ReferralController::class, 'adminUpdateReward']);
         Route::delete('admin/referral-rewards/{reward}', [ReferralController::class, 'adminDeleteReward']);
         Route::get('admin/referrals', [ReferralController::class, 'adminGetReferrals']);
+        
+        // How Found Us Admin Routes
+        Route::get('admin/referrals/top-referrers', [ApiReferralController::class, 'topReferrers']);
+        Route::get('admin/referrals/source-statistics', [ApiReferralController::class, 'sourceStatistics']);
         
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);

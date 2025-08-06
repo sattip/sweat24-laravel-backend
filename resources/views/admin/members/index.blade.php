@@ -44,6 +44,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membership</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -100,6 +101,18 @@
                             {{ ucfirst($member->status) }}
                         </span>
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        @if($member->found_us_via)
+                            <div class="text-sm text-gray-900">{{ $member->how_found_us_display }}</div>
+                            @if($member->referrer)
+                                <div class="text-xs text-blue-600">By: {{ $member->referrer->name }}</div>
+                            @elseif($member->social_platform)
+                                <div class="text-xs text-gray-500">{{ ucfirst($member->social_platform) }}</div>
+                            @endif
+                        @else
+                            <span class="text-sm text-gray-400">-</span>
+                        @endif
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ $member->created_at->format('M d, Y') }}
                     </td>
@@ -117,7 +130,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                         No members found.
                     </td>
                 </tr>
