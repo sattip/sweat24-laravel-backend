@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\ReferralController as ApiReferralController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\MedicalHistoryController;
 use App\Http\Controllers\AdminController;
 
 // Two-Phase Registration routes (public)
@@ -432,6 +433,15 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/booking-history', [ClientProfileController::class, 'bookingHistory']);
         Route::put('/bookings/{booking}/notes', [ClientProfileController::class, 'updateBookingNotes']);
         Route::post('/deactivation-request', [ClientProfileController::class, 'requestDeactivation']);
+    });
+    
+    // Medical History Routes
+    Route::prefix('medical-history')->group(function () {
+        Route::get('/ems-contraindications', [MedicalHistoryController::class, 'getEmsContraindications']);
+        Route::post('/', [MedicalHistoryController::class, 'submitMedicalHistory']);
+        Route::get('/', [MedicalHistoryController::class, 'getMedicalHistory']);
+        Route::get('/{userId}', [MedicalHistoryController::class, 'getMedicalHistory'])->where('userId', '[0-9]+')->middleware('role:admin,trainer');
+        Route::put('/', [MedicalHistoryController::class, 'updateMedicalHistory']);
     });
     
     

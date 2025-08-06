@@ -39,6 +39,9 @@ class User extends Authenticatable
         'approved_by',
         'last_visit',
         'medical_history',
+        'ems_interest',
+        'ems_contraindications',
+        'ems_liability_accepted',
         'emergency_contact',
         'emergency_phone',
         'notes',
@@ -82,6 +85,9 @@ class User extends Authenticatable
             'approved_at' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
+            'ems_interest' => 'boolean',
+            'ems_contraindications' => 'array',
+            'ems_liability_accepted' => 'boolean',
             'is_minor' => 'boolean',
             'age_at_registration' => 'integer',
             'referral_validated' => 'boolean',
@@ -318,6 +324,86 @@ class User extends Authenticatable
     public function hasEnoughLoyaltyPoints($amount)
     {
         return $this->loyalty_points_balance >= $amount;
+    }
+    
+    /**
+     * EMS-related helper methods
+     */
+    public function hasEmsInterest(): bool
+    {
+        return $this->ems_interest === true;
+    }
+    
+    public function hasEmsContraindications(): bool
+    {
+        if (!$this->ems_contraindications || !is_array($this->ems_contraindications)) {
+            return false;
+        }
+        
+        foreach ($this->ems_contraindications as $contraindication) {
+            if (isset($contraindication['has_condition']) && $contraindication['has_condition'] === true) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    public function getEmsContraindicationsList(): array
+    {
+        $list = [];
+        
+        if (!$this->ems_contraindications || !is_array($this->ems_contraindications)) {
+            return $list;
+        }
+        
+        foreach ($this->ems_contraindications as $name => $data) {
+            if (isset($data['has_condition']) && $data['has_condition'] === true) {
+                $list[] = [
+                    'name' => $name,
+                    'year_of_onset' => $data['year_of_onset'] ?? null
+                ];
+            }
+        }
+        
+        return $list;
+    }
+    
+    public function hasAcceptedEmsLiability(): bool
+    {
+        return $this->ems_liability_accepted === true;
+    }
+    
+    /**
+     * Scope for EMS filtering
+     */
+    public function scopeFilterByEms($query, $filterType)
+    {
+        switch ($filterType) {
+            case 'interested':
+                return $query->where('ems_interest', true);
+                
+            case 'interested_no_contraindications':
+                return $query->where('ems_interest', true)
+                      ->where(function($q) {
+                          $q->whereNull('ems_contraindications')
+                            ->orWhereJsonLength('ems_contraindications', 0);
+                      });
+                      
+            case 'interested_with_contraindications':
+                return $query->where('ems_interest', true)
+                      ->whereNotNull('ems_contraindications')
+                      ->whereJsonLength('ems_contraindications', '>', 0);
+                      
+            case 'not_interested':
+                return $query->where(function($q) {
+                    $q->where('ems_interest', false)
+                      ->orWhereNull('ems_interest');
+                });
+                
+            default:
+                return $query;
+        }
     }
     
     /**

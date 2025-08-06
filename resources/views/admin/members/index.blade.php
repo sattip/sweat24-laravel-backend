@@ -6,9 +6,17 @@
 <div class="max-w-7xl mx-auto">
     <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-800">Member Management</h1>
-        <button onclick="openCreateModal()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
-            <i class="fas fa-plus mr-2"></i>Add New Member
-        </button>
+        <div class="flex gap-2">
+            <button onclick="exportEmsData()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                <i class="fas fa-download mr-2"></i>Export EMS Data
+            </button>
+            <button onclick="showEmsStatistics()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition">
+                <i class="fas fa-chart-bar mr-2"></i>EMS Statistics
+            </button>
+            <button onclick="openCreateModal()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                <i class="fas fa-plus mr-2"></i>Add New Member
+            </button>
+        </div>
     </div>
     
     <!-- Filters -->
@@ -24,6 +32,13 @@
                 <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
                 <option value="inactive" {{ request('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                 <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Expired</option>
+            </select>
+            <select name="ems_filter" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All EMS Status</option>
+                <option value="interested" {{ request('ems_filter') == 'interested' ? 'selected' : '' }}>EMS Interested</option>
+                <option value="interested_no_contraindications" {{ request('ems_filter') == 'interested_no_contraindications' ? 'selected' : '' }}>EMS (No Contraindications)</option>
+                <option value="interested_with_contraindications" {{ request('ems_filter') == 'interested_with_contraindications' ? 'selected' : '' }}>EMS (With Contraindications)</option>
+                <option value="not_interested" {{ request('ems_filter') == 'not_interested' ? 'selected' : '' }}>No EMS Interest</option>
             </select>
             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
                 <i class="fas fa-search mr-2"></i>Filter
@@ -43,6 +58,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membership</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMS</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
@@ -95,6 +111,23 @@
                         @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
+                        @if($member->ems_interest)
+                            @if($member->hasEmsContraindications())
+                                <span class="text-yellow-600" title="EMS Interest with contraindications">
+                                    <i class="fas fa-exclamation-triangle"></i> EMS
+                                </span>
+                            @else
+                                <span class="text-green-600" title="EMS Interest without contraindications">
+                                    <i class="fas fa-check-circle"></i> EMS
+                                </span>
+                            @endif
+                        @else
+                            <span class="text-gray-400" title="No EMS Interest">
+                                <i class="fas fa-times-circle"></i> No EMS
+                            </span>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                             {{ $member->status === 'active' ? 'bg-green-100 text-green-800' : 
                                ($member->status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800') }}">
@@ -130,7 +163,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="9" class="px-6 py-4 text-center text-gray-500">
                         No members found.
                     </td>
                 </tr>
@@ -412,12 +445,46 @@
                     </div>
                 ` : ''}
                 
-                ${data.emergency_contact || data.medical_history ? `
+                ${data.emergency_contact || data.medical_history || data.ems_interest ? `
                     <div class="mt-6">
                         <h4 class="font-semibold text-gray-700 mb-2">Emergency & Medical Information</h4>
                         <dl class="space-y-2">
                             ${data.emergency_contact ? `<div><dt class="text-sm text-gray-500">Emergency Contact:</dt><dd class="text-sm font-medium">${data.emergency_contact} (${data.emergency_phone || 'No phone'})</dd></div>` : ''}
                             ${data.medical_history ? `<div><dt class="text-sm text-gray-500">Medical History:</dt><dd class="text-sm">${data.medical_history}</dd></div>` : ''}
+                        </dl>
+                    </div>
+                ` : ''}
+                
+                ${data.ems_interest ? `
+                    <div class="mt-6">
+                        <h4 class="font-semibold text-gray-700 mb-2">EMS Status</h4>
+                        <dl class="space-y-2">
+                            <div>
+                                <dt class="text-sm text-gray-500">EMS Interest:</dt>
+                                <dd class="text-sm font-medium">
+                                    ${data.ems_interest ? '<span class="text-green-600">Yes</span>' : '<span class="text-gray-500">No</span>'}
+                                </dd>
+                            </div>
+                            ${data.ems_liability_accepted ? `
+                                <div>
+                                    <dt class="text-sm text-gray-500">EMS Liability Accepted:</dt>
+                                    <dd class="text-sm font-medium"><span class="text-green-600">Yes</span></dd>
+                                </div>
+                            ` : ''}
+                            ${data.ems_contraindications && Object.keys(data.ems_contraindications).length > 0 ? `
+                                <div>
+                                    <dt class="text-sm text-gray-500">EMS Contraindications:</dt>
+                                    <dd class="text-sm">
+                                        <ul class="list-disc list-inside mt-1">
+                                            ${Object.entries(data.ems_contraindications)
+                                                .filter(([key, value]) => value.has_condition)
+                                                .map(([key, value]) => `
+                                                    <li>${key} ${value.year_of_onset ? `(${value.year_of_onset})` : ''}</li>
+                                                `).join('')}
+                                        </ul>
+                                    </dd>
+                                </div>
+                            ` : '<div><dt class="text-sm text-gray-500">EMS Contraindications:</dt><dd class="text-sm text-green-600">None</dd></div>'}
                         </dl>
                     </div>
                 ` : ''}
@@ -455,6 +522,79 @@
     // Create Member (placeholder)
     function openCreateModal() {
         alert('Create member functionality will be implemented next');
+    }
+    
+    // Export EMS Data
+    function exportEmsData() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const emsFilter = urlParams.get('ems_filter') || '';
+        
+        window.location.href = `/admin/members/export-ems?ems_filter=${emsFilter}`;
+    }
+    
+    // Show EMS Statistics
+    function showEmsStatistics() {
+        fetch('/admin/members/ems-statistics')
+            .then(response => response.json())
+            .then(data => {
+                let statsHtml = `
+                    <div class="p-6">
+                        <h3 class="text-2xl font-bold mb-4">EMS Statistics</h3>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-gray-50 p-4 rounded">
+                                <div class="text-sm text-gray-500">Total Members</div>
+                                <div class="text-2xl font-bold">${data.total_members}</div>
+                            </div>
+                            <div class="bg-blue-50 p-4 rounded">
+                                <div class="text-sm text-gray-500">EMS Interested</div>
+                                <div class="text-2xl font-bold text-blue-600">${data.ems_interested}</div>
+                                <div class="text-sm text-gray-500">${data.total_members > 0 ? Math.round(data.ems_interested / data.total_members * 100) : 0}%</div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded">
+                                <div class="text-sm text-gray-500">Without Contraindications</div>
+                                <div class="text-2xl font-bold text-green-600">${data.ems_no_contraindications}</div>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded">
+                                <div class="text-sm text-gray-500">With Contraindications</div>
+                                <div class="text-2xl font-bold text-yellow-600">${data.ems_with_contraindications}</div>
+                            </div>
+                        </div>
+                        
+                        ${Object.keys(data.common_contraindications).length > 0 ? `
+                            <div class="mt-6">
+                                <h4 class="font-semibold mb-2">Most Common Contraindications</h4>
+                                <div class="space-y-2">
+                                    ${Object.entries(data.common_contraindications).map(([name, count]) => `
+                                        <div class="flex justify-between bg-gray-50 p-2 rounded">
+                                            <span>${name}</span>
+                                            <span class="font-medium">${count} members</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // Create modal for statistics
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+                modal.innerHTML = `
+                    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                        ${statsHtml}
+                        <div class="mt-4">
+                            <button onclick="this.closest('.fixed').remove()" class="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            })
+            .catch(error => {
+                alert('Error loading statistics: ' + error.message);
+            });
     }
     
     // View Parent Signature
