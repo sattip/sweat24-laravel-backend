@@ -482,7 +482,7 @@
                             <div class="bg-blue-50 p-4 rounded">
                                 <div class="text-sm text-gray-500">EMS Interested</div>
                                 <div class="text-2xl font-bold text-blue-600">${data.ems_interested}</div>
-                                <div class="text-sm text-gray-500">${Math.round(data.ems_interested / data.total_members * 100)}%</div>
+                                <div class="text-sm text-gray-500">${data.total_members > 0 ? Math.round(data.ems_interested / data.total_members * 100) : 0}%</div>
                             </div>
                             <div class="bg-green-50 p-4 rounded">
                                 <div class="text-sm text-gray-500">Without Contraindications</div>

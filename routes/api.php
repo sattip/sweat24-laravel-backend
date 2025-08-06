@@ -425,7 +425,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/ems-contraindications', [MedicalHistoryController::class, 'getEmsContraindications']);
         Route::post('/', [MedicalHistoryController::class, 'submitMedicalHistory']);
         Route::get('/', [MedicalHistoryController::class, 'getMedicalHistory']);
-        Route::get('/{userId}', [MedicalHistoryController::class, 'getMedicalHistory'])->middleware('role:admin,trainer');
+        Route::get('/{userId}', [MedicalHistoryController::class, 'getMedicalHistory'])->where('userId', '[0-9]+')->middleware('role:admin,trainer');
         Route::put('/', [MedicalHistoryController::class, 'updateMedicalHistory']);
     });
     

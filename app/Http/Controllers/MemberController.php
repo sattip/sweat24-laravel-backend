@@ -28,31 +28,9 @@ class MemberController extends Controller
             $query->where('status', $request->status);
         }
         
-        // EMS filtering
+        // EMS filtering using scope
         if ($request->has('ems_filter') && $request->ems_filter) {
-            switch ($request->ems_filter) {
-                case 'interested':
-                    $query->where('ems_interest', true);
-                    break;
-                case 'interested_no_contraindications':
-                    $query->where('ems_interest', true)
-                          ->where(function($q) {
-                              $q->whereNull('ems_contraindications')
-                                ->orWhereJsonLength('ems_contraindications', 0);
-                          });
-                    break;
-                case 'interested_with_contraindications':
-                    $query->where('ems_interest', true)
-                          ->whereNotNull('ems_contraindications')
-                          ->whereJsonLength('ems_contraindications', '>', 0);
-                    break;
-                case 'not_interested':
-                    $query->where(function($q) {
-                        $q->where('ems_interest', false)
-                          ->orWhereNull('ems_interest');
-                    });
-                    break;
-            }
+            $query->filterByEms($request->ems_filter);
         }
         
         $members = $query->orderBy('created_at', 'desc')->paginate(20);
@@ -68,31 +46,9 @@ class MemberController extends Controller
         $query = User::where('membership_type', '!=', 'Admin')
                     ->orWhereNull('membership_type');
         
-        // Apply same filters as index
+        // Apply same filters as index using scope
         if ($request->has('ems_filter') && $request->ems_filter) {
-            switch ($request->ems_filter) {
-                case 'interested':
-                    $query->where('ems_interest', true);
-                    break;
-                case 'interested_no_contraindications':
-                    $query->where('ems_interest', true)
-                          ->where(function($q) {
-                              $q->whereNull('ems_contraindications')
-                                ->orWhereJsonLength('ems_contraindications', 0);
-                          });
-                    break;
-                case 'interested_with_contraindications':
-                    $query->where('ems_interest', true)
-                          ->whereNotNull('ems_contraindications')
-                          ->whereJsonLength('ems_contraindications', '>', 0);
-                    break;
-                case 'not_interested':
-                    $query->where(function($q) {
-                        $q->where('ems_interest', false)
-                          ->orWhereNull('ems_interest');
-                    });
-                    break;
-            }
+            $query->filterByEms($request->ems_filter);
         }
         
         $members = $query->get();
@@ -177,15 +133,15 @@ class MemberController extends Controller
             'ems_liability_accepted' => User::where('ems_liability_accepted', true)->count(),
         ];
         
-        // Get most common contraindications
-        $members = User::where('ems_interest', true)
+        // Get most common contraindications - optimize by only selecting needed column
+        $contraindicationsData = User::where('ems_interest', true)
             ->whereNotNull('ems_contraindications')
-            ->get();
+            ->pluck('ems_contraindications');
         
         $contraindicationsCount = [];
-        foreach ($members as $member) {
-            if ($member->ems_contraindications && is_array($member->ems_contraindications)) {
-                foreach ($member->ems_contraindications as $name => $data) {
+        foreach ($contraindicationsData as $contraindications) {
+            if ($contraindications && is_array($contraindications)) {
+                foreach ($contraindications as $name => $data) {
                     if (isset($data['has_condition']) && $data['has_condition']) {
                         if (!isset($contraindicationsCount[$name])) {
                             $contraindicationsCount[$name] = 0;

@@ -345,4 +345,36 @@ class User extends Authenticatable
     {
         return $this->ems_liability_accepted === true;
     }
+    
+    /**
+     * Scope for EMS filtering
+     */
+    public function scopeFilterByEms($query, $filterType)
+    {
+        switch ($filterType) {
+            case 'interested':
+                return $query->where('ems_interest', true);
+                
+            case 'interested_no_contraindications':
+                return $query->where('ems_interest', true)
+                      ->where(function($q) {
+                          $q->whereNull('ems_contraindications')
+                            ->orWhereJsonLength('ems_contraindications', 0);
+                      });
+                      
+            case 'interested_with_contraindications':
+                return $query->where('ems_interest', true)
+                      ->whereNotNull('ems_contraindications')
+                      ->whereJsonLength('ems_contraindications', '>', 0);
+                      
+            case 'not_interested':
+                return $query->where(function($q) {
+                    $q->where('ems_interest', false)
+                      ->orWhereNull('ems_interest');
+                });
+                
+            default:
+                return $query;
+        }
+    }
 }
