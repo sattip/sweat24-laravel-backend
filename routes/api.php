@@ -59,6 +59,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 Route::prefix('v1/auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
+    Route::post('/check-age', [AuthController::class, 'checkAge']);
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     

@@ -41,6 +41,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membership</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral</th>
@@ -67,6 +68,25 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900">{{ $member->email }}</div>
                         <div class="text-sm text-gray-500">{{ $member->phone ?? 'No phone' }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        @if($member->age_at_registration)
+                            <span class="text-sm font-medium {{ $member->is_minor ? 'text-red-600' : 'text-gray-900' }}">
+                                {{ $member->age_at_registration }} yrs
+                            </span>
+                            @if($member->is_minor)
+                                <div class="flex items-center mt-1">
+                                    <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Minor</span>
+                                    @if($member->parentConsent)
+                                        <span class="ml-1 text-green-600" title="Parent consent provided">
+                                            <i class="fas fa-check-circle text-xs"></i>
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
+                        @else
+                            <span class="text-sm text-gray-400">-</span>
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900">{{ $member->membership_type ?? 'Standard' }}</div>
@@ -110,7 +130,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                         No members found.
                     </td>
                 </tr>
@@ -327,6 +347,7 @@
                             <div><dt class="text-sm text-gray-500">Email:</dt><dd class="text-sm font-medium">${data.email}</dd></div>
                             <div><dt class="text-sm text-gray-500">Phone:</dt><dd class="text-sm font-medium">${data.phone || 'N/A'}</dd></div>
                             <div><dt class="text-sm text-gray-500">Date of Birth:</dt><dd class="text-sm font-medium">${data.date_of_birth || 'N/A'}</dd></div>
+                            <div><dt class="text-sm text-gray-500">Age at Registration:</dt><dd class="text-sm font-medium">${data.age_at_registration ? data.age_at_registration + ' years' : 'N/A'} ${data.is_minor ? '<span class="text-red-600">(Minor)</span>' : ''}</dd></div>
                             <div><dt class="text-sm text-gray-500">Address:</dt><dd class="text-sm font-medium">${data.address || 'N/A'}</dd></div>
                         </dl>
                     </div>
@@ -354,6 +375,39 @@
                                     <div class="text-sm text-gray-600">Sessions: ${pkg.remaining_sessions}/${pkg.total_sessions}</div>
                                 </div>
                             `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${data.parent_consent ? `
+                    <div class="mt-6 p-4 bg-yellow-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-user-shield text-yellow-600 mr-2"></i>
+                            Parent/Guardian Consent Information
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <dl class="space-y-2">
+                                    <div><dt class="text-sm text-gray-500">Parent Name:</dt><dd class="text-sm font-medium">${data.parent_consent.parent_full_name}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Father:</dt><dd class="text-sm">${data.parent_consent.father_first_name} ${data.parent_consent.father_last_name}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Mother:</dt><dd class="text-sm">${data.parent_consent.mother_first_name} ${data.parent_consent.mother_last_name}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Parent Birth Date:</dt><dd class="text-sm">${data.parent_consent.parent_birth_date}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">ID Number:</dt><dd class="text-sm font-medium">${data.parent_consent.parent_id_number}</dd></div>
+                                </dl>
+                            </div>
+                            <div>
+                                <dl class="space-y-2">
+                                    <div><dt class="text-sm text-gray-500">Phone:</dt><dd class="text-sm font-medium">${data.parent_consent.parent_phone}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Email:</dt><dd class="text-sm">${data.parent_consent.parent_email}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Address:</dt><dd class="text-sm">${data.parent_consent.parent_street} ${data.parent_consent.parent_street_number}, ${data.parent_consent.parent_postal_code} ${data.parent_consent.parent_location}</dd></div>
+                                    <div><dt class="text-sm text-gray-500">Consent Date:</dt><dd class="text-sm font-medium">${new Date(data.parent_consent.server_timestamp).toLocaleString()}</dd></div>
+                                    <div>
+                                        <button onclick="viewParentSignature('${data.parent_consent.signature}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                            <i class="fas fa-signature mr-1"></i>View Signature
+                                        </button>
+                                    </div>
+                                </dl>
+                            </div>
                         </div>
                     </div>
                 ` : ''}
@@ -401,6 +455,41 @@
     // Create Member (placeholder)
     function openCreateModal() {
         alert('Create member functionality will be implemented next');
+    }
+    
+    // View Parent Signature
+    function viewParentSignature(signatureData) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+        modal.innerHTML = `
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Parent/Guardian Signature</h3>
+                    <div class="border p-4 bg-gray-50 rounded">
+                        <img src="${signatureData}" alt="Parent Signature" class="w-full h-auto" />
+                    </div>
+                    <div class="mt-4 flex justify-between">
+                        <button onclick="downloadSignature('${signatureData}')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            <i class="fas fa-download mr-2"></i>Download
+                        </button>
+                        <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Download Signature
+    function downloadSignature(signatureData) {
+        const link = document.createElement('a');
+        link.href = signatureData;
+        link.download = 'parent_signature.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 </script>
 @endsection
