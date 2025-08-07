@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Signature;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
@@ -253,6 +255,205 @@ class AdminController extends Controller
             ]);
 
             return $this->serverErrorResponse('Παρουσιάστηκε σφάλμα κατά την απόρριψη του χρήστη');
+        }
+    }
+
+    /**
+     * Get full user profile with all related data for admin panel
+     */
+    public function getUserFullProfile(Request $request, $userId): JsonResponse
+    {
+        try {
+            $user = User::with([
+                'parentConsent',
+                'signatures',
+                'referrer'
+            ])->findOrFail($userId);
+
+            // Build the response structure
+            $response = [
+                'id' => $user->id,
+                'full_name' => $user->name,
+                'email' => $user->email,
+                'is_minor' => $user->is_minor,
+                'registration_date' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                'signature_url' => null,
+                'guardian_details' => null,
+                'medical_history' => null,
+                'found_us_via' => null,
+            ];
+
+            // Add user's signature URL if exists
+            $userSignature = $user->signatures()
+                ->where('document_type', 'terms_and_conditions')
+                ->latest()
+                ->first();
+            
+            if ($userSignature) {
+                $response['signature_url'] = $this->processSignature($userSignature, $user->id, 'user');
+            }
+
+            // Add guardian details if user is a minor
+            if ($user->is_minor && $user->parentConsent) {
+                $parentConsent = $user->parentConsent;
+                $guardianSignatureUrl = null;
+                
+                // Process parent signature if exists
+                if ($parentConsent->signature) {
+                    $guardianSignatureUrl = $this->processSignature(
+                        (object)['signature_data' => $parentConsent->signature],
+                        $user->id,
+                        'guardian'
+                    );
+                }
+
+                $response['guardian_details'] = [
+                    'full_name' => $parentConsent->parent_full_name,
+                    'father_name' => trim(($parentConsent->father_first_name ?? '') . ' ' . ($parentConsent->father_last_name ?? '')),
+                    'mother_name' => trim(($parentConsent->mother_first_name ?? '') . ' ' . ($parentConsent->mother_last_name ?? '')),
+                    'birth_date' => $parentConsent->parent_birth_date ? $parentConsent->parent_birth_date->format('Y-m-d') : null,
+                    'id_number' => $parentConsent->parent_id_number,
+                    'phone' => $parentConsent->parent_phone,
+                    'address' => trim(($parentConsent->parent_street ?? '') . ' ' . ($parentConsent->parent_street_number ?? '')),
+                    'city' => $parentConsent->parent_location,
+                    'zip_code' => $parentConsent->parent_postal_code,
+                    'email' => $parentConsent->parent_email,
+                    'consent_date' => $parentConsent->server_timestamp ? $parentConsent->server_timestamp->toIso8601String() : null,
+                    'signature_url' => $guardianSignatureUrl,
+                ];
+            }
+
+            // Add medical history (EMS) if user has interest
+            if ($user->ems_interest) {
+                $response['medical_history'] = [
+                    'has_ems_interest' => true,
+                    'ems_contraindications' => $user->ems_contraindications ?? [],
+                    'ems_liability_accepted' => $user->ems_liability_accepted ?? false,
+                    'other_medical_data' => [
+                        'medical_conditions' => [
+                            'medical_history' => $user->medical_history,
+                            'emergency_contact' => $user->emergency_contact,
+                            'emergency_phone' => $user->emergency_phone,
+                        ],
+                        'emergency_contact' => [
+                            'name' => $user->emergency_contact,
+                            'phone' => $user->emergency_phone,
+                        ]
+                    ]
+                ];
+            }
+
+            // Add referral/how found us information
+            if ($user->found_us_via) {
+                $foundUsData = [
+                    'source' => $user->found_us_via,
+                    'referrer_info' => null,
+                    'sub_source' => null,
+                ];
+
+                // If referred by someone
+                if (in_array($user->found_us_via, ['friend', 'member', 'Σύσταση']) || $user->referrer_id) {
+                    $referrer = $user->referrer;
+                    if ($referrer) {
+                        $foundUsData['referrer_info'] = [
+                            'referrer_id' => $referrer->id,
+                            'referrer_name' => $referrer->name,
+                            'code_or_name_used' => $user->referral_code_or_name,
+                        ];
+                    } else if ($user->referral_code_or_name) {
+                        $foundUsData['referrer_info'] = [
+                            'referrer_id' => null,
+                            'referrer_name' => $user->referral_code_or_name,
+                            'code_or_name_used' => $user->referral_code_or_name,
+                        ];
+                    }
+                }
+
+                // If from social media
+                if (in_array($user->found_us_via, ['facebook', 'instagram', 'Social'])) {
+                    $foundUsData['sub_source'] = $user->social_platform ?? $user->found_us_via;
+                }
+
+                $response['found_us_via'] = $foundUsData;
+            }
+
+            return $this->successResponse($response);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->notFoundResponse('Ο χρήστης δεν βρέθηκε');
+        } catch (\Exception $e) {
+            Log::error('Error fetching user full profile', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->serverErrorResponse('Παρουσιάστηκε σφάλμα κατά την ανάκτηση του προφίλ χρήστη');
+        }
+    }
+
+    /**
+     * Process signature data (convert Base64 to file URL)
+     */
+    private function processSignature($signatureObject, $userId, $type = 'user')
+    {
+        try {
+            $signatureData = $signatureObject->signature_data ?? $signatureObject->signature ?? null;
+            
+            if (!$signatureData) {
+                return null;
+            }
+
+            // Check if it's already a URL
+            if (filter_var($signatureData, FILTER_VALIDATE_URL)) {
+                return $signatureData;
+            }
+
+            // Check if it's Base64 data
+            if (strpos($signatureData, 'data:image') === 0) {
+                // Extract the base64 content
+                $parts = explode(',', $signatureData);
+                if (count($parts) !== 2) {
+                    return null;
+                }
+
+                $base64Data = $parts[1];
+                $imageData = base64_decode($base64Data);
+                
+                // Determine file extension from mime type
+                $mimeType = null;
+                if (preg_match('/^data:image\/(\w+);base64/', $signatureData, $matches)) {
+                    $mimeType = $matches[1];
+                }
+                
+                $extension = $mimeType === 'jpeg' ? 'jpg' : ($mimeType ?? 'png');
+                
+                // Generate filename
+                $filename = sprintf('signatures/user_%d_%s.%s', $userId, $type, $extension);
+                
+                // Store the file
+                Storage::disk('public')->put($filename, $imageData);
+                
+                // Return the full URL
+                return url('storage/' . $filename);
+            }
+
+            // If it's plain base64 without data URI prefix
+            if (base64_encode(base64_decode($signatureData, true)) === $signatureData) {
+                $imageData = base64_decode($signatureData);
+                $filename = sprintf('signatures/user_%d_%s.png', $userId, $type);
+                Storage::disk('public')->put($filename, $imageData);
+                return url('storage/' . $filename);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error processing signature', [
+                'user_id' => $userId,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
         }
     }
 }

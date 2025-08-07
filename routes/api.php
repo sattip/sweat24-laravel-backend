@@ -54,6 +54,7 @@ Route::prefix('v1/admin')->middleware(['auth:sanctum'])->group(function () {
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
     Route::post('/users/{id}/reject', [AdminController::class, 'rejectUser']);
+    Route::get('/users/{userId}/full-profile', [AdminController::class, 'getUserFullProfile']);
 });
 
 // Authentication routes (public)
