@@ -16,10 +16,12 @@ class BookingCancelled
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $booking;
+    public string $previousStatus;
 
-    public function __construct(Booking $booking)
+    public function __construct(Booking $booking, string $previousStatus)
     {
         $this->booking = $booking;
+        $this->previousStatus = $previousStatus;
     }
 
     public function broadcastOn(): array

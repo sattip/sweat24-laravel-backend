@@ -432,13 +432,14 @@ class BookingController extends Controller
         DB::beginTransaction();
         try {
             // Update booking status
+            $previousStatus = $booking->status;
             $booking->update([
                 'status' => 'cancelled',
                 'cancellation_reason' => $validated['cancellation_reason'] ?? null,
             ]);
             
             // Dispatch BookingCancelled event (handles session refund & participants count)
-            BookingCancelled::dispatch($booking);
+            BookingCancelled::dispatch($booking, $previousStatus);
             
             // Log the cancellation activity
             // ActivityLogger::logBookingCancellation($booking);

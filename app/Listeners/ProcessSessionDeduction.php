@@ -28,7 +28,7 @@ class ProcessSessionDeduction
         if ($event instanceof BookingCreated && $booking->status === 'confirmed') {
             $this->deductSession($booking);
         } elseif ($event instanceof BookingCancelled) {
-            $this->refundSession($booking);
+            $this->refundSession($booking, $event->previousStatus ?? null);
         }
     }
     
@@ -62,10 +62,11 @@ class ProcessSessionDeduction
         }
     }
     
-    private function refundSession($booking): void
+    private function refundSession($booking, ?string $previousStatus = null): void
     {
         // Only refund if the booking was originally confirmed
-        if ($booking->getOriginal('status') !== 'confirmed') {
+        $wasConfirmed = $previousStatus ? $previousStatus === 'confirmed' : ($booking->getOriginal('status') === 'confirmed');
+        if (!$wasConfirmed) {
             return;
         }
         
