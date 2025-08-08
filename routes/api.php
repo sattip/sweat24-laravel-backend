@@ -320,6 +320,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('admin/referrals/top-referrers', [ApiReferralController::class, 'topReferrers']);
         Route::get('admin/referrals/source-statistics', [ApiReferralController::class, 'sourceStatistics']);
         
+        // Assign package to user
+        Route::post('admin/users/{user}/assign-package', [\App\Http\Controllers\Admin\UserPackageController::class, 'assign']);
+
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);
         Route::post('admin/partners', [PartnerController::class, 'adminCreatePartner']);
