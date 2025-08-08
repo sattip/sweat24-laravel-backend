@@ -52,7 +52,14 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        return response()->json($user->load('packages', 'bookings', 'activityLogs', 'parentConsent'));
+        $userData = $user->load('packages', 'bookings', 'activityLogs', 'parentConsent')->toArray();
+        
+        // Ensure medical_history is decoded as JSON object, not string
+        if (isset($userData['medical_history']) && is_string($userData['medical_history'])) {
+            $userData['medical_history'] = json_decode($userData['medical_history'], true);
+        }
+        
+        return response()->json($userData);
     }
 
     public function update(Request $request, User $user)

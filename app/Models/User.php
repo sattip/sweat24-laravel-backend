@@ -88,11 +88,34 @@ class User extends Authenticatable
             'ems_interest' => 'boolean',
             'ems_contraindications' => 'array',
             'ems_liability_accepted' => 'boolean',
+            'medical_history' => 'json', // Use json cast for proper encoding/decoding
             'is_minor' => 'boolean',
             'age_at_registration' => 'integer',
             'referral_validated' => 'boolean',
             'referral_validated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Accessor to ensure medical_history is always returned as JSON object, not string
+     */
+    public function getMedicalHistoryAttribute($value)
+    {
+        if (is_null($value)) {
+            return null;
+        }
+        
+        // If it's already an array (properly cast), return as-is
+        if (is_array($value)) {
+            return $value;
+        }
+        
+        // If it's a string, decode it to array
+        if (is_string($value)) {
+            return json_decode($value, true);
+        }
+        
+        return $value;
     }
 
     public function packages()
@@ -487,4 +510,6 @@ class User extends Authenticatable
             'validated_referrals' => $this->referredUsers()->where('referral_validated', true)->count(),
         ];
     }
+
+
 }

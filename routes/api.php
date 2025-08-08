@@ -62,7 +62,7 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
-    Route::post('/check-age', [AuthController::class, 'checkAge']);
+    Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     
@@ -711,4 +711,12 @@ Route::any('/debug/admin-requests', function(Request $request) {
         ] : null,
         'timestamp' => now()
     ]);
+});
+
+Route::prefix('v1')->group(function () {
+    Route::get('debug/pusher', function(\Illuminate\Http\Request $request) {
+        $message = $request->query('message', 'Hello from Laravel!');
+        event(new \App\Events\TestPusherEvent($message));
+        return response()->json(['ok' => true, 'sent' => $message]);
+    });
 });

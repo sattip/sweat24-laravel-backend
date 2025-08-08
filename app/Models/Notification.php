@@ -16,6 +16,7 @@ class Notification extends Model
     const TYPE_OFFER = 'offer';           // Προσφορά
     const TYPE_PARTY_EVENT = 'party_event'; // Πάρτι/Εκδήλωση
     const TYPE_ORDER_STATUS = 'order_status'; // Κατάσταση Παραγγελίας
+    const TYPE_CHAT_MESSAGE = 'chat_message';
     
     // Priority constants
     const PRIORITY_LOW = 'low';
@@ -58,6 +59,7 @@ class Notification extends Model
             self::TYPE_OFFER => 'Προσφορά',
             self::TYPE_PARTY_EVENT => 'Πάρτι/Εκδήλωση',
             self::TYPE_ORDER_STATUS => 'Κατάσταση Παραγγελίας',
+            self::TYPE_CHAT_MESSAGE => 'Μήνυμα συνομιλίας',
         ];
     }
 
