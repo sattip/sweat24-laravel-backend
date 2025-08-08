@@ -322,6 +322,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         
         // Assign package to user
         Route::post('admin/users/{user}/assign-package', [\App\Http\Controllers\Admin\UserPackageController::class, 'assign']);
+        // Hard delete a user package for a specific user (admin only)
+        Route::delete('admin/users/{userId}/packages/{userPackageId}', [\App\Http\Controllers\Admin\UserPackageController::class, 'destroy']);
 
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);

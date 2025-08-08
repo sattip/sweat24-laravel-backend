@@ -84,4 +84,27 @@ class UserPackageController extends Controller
             ],
         ], 201);
     }
+
+    /**
+     * Hard delete a specific user package by id, scoped to the given user.
+     */
+    public function destroy(Request $request, int $userId, int $userPackageId)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $userPackage = UserPackage::where('id', $userPackageId)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (!$userPackage) {
+            return response()->json(['message' => 'User package not found'], 404);
+        }
+
+        $userPackage->delete(); // Hard delete; FKs are ON DELETE CASCADE for related tables
+
+        return response()->json(['message' => 'User package deleted'], 200);
+    }
 } 
