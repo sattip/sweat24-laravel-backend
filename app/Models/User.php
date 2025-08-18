@@ -265,6 +265,14 @@ class User extends Authenticatable
     }
     
     /**
+     * Get the body measurements for the user
+     */
+    public function bodyMeasurements()
+    {
+        return $this->hasMany(\App\Models\BodyMeasurement::class);
+    }
+    
+    /**
      * Get formatted gender for display
      */
     public function getGenderDisplayAttribute(): string

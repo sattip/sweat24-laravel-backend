@@ -328,6 +328,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         // Admin Progress Photos Routes
         Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
         Route::delete('admin/progress-photos/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'adminDestroy']);
+        
+        // Admin Body Measurements Routes
+        Route::get('admin/users/{userId}/measurements', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserMeasurements']);
+        Route::get('admin/users/{userId}/measurements/latest', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserLatestMeasurement']);
 
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);
@@ -450,6 +454,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'index']);
         Route::post('/', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'store']);
         Route::delete('/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'destroy']);
+    });
+    
+    // Body Measurements Routes
+    Route::prefix('measurements')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'store']);
+        Route::get('/latest', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'latest']);
+        Route::get('/comparison', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'comparison']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'destroy']);
     });
     
     // Medical History Routes
