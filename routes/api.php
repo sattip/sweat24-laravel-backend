@@ -324,6 +324,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('admin/users/{user}/assign-package', [\App\Http\Controllers\Admin\UserPackageController::class, 'assign']);
         // Hard delete a user package for a specific user (admin only)
         Route::delete('admin/users/{userId}/packages/{userPackageId}', [\App\Http\Controllers\Admin\UserPackageController::class, 'destroy']);
+        
+        // Admin Progress Photos Routes
+        Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
+        Route::delete('admin/progress-photos/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'adminDestroy']);
 
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);
@@ -439,6 +443,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/booking-history', [ClientProfileController::class, 'bookingHistory']);
         Route::put('/bookings/{booking}/notes', [ClientProfileController::class, 'updateBookingNotes']);
         Route::post('/deactivation-request', [ClientProfileController::class, 'requestDeactivation']);
+    });
+    
+    // Progress Photos Routes
+    Route::prefix('progress-photos')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'store']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'destroy']);
     });
     
     // Medical History Routes

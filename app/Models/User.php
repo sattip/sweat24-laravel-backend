@@ -257,6 +257,14 @@ class User extends Authenticatable
     }
     
     /**
+     * Get the progress photos for the user
+     */
+    public function progressPhotos()
+    {
+        return $this->hasMany(\App\Models\ProgressPhoto::class);
+    }
+    
+    /**
      * Get formatted gender for display
      */
     public function getGenderDisplayAttribute(): string
