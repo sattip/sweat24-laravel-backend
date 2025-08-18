@@ -29,6 +29,9 @@ class RegistrationController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'password' => 'required|string|min:8|confirmed',
                 'date_of_birth' => 'nullable|date|before:today',
+                'gender' => 'nullable|string|in:male,female,other,prefer_not_to_say',
+                'weight' => 'nullable|numeric|between:30,300',
+                'height' => 'nullable|numeric|between:100,250',
                 'address' => 'nullable|string|max:500',
                 'emergency_contact' => 'nullable|string|max:255',
                 'emergency_phone' => 'nullable|string|max:20',
@@ -49,6 +52,9 @@ class RegistrationController extends Controller
                 'phone' => $validated['phone'] ?? null,
                 'password' => Hash::make($validated['password']),
                 'date_of_birth' => $validated['date_of_birth'] ?? null,
+                'gender' => $validated['gender'] ?? null,
+                'weight' => $validated['weight'] ?? null,
+                'height' => $validated['height'] ?? null,
                 'address' => $validated['address'] ?? null,
                 'emergency_contact' => $validated['emergency_contact'] ?? null,
                 'emergency_phone' => $validated['emergency_phone'] ?? null,
@@ -60,6 +66,7 @@ class RegistrationController extends Controller
                 'registration_status' => 'pending_approval', // Changed to require admin approval first
                 'remaining_sessions' => 0,
                 'total_sessions' => 0,
+                'profile_last_updated' => now(),
                 'notification_preferences' => [
                     'email' => true,
                     'sms' => false,

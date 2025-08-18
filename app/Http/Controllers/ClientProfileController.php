@@ -45,17 +45,42 @@ class ClientProfileController extends Controller
     {
         $user = $request->user();
 
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
+        // Build validation rules dynamically
+        $rules = [
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|string|in:male,female,other,prefer_not_to_say',
+            'weight' => 'nullable|numeric|between:30,300',
+            'height' => 'nullable|numeric|between:100,250',
             'emergency_contact' => 'nullable|string|max:255',
             'emergency_phone' => 'nullable|string|max:20',
             'medical_history' => 'nullable|string|max:1000',
             'notes' => 'nullable|string|max:500',
-        ]);
+        ];
+
+        // Check if user can change name (only if not approved or completed registration)
+        $canChangeName = !($user->registration_status === 'completed' && $user->approved_at);
+        
+        if ($canChangeName) {
+            $rules['name'] = 'sometimes|string|max:255';
+        } else {
+            // If name is sent but user can't change it, return error
+            if ($request->has('name') && $request->name !== $user->name) {
+                return response()->json([
+                    'message' => 'Το όνομα δεν μπορεί να αλλάξει μετά την έγκριση του λογαριασμού',
+                    'errors' => [
+                        'name' => ['Το όνομα είναι κλειδωμένο μετά την έγκριση']
+                    ]
+                ], 422);
+            }
+        }
+
+        $validated = $request->validate($rules);
+        
+        // Add profile update timestamp
+        $validated['profile_last_updated'] = now();
 
         $user->update($validated);
 

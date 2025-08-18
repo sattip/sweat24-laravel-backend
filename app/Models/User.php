@@ -24,6 +24,9 @@ class User extends Authenticatable
         'phone',
         'address',
         'date_of_birth',
+        'gender',
+        'weight',
+        'height',
         'is_minor',
         'age_at_registration',
         'membership_type',
@@ -55,6 +58,7 @@ class User extends Authenticatable
         'referral_code_or_name',
         'referral_validated',
         'referral_validated_at',
+        'profile_last_updated',
     ];
 
     /**
@@ -83,6 +87,7 @@ class User extends Authenticatable
             'terms_accepted_at' => 'datetime',
             'registration_completed_at' => 'datetime',
             'approved_at' => 'datetime',
+            'profile_last_updated' => 'datetime',
             'notification_preferences' => 'array',
             'privacy_settings' => 'array',
             'ems_interest' => 'boolean',
@@ -93,6 +98,8 @@ class User extends Authenticatable
             'age_at_registration' => 'integer',
             'referral_validated' => 'boolean',
             'referral_validated_at' => 'datetime',
+            'weight' => 'decimal:2',
+            'height' => 'decimal:2',
         ];
     }
 
@@ -239,6 +246,45 @@ class User extends Authenticatable
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+    
+    /**
+     * Check if user can edit their name (only before approval)
+     */
+    public function canEditName(): bool
+    {
+        return !($this->registration_status === 'completed' && $this->approved_at);
+    }
+    
+    /**
+     * Get formatted gender for display
+     */
+    public function getGenderDisplayAttribute(): string
+    {
+        $genderMap = [
+            'male' => 'Άνδρας',
+            'female' => 'Γυναίκα', 
+            'other' => 'Άλλο',
+            'prefer_not_to_say' => 'Προτιμώ να μη το πω'
+        ];
+        
+        return $genderMap[$this->gender] ?? 'Δεν έχει οριστεί';
+    }
+    
+    /**
+     * Get formatted weight with unit
+     */
+    public function getWeightDisplayAttribute(): ?string
+    {
+        return $this->weight ? $this->weight . ' kg' : null;
+    }
+    
+    /**
+     * Get formatted height with unit
+     */
+    public function getHeightDisplayAttribute(): ?string
+    {
+        return $this->height ? $this->height . ' cm' : null;
     }
     
     public function approvedUsers()

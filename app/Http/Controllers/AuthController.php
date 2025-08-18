@@ -203,6 +203,9 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'date_of_birth' => $request->date_of_birth ?? null,
+            'gender' => $request->gender ?? null,
+            'weight' => $request->weight ?? null,
+            'height' => $request->height ?? null,
             'is_minor' => false,
             'age_at_registration' => isset($birthDate) ? $birthDate->age : null,
             'membership_type' => $request->membership_type ?? 'Basic',
@@ -215,6 +218,7 @@ class AuthController extends Controller
             'found_us_via' => $request->found_us_via,
             'social_platform' => $request->social_platform,
             'referral_code_or_name' => $request->referral_code_or_name,
+            'profile_last_updated' => now(),
         ];
 
         // Handle referral validation
@@ -318,7 +322,9 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'birthDate' => 'required|date|before:today',
-            'gender' => 'nullable|string|in:male,female,other',
+            'gender' => 'nullable|string|in:male,female,other,prefer_not_to_say',
+            'weight' => 'nullable|numeric|between:30,300',
+            'height' => 'nullable|numeric|between:100,250',
             'phone' => 'nullable|string|max:20',
             'signature' => 'required|string',
             'signedAt' => 'required|date',
@@ -363,6 +369,9 @@ class AuthController extends Controller
                 'password' => Hash::make($validated['password']),
                 'phone' => $validated['phone'] ?? null,
                 'date_of_birth' => $birthDate,
+                'gender' => $validated['gender'] ?? null,
+                'weight' => $validated['weight'] ?? null,
+                'height' => $validated['height'] ?? null,
                 'is_minor' => $isMinor,
                 'age_at_registration' => $age,
                 'membership_type' => 'Basic',
@@ -372,7 +381,8 @@ class AuthController extends Controller
                 'registration_status' => 'pending_approval',
                 'remaining_sessions' => 0,
                 'total_sessions' => 0,
-                'medical_history' => isset($validated['medicalHistory']) ? json_encode($validated['medicalHistory']) : null
+                'medical_history' => isset($validated['medicalHistory']) ? json_encode($validated['medicalHistory']) : null,
+                'profile_last_updated' => now(),
             ]);
             
             // Create parent consent if minor

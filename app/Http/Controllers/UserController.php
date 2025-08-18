@@ -70,6 +70,9 @@ class UserController extends Controller
             'phone' => 'nullable|string',
             'membership_type' => 'nullable|string',
             'status' => 'sometimes|in:active,inactive,expired',
+            'gender' => 'nullable|string|in:male,female,other,prefer_not_to_say',
+            'weight' => 'nullable|numeric|between:30,300',
+            'height' => 'nullable|numeric|between:100,250',
             'medical_history' => 'nullable|string',
             'emergency_contact' => 'nullable|string',
             'emergency_phone' => 'nullable|string',
@@ -86,6 +89,9 @@ class UserController extends Controller
             $validated['password'] = Hash::make($request->password);
         }
 
+        // Add profile update timestamp
+        $validated['profile_last_updated'] = now();
+        
         $user->update($validated);
         
         // Log the update activity
