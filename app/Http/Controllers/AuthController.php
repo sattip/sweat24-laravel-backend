@@ -81,7 +81,11 @@ class AuthController extends Controller
                 'last_visit' => $user->last_visit,
                 'medical_history' => $user->medical_history,
                 'notes' => $user->notes,
-                'has_signed_terms' => $user->signatures()->where('document_type', 'terms_and_conditions')->exists(),
+                'has_signed_terms' => $user->approved_at ? 
+                    $user->signatures()
+                        ->where('document_type', 'terms_and_conditions')
+                        ->where('signed_at', '>', $user->approved_at)
+                        ->exists() : false,
                 'terms_accepted_at' => $user->terms_accepted_at,
                 'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
                 'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
@@ -180,7 +184,11 @@ class AuthController extends Controller
                 'last_visit' => $user->last_visit,
                 'medical_history' => $user->medical_history,
                 'notes' => $user->notes,
-                'has_signed_terms' => $user->signatures()->where('document_type', 'terms_and_conditions')->exists(),
+                'has_signed_terms' => $user->approved_at ? 
+                    $user->signatures()
+                        ->where('document_type', 'terms_and_conditions')
+                        ->where('signed_at', '>', $user->approved_at)
+                        ->exists() : false,
                 'terms_accepted_at' => $user->terms_accepted_at,
                 'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
                 'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
