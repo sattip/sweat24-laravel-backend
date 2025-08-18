@@ -288,6 +288,8 @@ class AdminController extends Controller
                 'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
                 'is_minor' => $user->is_minor,
                 'registration_date' => $user->created_at ? $user->created_at->format('Y-m-d') : null,
+                'has_signed_terms' => $user->signatures()->where('document_type', 'terms_and_conditions')->exists(),
+                'terms_accepted_at' => $user->terms_accepted_at,
                 'signature_url' => null,
                 'guardian_details' => null,
                 'medical_history' => null,
