@@ -21,6 +21,7 @@ use App\Http\Controllers\NotificationFilterController;
 use App\Http\Controllers\UserPackageController;
 use App\Http\Controllers\ClientProfileController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\UserNotificationController;
 use App\Http\Controllers\AdminChatController;
 use App\Http\Controllers\OwnerNotificationController;
 use App\Http\Controllers\TestController;
@@ -569,6 +570,15 @@ Route::prefix('v1/chat')->middleware('auth:sanctum')->group(function () {
     Route::get('/conversation', [ChatController::class, 'getConversation']);
     Route::post('/messages', [ChatController::class, 'sendMessage']);
     Route::put('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
+});
+
+// User Notification routes (with auth)
+Route::prefix('v1/notifications')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', [UserNotificationController::class, 'index']);
+    Route::get('/unread-count', [UserNotificationController::class, 'getUnreadCount']);
+    Route::put('/{id}/read', [UserNotificationController::class, 'markAsRead']);
+    Route::put('/mark-all-read', [UserNotificationController::class, 'markAllAsRead']);
+    Route::delete('/{id}', [UserNotificationController::class, 'delete']);
 });
 
 // ============ LOYALTY SYSTEM ROUTES ============
