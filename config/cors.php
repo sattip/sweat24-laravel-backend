@@ -23,6 +23,7 @@ return [
         'http://localhost:5173',
         'http://localhost:5174',
         'https://sweat24.obs.com.gr',
+        'https://sweat24admin.obs.com.gr',
     ],
 
     'allowed_origins_patterns' => [],
