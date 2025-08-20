@@ -8,9 +8,15 @@ echo "==============================\n";
 echo "Chat API Test Suite\n";
 echo "==============================\n\n";
 
-// Configuration
-$baseUrl = 'http://localhost/api/v1';
-$adminToken = 'YOUR_ADMIN_TOKEN'; // Replace with actual admin token
+// Configuration - Load from environment variables
+$baseUrl = getenv('API_BASE_URL') ?: 'http://localhost/api/v1';
+$adminToken = getenv('ADMIN_TOKEN');
+
+if (!$adminToken) {
+    echo "❌ Error: ADMIN_TOKEN environment variable not set\n";
+    echo "Usage: ADMIN_TOKEN=your_token php test_chat_api.php\n";
+    exit(1);
+}
 
 // Test 1: Get existing conversations
 echo "Test 1: Getting existing conversations\n";
@@ -43,7 +49,7 @@ echo "\n";
 // Test 2: Create new conversation
 echo "Test 2: Creating new conversation from admin\n";
 echo "--------------------------------------------\n";
-$testUserId = 2; // Replace with actual user ID
+$testUserId = getenv('TEST_USER_ID') ?: 2; // Can be overridden via environment variable
 $testMessage = "Hello! This is a test message from admin at " . date('Y-m-d H:i:s');
 
 $ch = curl_init();

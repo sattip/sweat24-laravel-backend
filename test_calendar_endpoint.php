@@ -8,9 +8,16 @@ echo "=====================================\n";
 echo "   CALENDAR VIEW ENDPOINT TEST\n";
 echo "=====================================\n\n";
 
-// Configuration
-$baseUrl = 'http://localhost/api/v1';
-$adminToken = 'YOUR_ADMIN_TOKEN'; // Replace with actual admin token
+// Configuration - Load from environment variables
+$baseUrl = getenv('API_BASE_URL') ?: 'http://localhost/api/v1';
+$adminToken = getenv('ADMIN_TOKEN');
+
+if (!$adminToken) {
+    echo "❌ Error: ADMIN_TOKEN environment variable not set\n";
+    echo "Usage: ADMIN_TOKEN=your_token php test_calendar_endpoint.php\n";
+    exit(1);
+}
+
 $testDate = date('Y-m-d'); // Today's date
 
 echo "📅 Testing date: $testDate\n\n";

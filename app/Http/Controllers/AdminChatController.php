@@ -22,17 +22,21 @@ class AdminChatController extends Controller
         ])
         ->where('status', $status)
         ->orderBy('last_message_at', 'desc')
-        ->get()
-        ->map(function ($conversation) {
+        ->get();
+        
+        // Collect conversations that need unread count updates
+        $conversationsToUpdate = [];
+        
+        $conversationsData = $conversations->map(function ($conversation) use (&$conversationsToUpdate) {
             // Calculate actual unread count for admin
             $adminUnreadCount = $conversation->messages
                 ->where('sender_type', 'user')
                 ->where('is_read', false)
                 ->count();
             
-            // Update the database if count is different
+            // Track conversations that need updating
             if ($adminUnreadCount !== $conversation->admin_unread_count) {
-                $conversation->update(['admin_unread_count' => $adminUnreadCount]);
+                $conversationsToUpdate[$conversation->id] = $adminUnreadCount;
             }
             
             return [
@@ -46,7 +50,13 @@ class AdminChatController extends Controller
             ];
         });
         
-        return response()->json($conversations);
+        // Perform bulk update outside the loop to avoid N+1 queries
+        foreach ($conversationsToUpdate as $conversationId => $unreadCount) {
+            ChatConversation::where('id', $conversationId)
+                ->update(['admin_unread_count' => $unreadCount]);
+        }
+        
+        return response()->json($conversationsData);
     }
     
     public function sendMessage(Request $request)
@@ -82,18 +92,20 @@ class AdminChatController extends Controller
         
         $admin = Auth::user();
         
-        // Check if conversation already exists
-        $conversation = ChatConversation::where('user_id', $request->user_id)->first();
-        
-        if (!$conversation) {
-            // Create new conversation
-            $conversation = ChatConversation::create([
-                'user_id' => $request->user_id,
+        // Use firstOrCreate for atomic operation to prevent race condition
+        $conversation = ChatConversation::firstOrCreate(
+            ['user_id' => $request->user_id],
+            [
                 'status' => 'active',
                 'last_message_at' => now(),
                 'admin_unread_count' => 0,
-                'unread_count' => 1
-            ]);
+                'unread_count' => 0  // Set to 0 because message creation will increment it
+            ]
+        );
+        
+        // If an existing conversation was resolved or archived, reactivate it
+        if (!$conversation->wasRecentlyCreated && $conversation->status !== 'active') {
+            $conversation->update(['status' => 'active']);
         }
         
         // Create the initial message from admin
@@ -104,6 +116,9 @@ class AdminChatController extends Controller
             'content' => $request->initial_message,
             'is_read' => false
         ]);
+        
+        // Update unread count for user (admin sent a message)
+        $conversation->increment('unread_count');
         
         // Load necessary relationships
         $conversation->load([
