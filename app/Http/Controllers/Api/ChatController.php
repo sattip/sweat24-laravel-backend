@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
+use App\Events\ChatMessageReceived;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -72,6 +74,18 @@ class ChatController extends Controller
         ]);
         
         $message->load('sender:id,name,avatar');
+        
+        // Broadcast the message to all admins
+        $admins = User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            event(new ChatMessageReceived($message, $admin, false));
+        }
+        
+        // Update conversation's last message timestamp and increment admin unread count
+        $conversation->update([
+            'last_message_at' => now(),
+            'admin_unread_count' => $conversation->admin_unread_count + 1
+        ]);
         
         return response()->json([
             'message' => $message

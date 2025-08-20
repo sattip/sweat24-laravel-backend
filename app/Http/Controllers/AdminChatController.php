@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
+use App\Events\ChatMessageReceived;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -76,6 +77,18 @@ class AdminChatController extends Controller
         ]);
         
         $message->load('sender:id,name,avatar');
+        
+        // Broadcast the message to the user
+        $conversation = ChatConversation::find($request->conversation_id);
+        if ($conversation && $conversation->user) {
+            event(new ChatMessageReceived($message, $conversation->user, true));
+        }
+        
+        // Update conversation's last message timestamp and increment unread count
+        $conversation->update([
+            'last_message_at' => now(),
+            'unread_count' => $conversation->unread_count + 1
+        ]);
         
         return response()->json(['message' => $message]);
     }
