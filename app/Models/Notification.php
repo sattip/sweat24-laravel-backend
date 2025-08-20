@@ -198,23 +198,4 @@ class Notification extends Model
     {
         return self::getTypeColors()[$this->type] ?? 'gray';
     }
-    
-    /**
-     * User notification reads
-     */
-    public function userReads()
-    {
-        return $this->hasMany(UserNotificationRead::class);
-    }
-    
-    /**
-     * Check if notification is read by a specific user
-     */
-    public function isReadByUser($userId): bool
-    {
-        return $this->userReads()
-            ->where('user_id', $userId)
-            ->whereNotNull('read_at')
-            ->exists();
-    }
 }
