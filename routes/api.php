@@ -571,6 +571,11 @@ Route::prefix('v1/chat')->middleware('auth:sanctum')->group(function () {
     Route::put('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
 });
 
+// Custom broadcasting auth endpoint for Sanctum
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::post('broadcasting/auth', [\App\Http\Controllers\Api\BroadcastAuthController::class, 'authenticate']);
+});
+
 // ============ LOYALTY SYSTEM ROUTES ============
 
 // Admin Loyalty Management (Protected)
