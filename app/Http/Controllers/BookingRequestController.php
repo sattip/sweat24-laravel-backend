@@ -388,9 +388,9 @@ class BookingRequestController extends Controller
                 ];
             }
             
-            // Parse time and calculate end time (assuming 50 minutes for personal, 20 for EMS)
+            // Parse time and calculate end time based on service type
             $startTime = \Carbon\Carbon::parse($booking->confirmed_time);
-            $duration = $booking->service_type === 'ems' ? 20 : 50;
+            $duration = $booking->getDurationMinutes();
             $endTime = $startTime->copy()->addMinutes($duration);
             
             // Add appointment to instructor's list

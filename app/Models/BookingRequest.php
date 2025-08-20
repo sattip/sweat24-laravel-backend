@@ -43,6 +43,10 @@ class BookingRequest extends Model
     // Service type constants
     const SERVICE_EMS = 'ems';
     const SERVICE_PERSONAL = 'personal';
+    
+    // Duration constants (in minutes)
+    const EMS_DURATION_MINUTES = 20;
+    const PERSONAL_DURATION_MINUTES = 50;
 
     /**
      * Get the user who made the request
@@ -174,5 +178,15 @@ class BookingRequest extends Model
             self::STATUS_CANCELLED => 'Cancelled',
             self::STATUS_COMPLETED => 'Completed',
         ];
+    }
+
+    /**
+     * Get duration in minutes for this booking's service type
+     */
+    public function getDurationMinutes()
+    {
+        return $this->service_type === self::SERVICE_EMS 
+            ? self::EMS_DURATION_MINUTES 
+            : self::PERSONAL_DURATION_MINUTES;
     }
 } 
