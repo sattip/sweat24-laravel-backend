@@ -24,6 +24,7 @@ return [
         'http://localhost:5174',
         'https://sweat24.obs.com.gr',
         'https://sweat24admin.obs.com.gr',
+        'https://sweat24backend.obs.com.gr',
     ],
 
     'allowed_origins_patterns' => [],
