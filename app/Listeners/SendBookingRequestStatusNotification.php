@@ -60,7 +60,7 @@ class SendBookingRequestStatusNotification implements ShouldQueue
             $notification = $this->notificationService->createNotification([
                 'title' => $title,
                 'message' => $message,
-                'type' => 'booking_request_status',
+                'type' => 'order_status',  // Changed from 'booking_request_status' to valid type
                 'priority' => $priority,
                 'channels' => ['in_app', 'push'],
                 'filters' => [
