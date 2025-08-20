@@ -343,4 +343,79 @@ class BookingRequestController extends Controller
             'data' => $bookingRequest->fresh()->load(['user', 'instructor', 'processedBy']),
         ]);
     }
+    
+    /**
+     * Get calendar view of booking requests for admin panel
+     */
+    public function getCalendarView(Request $request)
+    {
+        // Validate date parameter
+        $request->validate([
+            'date' => 'required|date|date_format:Y-m-d'
+        ]);
+        
+        $date = $request->input('date');
+        
+        // Get all confirmed booking requests for the specified date
+        $bookingRequests = BookingRequest::with(['user', 'instructor'])
+            ->where('status', BookingRequest::STATUS_CONFIRMED)
+            ->whereDate('confirmed_date', $date)
+            ->get();
+        
+        // Group by instructor
+        $groupedByInstructor = [];
+        
+        foreach ($bookingRequests as $booking) {
+            // Resolve client name - critical logic
+            if ($booking->user_id && $booking->user) {
+                // If there's a user_id and user relation, use the user's name
+                $clientName = $booking->user->name;
+            } else {
+                // Otherwise use the client_name field from booking_request
+                $clientName = $booking->client_name;
+            }
+            
+            // Get instructor info
+            $instructorId = $booking->instructor_id;
+            $instructorName = $booking->instructor ? $booking->instructor->name : 'Χωρίς Προπονητή';
+            
+            // Initialize instructor group if not exists
+            if (!isset($groupedByInstructor[$instructorId])) {
+                $groupedByInstructor[$instructorId] = [
+                    'trainer_id' => $instructorId,
+                    'trainer_name' => $instructorName,
+                    'appointments' => []
+                ];
+            }
+            
+            // Parse time and calculate end time (assuming 50 minutes for personal, 20 for EMS)
+            $startTime = \Carbon\Carbon::parse($booking->confirmed_time);
+            $duration = $booking->service_type === 'ems' ? 20 : 50;
+            $endTime = $startTime->copy()->addMinutes($duration);
+            
+            // Add appointment to instructor's list
+            $groupedByInstructor[$instructorId]['appointments'][] = [
+                'id' => $booking->id,
+                'client_name' => $clientName,
+                'start_time' => $startTime->format('H:i'),
+                'end_time' => $endTime->format('H:i'),
+                'type' => $booking->service_type // 'ems' or 'personal'
+            ];
+        }
+        
+        // Sort appointments within each instructor by start time
+        foreach ($groupedByInstructor as &$instructor) {
+            usort($instructor['appointments'], function($a, $b) {
+                return strcmp($a['start_time'], $b['start_time']);
+            });
+        }
+        
+        // Convert to indexed array and sort by trainer_id
+        $result = array_values($groupedByInstructor);
+        usort($result, function($a, $b) {
+            return $a['trainer_id'] <=> $b['trainer_id'];
+        });
+        
+        return response()->json($result);
+    }
 } 

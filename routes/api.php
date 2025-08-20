@@ -346,6 +346,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         
         // Admin Booking Request Management (EMS/Personal)
         Route::get('admin/booking-requests', [BookingRequestController::class, 'index']);
+        Route::get('admin/booking-requests-calendar', [BookingRequestController::class, 'getCalendarView']);
         Route::get('admin/booking-requests/statistics', [BookingRequestController::class, 'statistics']);
         Route::post('admin/booking-requests/{bookingRequest}/confirm', [BookingRequestController::class, 'confirm']);
         Route::post('admin/booking-requests/{bookingRequest}/reject', [BookingRequestController::class, 'reject']);
@@ -480,6 +481,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Admin Chat Management routes
     Route::prefix('admin/chat')->middleware(['role:admin'])->group(function () {
         Route::get('/conversations', [AdminChatController::class, 'getConversations']);
+        Route::post('/conversations', [AdminChatController::class, 'createConversation']);
         Route::post('/messages', [AdminChatController::class, 'sendMessage']);
         Route::put('/conversations/{conversation}/read', [AdminChatController::class, 'markAsRead']);
         Route::put('/conversations/{conversation}/status', [AdminChatController::class, 'updateStatus']);
