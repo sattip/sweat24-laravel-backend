@@ -33,4 +33,23 @@ class ChatMessageReceived implements ShouldBroadcast
             new PrivateChannel('chat.' . $this->recipient->id),
         ];
     }
+    
+    /**
+     * Get the data to broadcast.
+     *
+     * @return array
+     */
+    public function broadcastWith()
+    {
+        // Load the conversation to get the updated unread count
+        $this->message->load('conversation');
+        
+        return [
+            'message' => $this->message->toArray(),
+            'unread_count' => $this->isForUser ? 
+                $this->message->conversation->unread_count : 
+                $this->message->conversation->admin_unread_count,
+            'conversation_id' => $this->message->conversation_id
+        ];
+    }
 } 
