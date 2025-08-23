@@ -19,8 +19,8 @@ class CheckRole
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Map roles to membership types
-        $userRole = $this->mapMembershipTypeToRole($request->user()->membership_type);
+        // Check user's role directly
+        $userRole = $request->user()->role;
         
         if (!in_array($userRole, $roles)) {
             return response()->json(['message' => 'Forbidden. You do not have permission to access this resource.'], 403);

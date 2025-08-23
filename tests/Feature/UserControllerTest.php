@@ -53,9 +53,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->getJson('/api/v1/users');
 
-        // UserController doesn't check permissions, so it returns 200
-        // This is a known issue but we'll test the actual behavior
-        $response->assertStatus(200);
+        $response->assertStatus(403);
     }
 
     public function test_admin_can_view_specific_user()
@@ -94,8 +92,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->getJson("/api/v1/users/{$otherUser->id}");
 
-        // UserController doesn't check permissions, so it returns 200
-        $response->assertStatus(200);
+        $response->assertStatus(403);
     }
 
     public function test_admin_can_create_user()
@@ -154,8 +151,7 @@ class UserControllerTest extends TestCase
             'name' => 'Hacked Name'
         ]);
 
-        // UserController doesn't check permissions, returns 200
-        $response->assertStatus(200);
+        $response->assertStatus(403);
     }
 
     public function test_admin_can_delete_user()
@@ -177,8 +173,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/v1/users/{$this->user->id}");
 
-        // UserController doesn't check permissions, returns 204
-        $response->assertStatus(204);
+        $response->assertStatus(403);
     }
 
     public function test_user_can_get_own_packages()

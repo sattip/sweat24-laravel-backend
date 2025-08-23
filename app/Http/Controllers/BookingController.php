@@ -19,7 +19,6 @@ class BookingController extends Controller
 {
     use ApiResponseTrait;
     
-    // Remove middleware for testing
     /**
      * Display a listing of the resource.
      */

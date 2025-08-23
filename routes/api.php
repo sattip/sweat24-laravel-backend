@@ -257,9 +257,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('events/rsvps', [EventController::class, 'getUserRSVPs']);
     
     // Classes (authenticated routes)
-    Route::post('classes', [GymClassController::class, 'store']);
-    Route::put('classes/{class}', [GymClassController::class, 'update']);
-    Route::delete('classes/{class}', [GymClassController::class, 'destroy']);
+    Route::post('classes', [GymClassController::class, 'store'])->middleware('role:admin,trainer');
+    Route::put('classes/{class}', [GymClassController::class, 'update'])->middleware('role:admin,trainer');
+    Route::delete('classes/{class}', [GymClassController::class, 'destroy'])->middleware('role:admin');
     
     // Waitlist
     Route::post('classes/{class}/waitlist/join', [WaitlistController::class, 'join']);
