@@ -26,8 +26,8 @@ class PackageControllerTest extends TestCase
 
     public function test_anyone_can_view_active_packages()
     {
-        Package::factory()->count(3)->create(['active' => true]);
-        Package::factory()->count(2)->create(['active' => false]);
+        Package::factory()->count(3)->create(['status' => 'active']);
+        Package::factory()->count(2)->create(['status' => 'inactive']);
 
         $response = $this->getJson('/api/v1/packages');
 
@@ -59,8 +59,8 @@ class PackageControllerTest extends TestCase
             'duration' => 30,
             'description' => 'Unlimited access for 30 days',
             'price' => 150.00,
-            'credits' => 0,
-            'active' => true
+            'sessions' => null,
+            'status' => 'active'
         ]);
 
         $response->assertStatus(201)
@@ -90,8 +90,8 @@ class PackageControllerTest extends TestCase
             'duration' => 30,
             'description' => 'Should fail',
             'price' => 100.00,
-            'credits' => 10,
-            'active' => true
+            'sessions' => 10,
+            'status' => 'active'
         ]);
 
         $response->assertStatus(403);
@@ -122,7 +122,7 @@ class PackageControllerTest extends TestCase
     public function test_admin_can_deactivate_package()
     {
         Sanctum::actingAs($this->admin);
-        $package = Package::factory()->create(['active' => true]);
+        $package = Package::factory()->create(['status' => 'active']);
 
         $response = $this->putJson("/api/packages/{$package->id}", [
             'active' => false
@@ -130,7 +130,7 @@ class PackageControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'active' => false
+                'active' => 0
             ]);
     }
 
@@ -152,9 +152,9 @@ class PackageControllerTest extends TestCase
         Sanctum::actingAs($this->user);
         $package = Package::factory()->create([
             'type' => 'sessions',
-            'credits' => 10,
+            'sessions' => 10,
             'duration' => 30,
-            'active' => true
+            'status' => 'active'
         ]);
 
         $response = $this->postJson('/api/v1/user-packages', [
@@ -175,14 +175,14 @@ class PackageControllerTest extends TestCase
             'user_id' => $this->user->id,
             'package_id' => $package->id,
             'sessions_remaining' => 10,
-            'active' => true
+            'status' => 'active'
         ]);
     }
 
     public function test_user_cannot_purchase_inactive_package()
     {
         Sanctum::actingAs($this->user);
-        $package = Package::factory()->create(['active' => false]);
+        $package = Package::factory()->create(['status' => 'inactive']);
 
         $response = $this->postJson('/api/v1/user-packages', [
             'package_id' => $package->id
@@ -203,7 +203,7 @@ class PackageControllerTest extends TestCase
             'user_id' => $this->user->id,
             'package_id' => $package->id,
             'sessions_remaining' => 5,
-            'active' => true,
+            'status' => 'active',
             'expires_at' => now()->addDays(30)
         ]);
 
@@ -231,7 +231,7 @@ class PackageControllerTest extends TestCase
             'user_id' => $this->user->id,
             'package_id' => $package->id,
             'sessions_remaining' => 5,
-            'active' => true,
+            'status' => 'active',
             'expires_at' => now()->subDay() // Expired yesterday
         ]);
 

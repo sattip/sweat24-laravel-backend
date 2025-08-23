@@ -33,14 +33,17 @@ class UserControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                '*' => [
-                    'id',
-                    'name',
-                    'email',
-                    'phone',
-                    'role',
-                    'created_at'
-                ]
+                'data' => [
+                    '*' => [
+                        'id',
+                        'name',
+                        'email',
+                        'phone',
+                        'role'
+                    ]
+                ],
+                'current_page',
+                'total'
             ]);
     }
 
