@@ -64,7 +64,11 @@ class InstructorControllerTest extends TestCase
             'name' => 'New Instructor',
             'email' => 'newinstructor@example.com',
             'phone' => '5551234567',
-            'specialization' => 'CrossFit',
+            'specialties' => 'CrossFit, HIIT',
+            'hourly_rate' => 75,
+            'contract_type' => 'hourly',
+            'status' => 'active',
+            'join_date' => now()->format('Y-m-d'),
             'bio' => 'Experienced CrossFit coach'
         ]);
 
@@ -90,7 +94,11 @@ class InstructorControllerTest extends TestCase
             'name' => 'Unauthorized Instructor',
             'email' => 'unauth@example.com',
             'phone' => '5551234567',
-            'specialization' => 'Yoga'
+            'specialties' => 'Yoga, Pilates',
+            'hourly_rate' => 50,
+            'contract_type' => 'hourly',
+            'status' => 'active',
+            'join_date' => now()->format('Y-m-d')
         ]);
 
         $response->assertStatus(403);
@@ -154,7 +162,11 @@ class InstructorControllerTest extends TestCase
             'name' => 'Duplicate Instructor',
             'email' => 'existing@example.com',
             'phone' => '5551234567',
-            'specialization' => 'Yoga'
+            'specialties' => 'Yoga, Pilates',
+            'hourly_rate' => 50,
+            'contract_type' => 'hourly',
+            'status' => 'active',
+            'join_date' => now()->format('Y-m-d')
         ]);
 
         $response->assertStatus(422)

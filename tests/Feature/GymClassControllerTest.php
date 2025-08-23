@@ -27,7 +27,11 @@ class GymClassControllerTest extends TestCase
             'name' => 'Test Instructor',
             'email' => 'instructor@test.com',
             'phone' => '1234567890',
-            'specialization' => 'Yoga'
+            'specialties' => 'Yoga, Pilates',
+            'hourly_rate' => 50,
+            'contract_type' => 'hourly',
+            'status' => 'active',
+            'join_date' => now()
         ]);
     }
 
@@ -235,7 +239,11 @@ class GymClassControllerTest extends TestCase
             'name' => 'Second Instructor',
             'email' => 'instructor2@test.com',
             'phone' => '9876543210',
-            'specialization' => 'Pilates'
+            'specialties' => 'Pilates, Boxing',
+            'hourly_rate' => 60,
+            'contract_type' => 'hourly',
+            'status' => 'active',
+            'join_date' => now()
         ]);
 
         GymClass::factory()->create(['instructor' => $this->instructor->id]);

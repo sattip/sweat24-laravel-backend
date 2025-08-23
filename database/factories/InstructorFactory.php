@@ -15,9 +15,13 @@ class InstructorFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
-            'specialization' => fake()->randomElement(['Yoga', 'Pilates', 'CrossFit', 'Boxing', 'Zumba', 'HIIT']),
-            'bio' => fake()->paragraph(),
-            'photo_url' => fake()->imageUrl(),
+            'specialties' => fake()->randomElement(['Yoga, Pilates', 'CrossFit, HIIT', 'Boxing, MMA', 'Zumba, Dance']),
+            'hourly_rate' => fake()->numberBetween(30, 100),
+            'contract_type' => fake()->randomElement(['hourly', 'salary', 'commission']),
+            'status' => 'active',
+            'join_date' => fake()->dateTimeBetween('-2 years', 'now'),
+            'bio' => fake()->optional()->paragraph(),
+            'title' => fake()->optional()->randomElement(['Senior Trainer', 'Head Coach', 'Fitness Expert']),
         ];
     }
 }
