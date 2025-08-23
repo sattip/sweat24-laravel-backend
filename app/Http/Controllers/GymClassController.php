@@ -143,6 +143,11 @@ class GymClassController extends Controller
             'status' => 'sometimes|in:active,cancelled,completed',
         ]);
         
+        // Remove null description to prevent NOT NULL constraint violation
+        if (array_key_exists('description', $validated) && is_null($validated['description'])) {
+            unset($validated['description']);
+        }
+        
         $class->update($validated);
         
         // Transform the response to include all necessary fields

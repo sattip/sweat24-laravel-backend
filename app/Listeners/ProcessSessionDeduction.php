@@ -66,7 +66,20 @@ class ProcessSessionDeduction
     {
         // Only refund if the booking was originally confirmed
         $wasConfirmed = $previousStatus ? $previousStatus === 'confirmed' : ($booking->getOriginal('status') === 'confirmed');
+        
+        Log::info('Refund session check', [
+            'booking_id' => $booking->id,
+            'user_id' => $booking->user_id,
+            'previous_status' => $previousStatus,
+            'original_status' => $booking->getOriginal('status'),
+            'was_confirmed' => $wasConfirmed,
+        ]);
+        
         if (!$wasConfirmed) {
+            Log::info('No session refund needed - booking was not confirmed', [
+                'booking_id' => $booking->id,
+                'previous_status' => $previousStatus,
+            ]);
             return;
         }
         
@@ -76,13 +89,21 @@ class ProcessSessionDeduction
             ->first();
             
         if ($activePackage) {
+            $beforeRefund = $activePackage->remaining_sessions;
             $activePackage->increment('remaining_sessions');
+            $afterRefund = $activePackage->fresh()->remaining_sessions;
             
             Log::info('Session refunded for cancelled booking', [
                 'booking_id' => $booking->id,
                 'user_id' => $booking->user_id,
                 'package_id' => $activePackage->id,
-                'remaining_sessions' => $activePackage->remaining_sessions + 1,
+                'sessions_before_refund' => $beforeRefund,
+                'sessions_after_refund' => $afterRefund,
+            ]);
+        } else {
+            Log::warning('No active package found for refund', [
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
             ]);
         }
     }

@@ -42,7 +42,7 @@ class SendSessionsEndingNotification implements ShouldQueue
             $notification = $this->notificationService->createNotification([
                 'title' => $title,
                 'message' => $message,
-                'type' => 'sessions_ending',
+                'type' => 'warning',
                 'priority' => $priority,
                 'channels' => ['in_app', 'push'],
                 'filters' => [
