@@ -10,6 +10,8 @@ use App\Models\Notification;
 use App\Models\NotificationRecipient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Notifications\Orders\OrderConfirmationNotification;
+use App\Notifications\Orders\OrderReadyNotification;
 
 class OrderController extends Controller
 {
@@ -114,8 +116,16 @@ class OrderController extends Controller
                 $order->items()->create($item);
             }
 
-            // Create simple notification for admin (skip for now due to table structure)
-            // TODO: Fix notification table structure to support order notifications
+            // Send order confirmation email to customer
+            if ($order->user) {
+                $order->user->notify(new OrderConfirmationNotification($order));
+            }
+
+            // Notify admins about new order
+            $admins = \App\Models\User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new OrderConfirmationNotification($order));
+            }
 
             DB::commit();
 
@@ -178,6 +188,11 @@ class OrderController extends Controller
         switch ($newStatus) {
             case 'ready_for_pickup':
                 $order->markAsReady();
+                
+                // Send order ready notification to customer
+                if ($order->user) {
+                    $order->user->notify(new OrderReadyNotification($order));
+                }
                 break;
 
             case 'completed':

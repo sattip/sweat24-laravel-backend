@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\BookingController;
@@ -63,6 +64,12 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
     Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);
+    
+    // Password reset routes
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
+    Route::post('/reset-password', [ForgotPasswordController::class, 'reset']);
+    Route::post('/validate-reset-token', [ForgotPasswordController::class, 'validateToken']);
+    
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     

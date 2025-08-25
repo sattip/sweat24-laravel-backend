@@ -9,6 +9,9 @@ use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\BookingRequests\NewBookingRequestNotification;
+use App\Notifications\BookingRequests\AppointmentScheduledNotification;
 
 class BookingRequestController extends Controller
 {
@@ -88,6 +91,12 @@ class BookingRequestController extends Controller
 
             return $bookingRequest;
         });
+
+        // Notify admins about new booking request
+        $admins = User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new NewBookingRequestNotification($bookingRequest));
+        }
 
         return response()->json([
             'message' => 'Booking request submitted successfully',
@@ -170,6 +179,15 @@ class BookingRequestController extends Controller
             // Dispatch event for push notification
             \App\Events\BookingRequestStatusChanged::dispatch($bookingRequest, $previousStatus, 'confirmed');
         });
+
+        // Send appointment scheduled email notification to user
+        if ($bookingRequest->user) {
+            $bookingRequest->user->notify(new AppointmentScheduledNotification($bookingRequest));
+        } elseif ($bookingRequest->client_email) {
+            // If no user account but we have email, send notification via Notification facade
+            Notification::route('mail', $bookingRequest->client_email)
+                ->notify(new AppointmentScheduledNotification($bookingRequest));
+        }
 
         return response()->json([
             'message' => 'Booking request confirmed successfully',

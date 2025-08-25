@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Events\WaitlistSpotAvailable;
 use App\Services\NotificationService;
+use App\Notifications\WaitlistSpotAvailableNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
@@ -73,6 +74,16 @@ class SendWaitlistSpotNotification implements ShouldQueue
                 'class_id' => $gymClass->id,
                 'booking_id' => $booking->id,
                 'notification_id' => $notification->id,
+                'expires_at' => $expiresAt->toDateTimeString()
+            ]);
+
+            // Send email notification to user
+            $user->notify(new WaitlistSpotAvailableNotification($gymClass, $booking, $expiresAt));
+
+            Log::info('Waitlist spot email notification sent', [
+                'user_id' => $user->id,
+                'class_id' => $gymClass->id,
+                'booking_id' => $booking->id,
                 'expires_at' => $expiresAt->toDateTimeString()
             ]);
 

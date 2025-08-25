@@ -14,6 +14,9 @@ use Carbon\Carbon;
 use App\Events\BookingCreated;
 use App\Events\BookingCancelled;
 use App\Traits\ApiResponseTrait;
+use App\Notifications\Bookings\BookingConfirmationNotification;
+use App\Notifications\Bookings\BookingCancelledNotification;
+use Illuminate\Support\Facades\Notification;
 
 class BookingController extends Controller
 {
@@ -323,6 +326,17 @@ class BookingController extends Controller
                         // Dispatch BookingCreated event for waitlist booking too
                         BookingCreated::dispatch($booking);
                         
+                        // Send waitlist booking confirmation email to user
+                        if ($user) {
+                            $user->notify(new BookingConfirmationNotification($booking));
+                        }
+                        
+                        // Notify admins about new waitlist booking
+                        $admins = \App\Models\User::where('role', 'admin')->get();
+                        foreach ($admins as $admin) {
+                            $admin->notify(new BookingConfirmationNotification($booking));
+                        }
+                        
                         return $this->createdResponse([
                             'booking' => $booking->load('user'),
                             'waitlist' => true
@@ -341,6 +355,18 @@ class BookingController extends Controller
         
         // Dispatch BookingCreated event (handles participants count & session deduction)
         BookingCreated::dispatch($booking);
+        
+        // Send booking confirmation email to user
+        if ($user) {
+            $booking->load('gymClass.instructor'); // Eager load for email
+            $user->notify(new BookingConfirmationNotification($booking));
+        }
+        
+        // Notify admins about new booking
+        $admins = \App\Models\User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new BookingConfirmationNotification($booking));
+        }
         
         return $this->createdResponse(
             ['booking' => $booking->load('user')],
@@ -440,6 +466,26 @@ class BookingController extends Controller
             
             // Dispatch BookingCancelled event (handles session refund & participants count)
             BookingCancelled::dispatch($booking, $previousStatus);
+            
+            // Send booking cancellation email to user
+            if ($booking->user) {
+                $booking->load('gymClass.instructor'); // Eager load for email
+                $booking->user->notify(new BookingCancelledNotification(
+                    $booking,
+                    $validated['cancellation_reason'] ?? null,
+                    'user'
+                ));
+            }
+            
+            // Notify admins about booking cancellation
+            $admins = \App\Models\User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new BookingCancelledNotification(
+                    $booking,
+                    $validated['cancellation_reason'] ?? null,
+                    'user'
+                ));
+            }
             
             // Log the cancellation activity
             // ActivityLogger::logBookingCancellation($booking);

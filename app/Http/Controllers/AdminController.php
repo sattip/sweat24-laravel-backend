@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Signature;
 use App\Traits\ApiResponseTrait;
+use App\Notifications\Auth\AccountApprovedNotification;
+use App\Notifications\Auth\AccountRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -168,6 +170,9 @@ class AdminController extends Controller
                 'approved_by' => $request->user()->id,
             ]);
 
+            // Send approval notification email to user
+            $user->notify(new AccountApprovedNotification($user));
+
             Log::info('👤 User approved by admin', [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -230,6 +235,9 @@ class AdminController extends Controller
                 'status' => 'inactive',
                 'notes' => ($user->notes ? $user->notes . ' | ' : '') . "ΑΠΟΡΡΙΦΘΗΚΕ: {$reason} (από {$request->user()->name} στις " . now()->format('d/m/Y H:i') . ")",
             ]);
+
+            // Send rejection notification email to user
+            $user->notify(new AccountRejectedNotification($user, $reason));
 
             Log::info('👤 User rejected by admin', [
                 'user_id' => $user->id,

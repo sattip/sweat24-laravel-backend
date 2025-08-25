@@ -7,11 +7,14 @@ use App\Models\AgeVerificationLog;
 use App\Models\ParentConsent;
 use App\Services\ActivityLogger;
 use App\Services\ReferralService;
+use App\Notifications\Auth\RegistrationConfirmationNotification;
+use App\Notifications\Admin\NewRegistrationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
@@ -295,6 +298,13 @@ class AuthController extends Controller
             );
         }
 
+        // Send registration confirmation email to user
+        $user->notify(new RegistrationConfirmationNotification($user));
+
+        // Send notification to admin about new registration
+        $admins = User::where('role', 'admin')->orWhere('membership_type', 'Admin')->get();
+        Notification::send($admins, new NewRegistrationNotification($user));
+
         // Don't provide auth token for pending approval users
         return response()->json([
             'success' => true,
@@ -473,6 +483,13 @@ class AuthController extends Controller
             
             // Log the registration
             ActivityLogger::logRegistration($user);
+            
+            // Send registration confirmation email to user
+            $user->notify(new RegistrationConfirmationNotification($user));
+
+            // Send notification to admin about new registration
+            $admins = User::where('role', 'admin')->orWhere('membership_type', 'Admin')->get();
+            Notification::send($admins, new NewRegistrationNotification($user));
             
             return response()->json([
                 'success' => true,

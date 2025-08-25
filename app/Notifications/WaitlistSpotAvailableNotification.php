@@ -34,7 +34,25 @@ class WaitlistSpotAvailableNotification extends Notification implements ShouldQu
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['mail', 'database'];
+    }
+
+    /**
+     * Get the mail representation of the notification.
+     */
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject('Spot Available in Waitlisted Class - Sweat93')
+            ->view('emails.bookings.waitlist-spot-available', [
+                'booking' => $this->booking,
+                'user' => $notifiable,
+                'gymClass' => $this->gymClass->load('instructor'),
+                'expiresAt' => $this->expiresAt,
+                'expires_in' => '30 λεπτά',
+                'waitlist_entry' => (object)['created_at' => now()],
+                'booking_url' => config('app.url') . '/book-now?class=' . $this->gymClass->id,
+            ]);
     }
 
     /**

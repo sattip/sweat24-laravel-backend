@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentInstallment;
+use App\Notifications\Payments\PaymentInstallmentReceivedNotification;
 use Illuminate\Http\Request;
 
 class PaymentInstallmentController extends Controller
@@ -77,8 +78,67 @@ class PaymentInstallmentController extends Controller
             'notes' => 'nullable|string',
         ]);
         
+        $previousStatus = $paymentInstallment->status;
         $paymentInstallment->update($validated);
+        
+        // Send payment received notification if status changed to 'paid'
+        if ($previousStatus !== 'paid' && $paymentInstallment->status === 'paid') {
+            // Find the customer user
+            $customer = \App\Models\User::find($paymentInstallment->customer_id);
+            if ($customer) {
+                $customer->notify(new PaymentInstallmentReceivedNotification($paymentInstallment));
+            }
+            
+            // Notify admins about payment received
+            $admins = \App\Models\User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new PaymentInstallmentReceivedNotification($paymentInstallment));
+            }
+        }
+        
         return response()->json($paymentInstallment);
+    }
+
+    /**
+     * Mark payment installment as paid
+     */
+    public function markAsPaid(Request $request, PaymentInstallment $paymentInstallment)
+    {
+        $validated = $request->validate([
+            'payment_method' => 'required|in:cash,card,transfer',
+            'paid_date' => 'nullable|date',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($paymentInstallment->status === 'paid') {
+            return response()->json([
+                'message' => 'Payment installment is already marked as paid'
+            ], 400);
+        }
+
+        $paymentInstallment->update([
+            'status' => 'paid',
+            'payment_method' => $validated['payment_method'],
+            'paid_date' => $validated['paid_date'] ?? now(),
+            'notes' => $validated['notes'] ?? $paymentInstallment->notes,
+        ]);
+
+        // Send payment received notification
+        $customer = \App\Models\User::find($paymentInstallment->customer_id);
+        if ($customer) {
+            $customer->notify(new PaymentInstallmentReceivedNotification($paymentInstallment));
+        }
+        
+        // Notify admins about payment received
+        $admins = \App\Models\User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new PaymentInstallmentReceivedNotification($paymentInstallment));
+        }
+
+        return response()->json([
+            'message' => 'Payment installment marked as paid and notifications sent',
+            'data' => $paymentInstallment
+        ]);
     }
 
     /**
