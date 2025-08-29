@@ -235,7 +235,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     
     Route::post('bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
     Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
-    Route::get('bookings/{booking}/policy-check', [CancellationPolicyController::class, 'checkBookingPolicy']);
+    Route::get('bookings/{booking}/policy-check', [CancellationPolicyController::class, 'testPolicy']);
     Route::post('bookings/{booking}/reschedule', [CancellationPolicyController::class, 'requestReschedule']);
     
     // Instructors/Trainers
@@ -406,10 +406,16 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('reschedules/history', [CancellationPolicyController::class, 'userRescheduleHistory']);
     
     Route::middleware(['role:admin'])->group(function () {
+        // Cancellation Policies Admin Routes
         Route::post('cancellation-policies', [CancellationPolicyController::class, 'store']);
         Route::get('cancellation-policies/{cancellationPolicy}', [CancellationPolicyController::class, 'show']);
         Route::put('cancellation-policies/{cancellationPolicy}', [CancellationPolicyController::class, 'update']);
         Route::delete('cancellation-policies/{cancellationPolicy}', [CancellationPolicyController::class, 'destroy']);
+        Route::patch('cancellation-policies/{cancellationPolicy}/toggle', [CancellationPolicyController::class, 'toggleStatus']);
+        Route::get('cancellation-policies/statistics', [CancellationPolicyController::class, 'getStatistics']);
+        Route::get('cancellation-policies/configuration-options', [CancellationPolicyController::class, 'getConfigurationOptions']);
+        
+        // Reschedule Admin Routes  
         Route::get('reschedules/admin', [CancellationPolicyController::class, 'adminRescheduleRequests']);
         Route::put('reschedules/{reschedule}/process', [CancellationPolicyController::class, 'processReschedule']);
     });
@@ -566,6 +572,12 @@ Route::get('/test-history', [BookingController::class, 'testHistory']);
 // Add policy endpoint under v1 prefix for client app
 Route::prefix('v1')->group(function () {
     Route::get('test-policy/{booking_id}', [CancellationPolicyController::class, 'testPolicy'])->name('public.test.policy');
+    
+    // Test endpoints for cancellation policies (development only)
+    Route::prefix('admin/cancellation-policies')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+        Route::post('test-data', [CancellationPolicyController::class, 'seedTestData']);
+        Route::delete('test-data', [CancellationPolicyController::class, 'clearTestData']);
+    });
 });
 
 Route::get('/test-policy/{bookingId}', [CancellationPolicyController::class, 'testPolicy']);

@@ -71,4 +71,20 @@ class CancellationPolicy extends Model
     {
         return $amount * ($this->penalty_percentage / 100);
     }
+    
+    /**
+     * Classes that use this policy
+     */
+    public function classes()
+    {
+        return $this->hasMany(GymClass::class);
+    }
+    
+    /**
+     * Check if policy can be deleted (not used by any classes)
+     */
+    public function canBeDeleted()
+    {
+        return $this->classes()->count() === 0;
+    }
 }
