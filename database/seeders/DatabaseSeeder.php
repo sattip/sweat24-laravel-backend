@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
         // Core seeders (existing)
         $this->call([
             AdminSeeder::class,
-            TrainerSeeder::class,
+            // TrainerSeeder::class, // Missing - skipped for testing
             GymDataSeeder::class,
             ActivityLogSeeder::class,
             CancellationPolicySeeder::class,
