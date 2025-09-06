@@ -22,6 +22,7 @@ class GymClass extends Model
         'location',
         'description',
         'status',
+        'cancellation_policy_id',
     ];
 
     protected function casts(): array
@@ -34,6 +35,11 @@ class GymClass extends Model
     public function instructor()
     {
         return $this->belongsTo(Instructor::class);
+    }
+    
+    public function cancellationPolicy()
+    {
+        return $this->belongsTo(CancellationPolicy::class);
     }
     
     public function bookings()
@@ -79,5 +85,32 @@ class GymClass extends Model
     public function evaluations()
     {
         return $this->hasMany(ClassEvaluation::class, 'class_id');
+    }
+    
+    /**
+     * Get applicable cancellation policy for this class
+     */
+    public function getApplicablePolicy()
+    {
+        // If class has specific policy assigned, use it
+        if ($this->cancellation_policy_id && $this->cancellationPolicy) {
+            return $this->cancellationPolicy;
+        }
+        
+        // Otherwise, find the best matching policy based on class type
+        $policies = CancellationPolicy::where('is_active', true)
+            ->orderBy('priority', 'asc')
+            ->get();
+            
+        foreach ($policies as $policy) {
+            if ($policy->appliesToClassType($this->type)) {
+                return $policy;
+            }
+        }
+        
+        // Return default policy if no specific match
+        return CancellationPolicy::where('is_active', true)
+            ->orderBy('priority', 'asc')
+            ->first();
     }
 }

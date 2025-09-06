@@ -40,7 +40,7 @@ class CashRegisterEntryController extends Controller
             'amount' => 'required|numeric|min:0',
             'description' => 'required|string',
             'category' => 'required|string|max:255',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => 'nullable|in:cash,card,transfer,iris,cash_a',
             'related_entity_id' => 'nullable|string|max:255',
             'related_entity_type' => 'nullable|in:customer,package,expense,other',
         ]);
@@ -69,7 +69,7 @@ class CashRegisterEntryController extends Controller
             'amount' => 'sometimes|numeric|min:0',
             'description' => 'sometimes|string',
             'category' => 'sometimes|string|max:255',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => 'nullable|in:cash,card,transfer,iris,cash_a',
             'related_entity_id' => 'nullable|string|max:255',
             'related_entity_type' => 'nullable|in:customer,package,expense,other',
         ]);

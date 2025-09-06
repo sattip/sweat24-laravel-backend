@@ -214,18 +214,36 @@ class AuthController extends Controller
             'user_agent' => $request->userAgent()
         ]);
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'phone' => 'nullable|string',
-            'membership_type' => 'nullable|string',
-            'date_of_birth' => 'required|date|before:today', // Now required to check age
-            'found_us_via' => 'nullable|string|in:facebook,instagram,google,friend,member,website,walk_in,flyer,event,other',
-            'social_platform' => 'nullable|string|required_if:found_us_via,facebook,instagram',
-            'referral_code_or_name' => 'nullable|string',
-            'referrer_id' => 'nullable|exists:users,id',
-        ]);
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+                'phone' => 'nullable|string',
+                'membership_type' => 'nullable|string',
+                'date_of_birth' => 'required|date|before:today', // Now required to check age
+                'found_us_via' => 'nullable|string|in:facebook,instagram,google,friend,member,website,walk_in,flyer,event,other',
+                'social_platform' => 'nullable|string|required_if:found_us_via,facebook,instagram',
+                'referral_code_or_name' => 'nullable|string',
+                'referrer_id' => 'nullable|exists:users,id',
+                // Medical History (optional at registration)
+                'medicalHistory' => 'nullable|array'
+            ]);
+        } catch (ValidationException $e) {
+            // Custom error message for liability declaration
+            $errors = $e->errors();
+            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
+                $errors['medicalHistory.ems_liability_accepted'] = [
+                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση για να συνεχίσετε'
+                ];
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+                'errors' => $errors
+            ], 422);
+        }
 
         // Check if user is minor - if so, redirect to proper endpoint
         if ($request->has('date_of_birth')) {
@@ -283,6 +301,37 @@ class AuthController extends Controller
         }
 
         $user = User::create($userData);
+
+        // Process medical history if provided
+        if ($request->has('medicalHistory')) {
+            $medicalHistory = $request->medicalHistory;
+            
+            // Store medical history JSON (filtered)
+            $medicalHistoryData = [
+                'medical_conditions' => $medicalHistory['medical_conditions'] ?? [],
+                'current_health_problems' => $medicalHistory['current_health_problems'] ?? [],
+                'prescribed_medications' => $medicalHistory['prescribed_medications'] ?? [],
+                'smoking' => $medicalHistory['smoking'] ?? [],
+                'physical_activity' => $medicalHistory['physical_activity'] ?? [],
+                'submitted_at' => $medicalHistory['submitted_at'] ?? now()->toISOString()
+            ];
+            
+            // Update user with medical history and EMS data
+            $user->update([
+                'medical_history' => json_encode($medicalHistoryData),
+                'ems_interest' => $medicalHistory['ems_interest'] ?? false,
+                'ems_liability_accepted' => $medicalHistory['ems_liability_accepted'],
+                'ems_contraindications' => $medicalHistory['ems_contraindications'] ?? null,
+                'emergency_contact' => $medicalHistory['emergency_contact']['name'] ?? null,
+                'emergency_phone' => $medicalHistory['emergency_contact']['phone'] ?? null,
+            ]);
+            
+            Log::info('Legacy registration with medical history processed', [
+                'user_id' => $user->id,
+                'ems_interest' => $user->ems_interest,
+                'ems_liability_accepted' => $user->ems_liability_accepted
+            ]);
+        }
 
         // Log the registration activity
         ActivityLogger::logRegistration($user);
@@ -382,7 +431,19 @@ class AuthController extends Controller
             'signedAt' => 'required|date',
             'documentType' => 'required|string',
             'documentVersion' => 'required|string',
-            'medicalHistory' => 'nullable|array'
+            'medicalHistory' => 'nullable|array',
+            // Medical History validation
+            'medicalHistory.medical_conditions' => 'sometimes|array',
+            'medicalHistory.current_health_problems' => 'sometimes|array',
+            'medicalHistory.prescribed_medications' => 'sometimes|array',
+            'medicalHistory.smoking' => 'sometimes|array',
+            'medicalHistory.physical_activity' => 'sometimes|array',
+            'medicalHistory.emergency_contact' => 'sometimes|array',
+            'medicalHistory.emergency_contact.name' => 'nullable|string|max:255',
+            'medicalHistory.emergency_contact.phone' => 'nullable|string|max:20',
+            'medicalHistory.ems_interest' => 'sometimes|boolean',
+            'medicalHistory.ems_liability_accepted' => 'required|accepted',
+            'medicalHistory.submitted_at' => 'sometimes|date'
         ];
         
         // Check if user is minor
@@ -410,7 +471,23 @@ class AuthController extends Controller
             $rules['parentConsent.signature'] = 'required|string';
         }
         
-        $validated = $request->validate($rules);
+        try {
+            $validated = $request->validate($rules);
+        } catch (ValidationException $e) {
+            // Custom error message for liability declaration
+            $errors = $e->errors();
+            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
+                $errors['medicalHistory.ems_liability_accepted'] = [
+                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση για να συνεχίσετε'
+                ];
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+                'errors' => $errors
+            ], 422);
+        }
         
         DB::beginTransaction();
         try {
@@ -433,9 +510,41 @@ class AuthController extends Controller
                 'registration_status' => 'pending_approval',
                 'remaining_sessions' => 0,
                 'total_sessions' => 0,
-                'medical_history' => isset($validated['medicalHistory']) ? json_encode($validated['medicalHistory']) : null,
+                'medical_history' => null, // Will be processed separately below
                 'profile_last_updated' => now(),
             ]);
+
+            // Process medical history if provided
+            if (isset($validated['medicalHistory'])) {
+                $medicalHistory = $validated['medicalHistory'];
+                
+
+                // Store medical history JSON (filtered)
+                $medicalHistoryData = [
+                    'medical_conditions' => $this->convertConditionsToArray($medicalHistory['medical_conditions'] ?? []),
+                    'current_health_problems' => $medicalHistory['current_health_problems'] ?? [],
+                    'prescribed_medications' => $medicalHistory['prescribed_medications'] ?? [],
+                    'smoking' => $medicalHistory['smoking'] ?? [],
+                    'physical_activity' => $medicalHistory['physical_activity'] ?? [],
+                    'submitted_at' => $medicalHistory['submitted_at'] ?? now()->toISOString()
+                ];
+                
+                // Update user with medical history and EMS data
+                $user->update([
+                    'medical_history' => json_encode($medicalHistoryData),
+                    'ems_interest' => $medicalHistory['ems_interest'] ?? false,
+                    'ems_liability_accepted' => $validated['medicalHistory']['ems_liability_accepted'],
+                    'ems_contraindications' => $medicalHistory['ems_contraindications'] ?? null,
+                    'emergency_contact' => $medicalHistory['emergency_contact']['name'] ?? null,
+                    'emergency_phone' => $medicalHistory['emergency_contact']['phone'] ?? null,
+                ]);
+                
+                Log::info('Registration with medical history processed', [
+                    'user_id' => $user->id,
+                    'ems_interest' => $user->ems_interest,
+                    'ems_liability_accepted' => $user->ems_liability_accepted
+                ]);
+            }
             
             // Create parent consent if minor
             if ($isMinor && isset($validated['parentConsent'])) {
@@ -476,7 +585,7 @@ class AuthController extends Controller
                 'signed_at' => $validated['signedAt'],
                 'document_type' => $validated['documentType'],
                 'document_version' => $validated['documentVersion'],
-                'ip_address' => $request->ip()
+                'ip_address' => $request->ip() ?: '127.0.0.1'
             ]);
             
             DB::commit();
@@ -520,5 +629,28 @@ class AuthController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Convert medical conditions from object format to array format for storage
+     */
+    private function convertConditionsToArray($conditions)
+    {
+        if (!is_array($conditions)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($conditions as $name => $data) {
+            if (is_array($data) && isset($data['has_condition']) && $data['has_condition']) {
+                $result[] = [
+                    'name' => $name,
+                    'has_condition' => true,
+                    'year_of_onset' => $data['year_of_onset'] ?? null,
+                    'details' => $data['details'] ?? ''
+                ];
+            }
+        }
+        return $result;
     }
 }

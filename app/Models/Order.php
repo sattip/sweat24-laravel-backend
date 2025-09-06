@@ -20,15 +20,21 @@ class Order extends Model
         'customer_phone',
         'notes',
         'ready_at',
-        'completed_at'
+        'completed_at',
+        'points_applied',
+        'points_awarded',
+        'points_applied_at'
     ];
 
     protected $casts = [
         'subtotal' => 'decimal:2',
         'tax' => 'decimal:2',
         'total' => 'decimal:2',
+        'points_awarded' => 'decimal:2',
+        'points_applied' => 'boolean',
         'ready_at' => 'datetime',
         'completed_at' => 'datetime',
+        'points_applied_at' => 'datetime',
     ];
 
     /**
@@ -95,5 +101,30 @@ class Order extends Model
     public function cancel(): void
     {
         $this->update(['status' => 'cancelled']);
+    }
+
+    /**
+     * Check if points have been applied to this order.
+     */
+    public function hasPointsApplied(): bool
+    {
+        return (bool) $this->points_applied;
+    }
+
+    /**
+     * Get the loyalty points record for this order.
+     */
+    public function loyaltyPoints()
+    {
+        return $this->morphMany(LoyaltyPoint::class, 'reference');
+    }
+
+    /**
+     * Get points preview for this order without applying them.
+     */
+    public function getPointsPreview(): array
+    {
+        $pointsService = app(\App\Services\PointsService::class);
+        return $pointsService->previewPointsForOrder($this);
     }
 }

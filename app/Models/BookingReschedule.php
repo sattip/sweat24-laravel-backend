@@ -71,7 +71,7 @@ class BookingReschedule extends Model
         return $query->where('user_id', $userId);
     }
 
-    public function getRescheduleCountForMonth($userId, $month = null)
+    public static function getRescheduleCountForMonth($userId, $month = null)
     {
         $month = $month ?? now();
         

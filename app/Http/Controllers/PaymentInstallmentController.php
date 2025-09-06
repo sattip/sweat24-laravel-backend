@@ -41,7 +41,7 @@ class PaymentInstallmentController extends Controller
             'total_installments' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0',
             'due_date' => 'required|date',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => 'nullable|in:cash,card,transfer,iris,cash_a',
             'status' => 'required|in:pending,paid,overdue',
             'notes' => 'nullable|string',
         ]);
@@ -73,7 +73,7 @@ class PaymentInstallmentController extends Controller
             'amount' => 'sometimes|numeric|min:0',
             'due_date' => 'sometimes|date',
             'paid_date' => 'nullable|date',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => 'nullable|in:cash,card,transfer,iris,cash_a',
             'status' => 'sometimes|in:pending,paid,overdue',
             'notes' => 'nullable|string',
         ]);
@@ -105,7 +105,7 @@ class PaymentInstallmentController extends Controller
     public function markAsPaid(Request $request, PaymentInstallment $paymentInstallment)
     {
         $validated = $request->validate([
-            'payment_method' => 'required|in:cash,card,transfer',
+            'payment_method' => 'required|in:cash,card,transfer,iris,cash_a',
             'paid_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);

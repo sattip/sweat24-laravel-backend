@@ -17,8 +17,18 @@ class CancellationPolicyController extends Controller
      */
     public function index()
     {
-        $policies = CancellationPolicy::active()->get();
-        return response()->json($policies);
+        $policies = CancellationPolicy::orderBy('priority', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        return response()->json([
+            'data' => $policies,
+            'meta' => [
+                'total' => $policies->count(),
+                'active' => $policies->where('is_active', true)->count(),
+                'inactive' => $policies->where('is_active', false)->count()
+            ]
+        ]);
     }
 
     /**
@@ -34,12 +44,29 @@ class CancellationPolicyController extends Controller
             'allow_reschedule' => 'required|boolean',
             'reschedule_hours_before' => 'nullable|integer|min:0',
             'max_reschedules_per_month' => 'required|integer|min:0',
-            'priority' => 'integer',
+            'priority' => 'sometimes|integer|min:1',
             'applicable_to' => 'nullable|array',
+            'applicable_to.class_types' => 'nullable|array',
+            'applicable_to.package_ids' => 'nullable|array'
         ]);
 
+        // Auto-assign priority if not provided
+        if (!isset($validated['priority'])) {
+            $maxPriority = CancellationPolicy::max('priority') ?? 0;
+            $validated['priority'] = $maxPriority + 1;
+        }
+
+        // Validate reschedule fields if reschedule is allowed
+        if ($validated['allow_reschedule'] && !$validated['reschedule_hours_before']) {
+            $validated['reschedule_hours_before'] = $validated['hours_before'];
+        }
+
         $policy = CancellationPolicy::create($validated);
-        return response()->json($policy, 201);
+        
+        return response()->json([
+            'data' => $policy,
+            'message' => 'Η πολιτική ακύρωσης δημιουργήθηκε επιτυχώς'
+        ], 201);
     }
 
     /**
@@ -64,12 +91,38 @@ class CancellationPolicyController extends Controller
             'reschedule_hours_before' => 'nullable|integer|min:0',
             'max_reschedules_per_month' => 'sometimes|integer|min:0',
             'is_active' => 'sometimes|boolean',
-            'priority' => 'sometimes|integer',
+            'priority' => 'sometimes|integer|min:1',
             'applicable_to' => 'nullable|array',
+            'applicable_to.class_types' => 'nullable|array',
+            'applicable_to.package_ids' => 'nullable|array'
         ]);
 
+        // Handle priority uniqueness
+        if (isset($validated['priority']) && $validated['priority'] != $cancellationPolicy->priority) {
+            $existingWithPriority = CancellationPolicy::where('priority', $validated['priority'])
+                ->where('id', '!=', $cancellationPolicy->id)
+                ->first();
+            
+            if ($existingWithPriority) {
+                return response()->json([
+                    'error' => 'Validation failed',
+                    'details' => ['priority' => ['Η προτεραιότητα πρέπει να είναι μοναδική']]
+                ], 422);
+            }
+        }
+
+        // Validate reschedule fields if reschedule is being enabled
+        if (isset($validated['allow_reschedule']) && $validated['allow_reschedule'] && 
+            !isset($validated['reschedule_hours_before']) && !$cancellationPolicy->reschedule_hours_before) {
+            $validated['reschedule_hours_before'] = $validated['hours_before'] ?? $cancellationPolicy->hours_before;
+        }
+
         $cancellationPolicy->update($validated);
-        return response()->json($cancellationPolicy);
+        
+        return response()->json([
+            'data' => $cancellationPolicy->fresh(),
+            'message' => 'Η πολιτική ακύρωσης ενημερώθηκε επιτυχώς'
+        ]);
     }
 
     /**
@@ -77,8 +130,24 @@ class CancellationPolicyController extends Controller
      */
     public function destroy(CancellationPolicy $cancellationPolicy)
     {
+        // Check if policy is being used by any classes or bookings
+        $usageCount = DB::table('gym_classes')
+            ->where('cancellation_policy_id', $cancellationPolicy->id)
+            ->count();
+            
+        if ($usageCount > 0) {
+            return response()->json([
+                'error' => 'Δεν είναι δυνατή η διαγραφή',
+                'message' => "Η πολιτική χρησιμοποιείται από {$usageCount} μαθήματα"
+            ], 422);
+        }
+
         $cancellationPolicy->delete();
-        return response()->json(['message' => 'Policy deleted successfully']);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Η πολιτική ακύρωσης διαγράφηκε επιτυχώς'
+        ]);
     }
 
     /**
@@ -113,11 +182,41 @@ class CancellationPolicyController extends Controller
             $now = Carbon::now();
             $hoursUntilClass = $now->diffInHours($classDateTime, false);
             
-            // Policy logic - FINAL CORRECT RULES (no penalty logic)
-            $canCancel = $hoursUntilClass >= 6; // Ακύρωση: έως 6+ ώρες πριν 
-            $canReschedule = $hoursUntilClass >= 3; // Αλλαγή ώρας: έως 3+ ώρες πριν  
-            $canCancelWithoutPenalty = true; // No penalty system implemented
-            $penaltyPercentage = 0; // No penalties
+            // Get dynamic policy based on class
+            $class = null;
+            if ($booking->class_id) {
+                $class = GymClass::find($booking->class_id);
+            }
+            
+            $applicablePolicy = $class ? $class->getApplicablePolicy() : null;
+            
+            if ($applicablePolicy) {
+                // Use dynamic policy
+                $canCancel = $hoursUntilClass >= $applicablePolicy->hours_before;
+                $canCancelWithoutPenalty = $applicablePolicy->canCancelWithoutPenalty($hoursUntilClass);
+                $canReschedule = $applicablePolicy->canReschedule($hoursUntilClass);
+                $penaltyPercentage = $canCancelWithoutPenalty ? 0 : $applicablePolicy->penalty_percentage;
+                
+                $policyInfo = [
+                    'name' => $applicablePolicy->name,
+                    'description' => $applicablePolicy->description,
+                    'hours_before' => $applicablePolicy->hours_before,
+                    'penalty_percentage' => $applicablePolicy->penalty_percentage,
+                    'allow_reschedule' => $applicablePolicy->allow_reschedule,
+                    'reschedule_hours_before' => $applicablePolicy->reschedule_hours_before
+                ];
+            } else {
+                // Fallback to default policy
+                $canCancel = $hoursUntilClass >= 6;
+                $canReschedule = $hoursUntilClass >= 3;  
+                $canCancelWithoutPenalty = true;
+                $penaltyPercentage = 0;
+                
+                $policyInfo = [
+                    'name' => 'Βασική Πολιτική',
+                    'description' => 'Βασική πολιτική ακύρωσης και μετάθεσης'
+                ];
+            }
             
             return response()->json([
                 'can_cancel' => $canCancel,
@@ -125,10 +224,7 @@ class CancellationPolicyController extends Controller
                 'can_cancel_without_penalty' => $canCancelWithoutPenalty,
                 'penalty_percentage' => $penaltyPercentage,
                 'hours_until_class' => round($hoursUntilClass, 1),
-                'policy' => [
-                    'name' => 'Βασική Πολιτική',
-                    'description' => 'Βασική πολιτική ακύρωσης και μετάθεσης'
-                ],
+                'policy' => $policyInfo,
                 'booking_info' => [
                     'id' => $booking->id,
                     'class_name' => $booking->class_name,
@@ -412,5 +508,147 @@ class CancellationPolicyController extends Controller
                 'message' => 'Σφάλμα κατά την επεξεργασία του αιτήματος'
             ], 500);
         }
+    }
+
+    /**
+     * Toggle policy active status
+     */
+    public function toggleStatus(CancellationPolicy $cancellationPolicy)
+    {
+        $cancellationPolicy->update([
+            'is_active' => !$cancellationPolicy->is_active
+        ]);
+
+        return response()->json([
+            'data' => $cancellationPolicy->fresh(),
+            'message' => $cancellationPolicy->is_active 
+                ? 'Η πολιτική ενεργοποιήθηκε' 
+                : 'Η πολιτική απενεργοποιήθηκε'
+        ]);
+    }
+
+    /**
+     * Get statistics for dashboard
+     */
+    public function getStatistics()
+    {
+        $totalPolicies = CancellationPolicy::count();
+        $activePolicies = CancellationPolicy::where('is_active', true)->count();
+        $averageHoursBefore = CancellationPolicy::where('is_active', true)->avg('hours_before') ?? 0;
+        $maxReschedules = CancellationPolicy::where('is_active', true)->max('max_reschedules_per_month') ?? 0;
+
+        return response()->json([
+            'total_policies' => $totalPolicies,
+            'active_policies' => $activePolicies,
+            'inactive_policies' => $totalPolicies - $activePolicies,
+            'average_hours_before' => round($averageHoursBefore, 1),
+            'max_reschedules_allowed' => $maxReschedules
+        ]);
+    }
+
+    /**
+     * Get available class types and packages for policy configuration
+     */
+    public function getConfigurationOptions()
+    {
+        $classTypes = [
+            ['value' => 'group', 'label' => 'Ομαδικά Μαθήματα'],
+            ['value' => 'personal', 'label' => 'Προσωπική Προπόνηση'],
+            ['value' => 'ems', 'label' => 'EMS Training'],
+            ['value' => 'pilates', 'label' => 'Pilates'],
+            ['value' => 'yoga', 'label' => 'Yoga'],
+            ['value' => 'hiit', 'label' => 'HIIT']
+        ];
+
+        $packages = DB::table('packages')
+            ->select('id as value', 'name as label')
+            ->where('is_active', true)
+            ->get()
+            ->toArray();
+
+        return response()->json([
+            'class_types' => $classTypes,
+            'packages' => $packages
+        ]);
+    }
+
+    /**
+     * Seed test data (development only)
+     */
+    public function seedTestData()
+    {
+        if (!app()->environment(['local', 'testing'])) {
+            return response()->json(['error' => 'Not available in production'], 403);
+        }
+
+        $policies = [
+            [
+                'name' => 'Βασική Πολιτική',
+                'description' => 'Στάνταρ πολιτική ακύρωσης για όλα τα μαθήματα',
+                'hours_before' => 24,
+                'penalty_percentage' => 50,
+                'allow_reschedule' => true,
+                'reschedule_hours_before' => 12,
+                'max_reschedules_per_month' => 3,
+                'priority' => 1,
+                'is_active' => true,
+                'applicable_to' => ['class_types' => ['group'], 'package_ids' => []]
+            ],
+            [
+                'name' => 'Προσωπική Προπόνηση',
+                'description' => 'Αυστηρότερη πολιτική για προσωπικές προπονήσεις',
+                'hours_before' => 48,
+                'penalty_percentage' => 75,
+                'allow_reschedule' => true,
+                'reschedule_hours_before' => 24,
+                'max_reschedules_per_month' => 2,
+                'priority' => 2,
+                'is_active' => true,
+                'applicable_to' => ['class_types' => ['personal'], 'package_ids' => []]
+            ],
+            [
+                'name' => 'Ευέλικτη Πολιτική',
+                'description' => 'Ευέλικτη πολιτική για VIP μέλη',
+                'hours_before' => 6,
+                'penalty_percentage' => 25,
+                'allow_reschedule' => true,
+                'reschedule_hours_before' => 3,
+                'max_reschedules_per_month' => 5,
+                'priority' => 3,
+                'is_active' => false,
+                'applicable_to' => ['class_types' => [], 'package_ids' => []]
+            ]
+        ];
+
+        foreach ($policies as $policyData) {
+            CancellationPolicy::updateOrCreate(
+                ['name' => $policyData['name']],
+                $policyData
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Δημιουργήθηκαν 3 test πολιτικές ακύρωσης',
+            'policies' => CancellationPolicy::orderBy('priority')->get()
+        ]);
+    }
+
+    /**
+     * Clear test data (development only)
+     */
+    public function clearTestData()
+    {
+        if (!app()->environment(['local', 'testing'])) {
+            return response()->json(['error' => 'Not available in production'], 403);
+        }
+
+        $count = CancellationPolicy::count();
+        CancellationPolicy::truncate();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Διαγράφηκαν {$count} πολιτικές ακύρωσης"
+        ]);
     }
 }
