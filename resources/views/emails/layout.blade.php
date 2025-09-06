@@ -215,7 +215,7 @@
     <div class="email-wrapper">
         <div class="email-container">
             <div class="email-header">
-                <a href="{{ config('app.url') }}" class="logo">
+                <a href="https://sweat93.gr" class="logo">
                     <img src="https://sweat24backend.obs.com.gr/logo-dark.png" alt="Sweat93" style="max-width: 200px; height: auto;">
                 </a>
                 <div class="tagline">Το Ταξίδι της Φυσικής σας Κατάστασης Αρχίζει Εδώ</div>
@@ -227,10 +227,10 @@
             
             <div class="email-footer">
                 <div class="footer-links">
-                    <a href="{{ config('app.url') }}/dashboard">Πίνακας Ελέγχου</a>
-                    <a href="{{ config('app.url') }}/bookings">Οι Κρατήσεις μου</a>
-                    <a href="{{ config('app.url') }}/profile">Προφίλ</a>
-                    <a href="{{ config('app.url') }}/support">Υποστήριξη</a>
+                    <a href="https://sweat93.gr/dashboard">Πίνακας Ελέγχου</a>
+                    <a href="https://sweat93.gr/bookings">Οι Κρατήσεις μου</a>
+                    <a href="https://sweat93.gr/profile">Προφίλ</a>
+                    <a href="https://sweat93.gr/support">Υποστήριξη</a>
                 </div>
                 
                 <div class="divider"></div>
@@ -240,27 +240,24 @@
                     
                     <div style="margin-bottom: 10px;">
                         <strong style="color: #dc3545;">📍 Διεύθυνση</strong><br>
-                        <span style="color: #666;">Λαγονήσι: Ολύμπου 2, Λαγονήσι 19010</span><br>
-                        <span style="color: #666;">Βάρη: Ηφαίστου 4</span>
+                        <span style="color: #666;">Ηφαίστου 4, Βάρη 16672</span>
                     </div>
                     
                     <div style="margin-bottom: 10px;">
                         <strong style="color: #dc3545;">📞 Τηλέφωνο</strong><br>
-                        <a href="tel:+306980912176" style="color: #666; text-decoration: none;">698 091 2176</a>
+                        <a href="tel:+302101234567" style="color: #666; text-decoration: none;">+30 210 123 4567</a>
                     </div>
                     
                     <div style="margin-bottom: 10px;">
                         <strong style="color: #dc3545;">✉️ Email</strong><br>
-                        <a href="mailto:info@sweat93.gr" style="color: #666; text-decoration: none;">info@sweat93.gr</a>
+                        <a href="mailto:info@sweat93.com" style="color: #666; text-decoration: none;">info@sweat93.com</a>
                     </div>
                     
                     <div style="margin-bottom: 10px;">
                         <strong style="color: #dc3545;">🕐 Ωράριο</strong><br>
                         <span style="color: #666; font-size: 14px;">
-                            <strong>Δευτέρα - Παρασκευή:</strong><br>
-                            07:00 - 22:30 (Βάρη) | 07:00 - 21:30 (Λαγονήσι)<br>
-                            <strong>Σάββατο:</strong> 09:00 - 14:00<br>
-                            <strong>Κυριακή:</strong> Κλειστά
+                            08:00 - 20:00<br>
+                            09:00 - 18:00
                         </span>
                     </div>
                 </div>

@@ -45,8 +45,8 @@
 
 <p>Αν συνεχίζετε να έχετε προβλήματα με την επαναφορά του κωδικού σας, παρακαλούμε επικοινωνήστε με την ομάδα υποστήριξής μας:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:support@sweat93.gr">support@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
 </ul>
 
 <p>Η ομάδα υποστήριξής μας είναι διαθέσιμη Δευτέρα έως Παρασκευή, 9:00 πμ - 6:00 μμ (GMT+2).</p>

@@ -32,7 +32,7 @@
 </ul>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="mailto:info@sweat93.gr?subject=Registration Appeal - {{ $user->email }}" class="btn">Επικοινωνία με την Υποστήριξη</a>
+    <a href="mailto:info@sweat93.com?subject=Registration Appeal - {{ $user->email }}" class="btn">Επικοινωνία με την Υποστήριξη</a>
 </div>
 
 <h2>Εναλλακτικές Επιλογές</h2>
@@ -48,9 +48,9 @@
 
 <div class="info-box">
     <h3>Στοιχεία Επικοινωνίας</h3>
-    <p><strong>Email:</strong> <a href="mailto:info@sweat93.gr">info@sweat93.gr</a></p>
-    <p><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></p>
-    <p><strong>Επισκεφθείτε μας:</strong> Sweat93 Gym - Your Gym Address Here</p>
+    <p><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></p>
+    <p><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></p>
+    <p><strong>Επισκεφθείτε μας:</strong> Ηφαίστου 4, Βάρη 16672</p>
 </div>
 
 <p>Σας ευχαριστούμε που σκεφτηκατε το Sweat93 για τις ανάγκες γυμναστικής σας.</p>
