@@ -63,7 +63,7 @@
 </p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/bookings" 
+    <a href="https://sweat93.gr/bookings" 
        style="display: inline-block; padding: 12px 30px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
         Δείτε τις Κρατήσεις σας
     </a>
@@ -71,7 +71,7 @@
 
 <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 30px;">
     <p style="color: #856404; font-size: 14px; margin: 0;">
-        <strong>Σημείωση:</strong> Εάν δεν λάβετε επιβεβαίωση εντός 24 ωρών, παρακαλούμε επικοινωνήστε μαζί μας στο <a href="tel:+306980912176">698 091 2176</a>.
+        <strong>Σημείωση:</strong> Εάν δεν λάβετε επιβεβαίωση εντός 24 ωρών, παρακαλούμε επικοινωνήστε μαζί μας στο <a href="tel:+302101234567">+30 210 123 4567</a>.
     </p>
 </div>
 @endsection

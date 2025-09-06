@@ -122,8 +122,8 @@
 @endif
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/orders/{{ $order->id }}" class="btn">Παρακολούθηση Παραγγελίας</a>
-    <a href="{{ config('app.url') }}/orders" class="btn btn-secondary">Προβολή Όλων των Παραγγελιών</a>
+    <a href="https://sweat93.gr/orders/{{ $order->id }}" class="btn">Παρακολούθηση Παραγγελίας</a>
+    <a href="https://sweat93.gr/orders" class="btn btn-secondary">Προβολή Όλων των Παραγγελιών</a>
 </div>
 
 @if($order->special_instructions)
@@ -136,8 +136,8 @@
 <h2>Χρειάζεστε Βοήθεια;</h2>
 <p>Αν έχετε ερωτήσεις σχετικά με την παραγγελία σας ή χρειάζεστε να κάνετε αλλαγές:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:orders@sweat93.gr">orders@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
     <li><strong>WhatsApp:</strong> Διαθέσιμο για ενημερώσεις παραγγελιών</li>
 </ul>
 

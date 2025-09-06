@@ -50,7 +50,7 @@
 <p>Μπορείτε να εξοφλήσετε αυτή την πληρωμή χρησιμοποιώντας οποιαδήποτε από τις ακόλουθες μεθόδους:</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ $payment_url ?? config('app.url') . '/payments/' . $payment->id }}" class="btn">Πληρωμή Online Τώρα</a>
+    <a href="{{ $payment_url ?? 'https://sweat93.gr/payments/' . $payment->id }}" class="btn">Πληρωμή Online Τώρα</a>
 </div>
 
 <h3>Επιλογές Πληρωμής:</h3>
@@ -114,8 +114,8 @@
 <p>Κατανοούμε ότι οι οικονομικές καταστάσεις μπορούν να είναι προκλητικές. Εάν αντιμετωπίζετε δυσκολία στην εκτέλεση αυτής της πληρωμής, παρακαλώ επικοινωνήστε μαζί μας. Είμαστε εδώ για να βοηθήσουμε να βρείτε μια λύση που λειτουργεί για τους δύο μας.</p>
 
 <ul>
-    <li><strong>Υποστήριξη Χρεώσεων:</strong> <a href="mailto:billing@sweat93.gr">billing@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Υποστήριξη Χρεώσεων:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
     <li><strong>WhatsApp:</strong> Γρήγορη βοήθεια πληρωμής</li>
     <li><strong>Προσωπικά:</strong> Επισκεφθείτε τη ρεσεψιόν μας</li>
 </ul>

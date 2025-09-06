@@ -58,13 +58,13 @@
     <h3 style="color: #333; font-size: 16px; margin-bottom: 15px;">📍 Τοποθεσία</h3>
     <p style="color: #666; font-size: 14px; line-height: 1.5; margin: 0;">
         Sweat93<br>
-        {{ config('mail.from.address', 'Διεύθυνση 123, Αθήνα') }}<br>
-        Τηλ: <a href="tel:+306980912176">698 091 2176</a>
+        Ηφαίστου 4, Βάρη 16672<br>
+        Τηλ: <a href="tel:+302101234567">+30 210 123 4567</a>
     </p>
 </div>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/bookings" 
+    <a href="https://sweat93.gr/bookings" 
        style="display: inline-block; padding: 12px 30px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
         Δείτε το Ραντεβού σας
     </a>
@@ -83,7 +83,7 @@
 <div style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border-radius: 5px;">
     <p style="color: #856404; font-size: 14px; margin: 0;">
         <strong>Πολιτική Ακύρωσης:</strong> Μπορείτε να ακυρώσετε ή να αλλάξετε το ραντεβού σας έως 24 ώρες πριν. 
-        Για αλλαγές, επικοινωνήστε στο <a href="tel:+306980912176">698 091 2176</a>.
+        Για αλλαγές, επικοινωνήστε στο <a href="tel:+302101234567">+30 210 123 4567</a>.
     </p>
 </div>
 @endsection

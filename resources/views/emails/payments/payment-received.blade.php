@@ -127,8 +127,8 @@
 </div>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/payments/{{ $payment->id }}/receipt" class="btn">Λήψη Απόδειξης</a>
-    <a href="{{ config('app.url') }}/payments" class="btn btn-secondary">Προβολή Ιστορικού Πληρωμών</a>
+    <a href="https://sweat93.gr/payments/{{ $payment->id }}/receipt" class="btn">Λήψη Απόδειξης</a>
+    <a href="https://sweat93.gr/payments" class="btn btn-secondary">Προβολή Ιστορικού Πληρωμών</a>
 </div>
 
 @if($payment->payment_method === 'bank_transfer')
@@ -182,8 +182,8 @@
 <h2>Ερωτήσεις ή Ανησυχίες;</h2>
 <p>Εάν έχετε οποιεσδήποτε ερωτήσεις για αυτή την πληρωμή ή χρειάζεστε βοήθεια:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:billing@sweat93.gr">billing@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
     <li><strong>Προσωπικά:</strong> Επισκεφθείτε τη ρεσεψιόν του γυμναστηρίου</li>
 </ul>
 
