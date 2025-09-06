@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\CancellationPolicy;
 
@@ -16,56 +15,88 @@ class CancellationPolicySeeder extends Seeder
         $policies = [
             [
                 'name' => 'Βασική Πολιτική Ακύρωσης',
-                'description' => 'Ακύρωση χωρίς χρέωση έως 24 ώρες πριν το μάθημα. Μετάθεση επιτρέπεται έως 12 ώρες πριν.',
+                'description' => 'Στάνταρ πολιτική ακύρωσης για ομαδικά μαθήματα. Ακύρωση χωρίς χρέωση έως 24 ώρες πριν το μάθημα.',
                 'hours_before' => 24,
-                'penalty_percentage' => 50,
+                'penalty_percentage' => 50.00,
                 'allow_reschedule' => true,
                 'reschedule_hours_before' => 12,
                 'max_reschedules_per_month' => 3,
-                'is_active' => true,
                 'priority' => 1,
-                'applicable_to' => json_encode(['class_types' => ['group']]),
+                'is_active' => true,
+                'applicable_to' => [
+                    'class_types' => ['group', 'hiit', 'yoga', 'pilates'],
+                    'package_ids' => []
+                ]
             ],
             [
-                'name' => 'Πολιτική Personal Training',
-                'description' => 'Ακύρωση χωρίς χρέωση έως 48 ώρες πριν τη συνεδρία. Μετάθεση επιτρέπεται έως 24 ώρες πριν.',
+                'name' => 'Πολιτική Προσωπικής Προπόνησης',
+                'description' => 'Αυστηρότερη πολιτική για προσωπικές προπονήσεις λόγω της προσωπικής δέσμευσης του εκπαιδευτή.',
                 'hours_before' => 48,
-                'penalty_percentage' => 100,
+                'penalty_percentage' => 75.00,
                 'allow_reschedule' => true,
                 'reschedule_hours_before' => 24,
                 'max_reschedules_per_month' => 2,
-                'is_active' => true,
                 'priority' => 2,
-                'applicable_to' => json_encode(['class_types' => ['personal']]),
-            ],
-            [
-                'name' => 'Πολιτική Premium Πακέτων',
-                'description' => 'Ευέλικτη πολιτική για κατόχους premium πακέτων. Ακύρωση έως 6 ώρες πριν χωρίς χρέωση.',
-                'hours_before' => 6,
-                'penalty_percentage' => 0,
-                'allow_reschedule' => true,
-                'reschedule_hours_before' => 6,
-                'max_reschedules_per_month' => 5,
                 'is_active' => true,
-                'priority' => 3,
-                'applicable_to' => json_encode(['package_ids' => [5]]), // Premium Membership 6 μήνες
+                'applicable_to' => [
+                    'class_types' => ['personal'],
+                    'package_ids' => []
+                ]
             ],
             [
-                'name' => 'Αυστηρή Πολιτική Ειδικών Σεμιναρίων',
-                'description' => 'Για ειδικά σεμινάρια και workshops. Δεν επιτρέπεται μετάθεση.',
+                'name' => 'EMS Training Πολιτική',
+                'description' => 'Ειδική πολιτική για EMS sessions που απαιτούν εξειδικευμένο εξοπλισμό και προετοιμασία.',
+                'hours_before' => 36,
+                'penalty_percentage' => 60.00,
+                'allow_reschedule' => true,
+                'reschedule_hours_before' => 18,
+                'max_reschedules_per_month' => 2,
+                'priority' => 3,
+                'is_active' => true,
+                'applicable_to' => [
+                    'class_types' => ['ems'],
+                    'package_ids' => []
+                ]
+            ],
+            [
+                'name' => 'Ευέλικτη Πολιτική VIP',
+                'description' => 'Ευέλικτη πολιτική για VIP μέλη με περισσότερες δυνατότητες μετάθεσης.',
+                'hours_before' => 6,
+                'penalty_percentage' => 25.00,
+                'allow_reschedule' => true,
+                'reschedule_hours_before' => 3,
+                'max_reschedules_per_month' => 5,
+                'priority' => 4,
+                'is_active' => false, // Απενεργοποιημένη από προεπιλογή
+                'applicable_to' => [
+                    'class_types' => [],
+                    'package_ids' => [] // Θα συμπληρωθούν VIP package IDs
+                ]
+            ],
+            [
+                'name' => 'Αυστηρή Πολιτική',
+                'description' => 'Αυστηρή πολιτική για ειδικά μαθήματα ή περιόδους υψηλής ζήτησης.',
                 'hours_before' => 72,
-                'penalty_percentage' => 100,
+                'penalty_percentage' => 100.00,
                 'allow_reschedule' => false,
                 'reschedule_hours_before' => null,
                 'max_reschedules_per_month' => 0,
-                'is_active' => true,
-                'priority' => 4,
-                'applicable_to' => json_encode(['class_types' => ['workshop', 'seminar']]),
-            ],
+                'priority' => 5,
+                'is_active' => false,
+                'applicable_to' => [
+                    'class_types' => [],
+                    'package_ids' => []
+                ]
+            ]
         ];
 
-        foreach ($policies as $policy) {
-            CancellationPolicy::create($policy);
+        foreach ($policies as $policyData) {
+            CancellationPolicy::updateOrCreate(
+                ['name' => $policyData['name']],
+                $policyData
+            );
         }
+
+        $this->command->info('Δημιουργήθηκαν ' . count($policies) . ' πολιτικές ακύρωσης.');
     }
 }

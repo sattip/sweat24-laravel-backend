@@ -47,7 +47,7 @@ class BusinessExpenseController extends Controller
             'date' => 'required|date',
             'vendor' => 'nullable|string|max:255',
             'receipt' => 'nullable|string',
-            'payment_method' => 'required|in:cash,card,transfer',
+            'payment_method' => 'required|in:cash,card,transfer,iris,cash_a',
             'notes' => 'nullable|string',
         ]);
         
@@ -78,7 +78,7 @@ class BusinessExpenseController extends Controller
             'date' => 'sometimes|date',
             'vendor' => 'nullable|string|max:255',
             'receipt' => 'nullable|string',
-            'payment_method' => 'sometimes|in:cash,card,transfer',
+            'payment_method' => 'sometimes|in:cash,card,transfer,iris,cash_a',
             'approved' => 'sometimes|boolean',
             'approved_by' => 'nullable|string|max:255',
             'notes' => 'nullable|string',

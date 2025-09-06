@@ -35,6 +35,7 @@ use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\MedicalHistoryController;
+use App\Http\Controllers\Api\PointsSettingsController;
 use App\Http\Controllers\AdminController;
 
 // Two-Phase Registration routes (public)
@@ -268,6 +269,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::put('classes/{class}', [GymClassController::class, 'update']);
     Route::delete('classes/{class}', [GymClassController::class, 'destroy']);
     
+    // Recurring class management (Admin only)
+    Route::get('admin/classes/{class}/recurring/info', [GymClassController::class, 'getRecurringInfo'])->middleware('role:admin');
+    Route::get('admin/classes/{class}/recurring/preview', [GymClassController::class, 'previewRecurringDeletion'])->middleware('role:admin');
+    Route::delete('admin/classes/{class}/recurring', [GymClassController::class, 'deleteRecurring'])->middleware('role:admin');
+    
     // Waitlist
     Route::post('classes/{class}/waitlist/join', [WaitlistController::class, 'join']);
     Route::delete('classes/{class}/waitlist/leave', [WaitlistController::class, 'leave']);
@@ -311,6 +317,18 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         // Admin Events Management
         Route::get('admin/events', [EventController::class, 'adminIndex']);
         Route::get('admin/event-rsvps', [EventController::class, 'adminGetAllRsvps']);
+        
+        // Points Settings (Admin only)
+        Route::prefix('points')->group(function () {
+            Route::get('settings', [PointsSettingsController::class, 'getSettings']);
+            Route::put('settings', [PointsSettingsController::class, 'updateSettings']);
+            Route::post('settings/reset', [PointsSettingsController::class, 'resetSettings']);
+            Route::get('user', [PointsSettingsController::class, 'getUserPoints']);
+            Route::post('users', [PointsSettingsController::class, 'getUsersPoints']);
+        });
+        
+        // Points Rewards Admin Management (with admin prefix) - removed from here
+        
         Route::post('events', [EventController::class, 'store']);
         Route::put('events/{event}', [EventController::class, 'update']);
         Route::delete('events/{event}', [EventController::class, 'destroy']);
@@ -517,6 +535,53 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('notifications/bell-state', [App\Http\Controllers\DebugController::class, 'getNotificationBellState']);
         Route::get('system/status', [App\Http\Controllers\DebugController::class, 'getSystemStatus']);
     });
+});
+
+// ============ MOBILE POINTS API ROUTES ============
+
+// Public Points API Routes
+Route::prefix('v1/points')->group(function () {
+    // User points (accessible by admin panel without auth)
+    Route::get('/user', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserPoints']);
+    Route::get('/history', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsHistory']);
+    Route::get('/stats', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsStats']);
+    
+    // Rewards (public access for mobile app)
+    Route::get('/rewards/affordable', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAffordableRewards']);
+    Route::get('/rewards', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAllRewards']);
+    Route::post('/rewards/{id}/redeem', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'redeemReward']);
+    
+    // User redemptions
+    Route::get('/redemptions', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserRedemptions']);
+    
+    // Test endpoint
+    Route::get('/test-user', function(\Illuminate\Http\Request $request) {
+        $userId = $request->query('user_id', 79);
+        $userPoints = \App\Models\UserPoints::where('user_id', $userId)->first();
+        return response()->json([
+            'success' => true,
+            'test' => true,
+            'data' => [
+                'user_id' => $userId,
+                'points_balance' => $userPoints ? $userPoints->points_balance : 0
+            ]
+        ]);
+    });
+});
+
+// Mobile Points API Routes (Protected)
+Route::middleware(['auth:sanctum'])->prefix('v1/points')->group(function () {
+    // User points history and stats
+    Route::get('/history', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsHistory']);
+    Route::get('/stats', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsStats']);
+    
+    // Rewards
+    Route::get('/rewards/affordable', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAffordableRewards']);
+    Route::get('/rewards', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAllRewards']);
+    Route::post('/rewards/{id}/redeem', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'redeemReward']);
+    
+    // User redemptions
+    Route::get('/redemptions', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserRedemptions']);
 });
 
 // Simple test endpoint
@@ -776,4 +841,10 @@ Route::prefix('v1')->group(function () {
         event(new \App\Events\TestPusherEvent($message));
         return response()->json(['ok' => true, 'sent' => $message]);
     });
+});
+
+// ============ PUBLIC ADMIN POINTS REWARDS ROUTES ============
+// These routes are public to allow admin panel access without Sanctum authentication
+Route::prefix('v1/admin/points')->group(function () {
+    Route::apiResource('rewards', \App\Http\Controllers\Api\PointsRewardsController::class);
 });

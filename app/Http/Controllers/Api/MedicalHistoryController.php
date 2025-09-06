@@ -74,14 +74,21 @@ class MedicalHistoryController extends Controller
                 'ems_contraindications' => 'required_if:ems_interest,true|nullable|array',
                 'ems_contraindications.*.has_condition' => 'required|boolean',
                 'ems_contraindications.*.year_of_onset' => 'nullable|integer|min:1900|max:' . $currentYear,
-                'ems_liability_accepted' => 'required_if:ems_interest,true|nullable|boolean',
+                // Liability declaration (single checkbox used for ALL users)
+                'ems_liability_accepted' => 'required|accepted',
                 
-                // General liability
-                'liability_declaration_accepted' => 'required|boolean',
+                // General fields
                 'submitted_at' => 'required|date'
             ]);
         } catch (ValidationException $e) {
-            return $this->validationErrorResponse($e->errors(), 'Validation failed');
+            // Custom error message for liability declaration (single checkbox)
+            $errors = $e->errors();
+            if (isset($errors['ems_liability_accepted'])) {
+                $errors['ems_liability_accepted'] = [
+                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση για να συνεχίσετε'
+                ];
+            }
+            return $this->validationErrorResponse($errors, 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική');
         }
 
         $user = Auth::user();
@@ -93,12 +100,11 @@ class MedicalHistoryController extends Controller
         try {
             // Prepare medical history JSON
             $medicalHistory = [
-                'medical_conditions' => $validated['medical_conditions'] ?? [],
+                'medical_conditions' => $this->convertConditionsToArray($validated['medical_conditions'] ?? []),
                 'current_health_problems' => $validated['current_health_problems'] ?? [],
                 'prescribed_medications' => $validated['prescribed_medications'] ?? [],
                 'smoking' => $validated['smoking'] ?? [],
                 'physical_activity' => $validated['physical_activity'] ?? [],
-                'liability_declaration_accepted' => $validated['liability_declaration_accepted'],
                 'submitted_at' => $validated['submitted_at']
             ];
 
@@ -113,11 +119,11 @@ class MedicalHistoryController extends Controller
             // Only add EMS contraindications if user has EMS interest
             if ($validated['ems_interest']) {
                 $updateData['ems_contraindications'] = $validated['ems_contraindications'];
-                $updateData['ems_liability_accepted'] = $validated['ems_liability_accepted'];
             } else {
                 $updateData['ems_contraindications'] = null;
-                $updateData['ems_liability_accepted'] = null;
             }
+            // Liability acceptance applies to all users
+            $updateData['ems_liability_accepted'] = $validated['ems_liability_accepted'];
 
             $user->update($updateData);
 
@@ -316,5 +322,28 @@ class MedicalHistoryController extends Controller
             }
         }
         return $count;
+    }
+
+    /**
+     * Convert medical conditions from object format to array format for storage
+     */
+    private function convertConditionsToArray($conditions)
+    {
+        if (!is_array($conditions)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($conditions as $name => $data) {
+            if (is_array($data) && isset($data['has_condition']) && $data['has_condition']) {
+                $result[] = [
+                    'name' => $name,
+                    'has_condition' => true,
+                    'year_of_onset' => $data['year_of_onset'] ?? null,
+                    'details' => $data['details'] ?? ''
+                ];
+            }
+        }
+        return $result;
     }
 }

@@ -344,25 +344,24 @@ class AdminController extends Controller
                 ];
             }
 
-            // Add medical history (EMS) if user has interest
-            if ($user->ems_interest) {
-                $response['medical_history'] = [
-                    'has_ems_interest' => true,
-                    'ems_contraindications' => $user->ems_contraindications ?? [],
-                    'ems_liability_accepted' => $user->ems_liability_accepted ?? false,
-                    'other_medical_data' => [
-                        'medical_conditions' => [
-                            'medical_history' => $user->medical_history,
-                            'emergency_contact' => $user->emergency_contact,
-                            'emergency_phone' => $user->emergency_phone,
-                        ],
-                        'emergency_contact' => [
-                            'name' => $user->emergency_contact,
-                            'phone' => $user->emergency_phone,
-                        ]
-                    ]
-                ];
-            }
+            // Add medical history (ALWAYS present)
+            $medicalHistoryData = $user->medical_history ? json_decode($user->medical_history, true) : [];
+            
+            $response['medical_history'] = [
+                'has_ems_interest' => $user->ems_interest ?? false,
+                'ems_contraindications' => $user->ems_contraindications ?? [],
+                'ems_liability_accepted' => $user->ems_liability_accepted ?? false,
+                'medical_conditions' => $medicalHistoryData['medical_conditions'] ?? [],
+                'current_health_problems' => $medicalHistoryData['current_health_problems'] ?? [],
+                'prescribed_medications' => $medicalHistoryData['prescribed_medications'] ?? [],
+                'smoking' => $medicalHistoryData['smoking'] ?? [],
+                'physical_activity' => $medicalHistoryData['physical_activity'] ?? [],
+                'emergency_contact' => [
+                    'name' => $user->emergency_contact,
+                    'phone' => $user->emergency_phone,
+                ],
+                'submitted_at' => $medicalHistoryData['submitted_at'] ?? null
+            ];
 
             // Add referral/how found us information
             if ($user->found_us_via) {

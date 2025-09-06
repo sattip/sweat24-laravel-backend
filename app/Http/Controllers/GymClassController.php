@@ -73,6 +73,7 @@ class GymClassController extends Controller
             'max_participants' => 'required|integer|min:1',
             'location' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'cancellation_policy_id' => 'nullable|exists:cancellation_policies,id',
         ]);
         
         $validated['status'] = 'active';
@@ -141,6 +142,7 @@ class GymClassController extends Controller
             'location' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'status' => 'sometimes|in:active,cancelled,completed',
+            'cancellation_policy_id' => 'nullable|exists:cancellation_policies,id',
         ]);
         
         // Remove null description to prevent NOT NULL constraint violation
@@ -188,5 +190,243 @@ class GymClassController extends Controller
     {
         $class->delete();
         return response()->json(['message' => 'Class deleted successfully']);
+    }
+    
+    /**
+     * Delete recurring classes based on scope
+     */
+    public function deleteRecurring(Request $request, GymClass $class)
+    {
+        $validated = $request->validate([
+            'scope' => 'required|in:day,week,month,all',
+            'date' => 'nullable|date'
+        ]);
+        
+        $scope = $validated['scope'];
+        $referenceDate = $validated['date'] ?? $class->date->toDateString();
+        $referenceDateCarbon = \Carbon\Carbon::parse($referenceDate);
+        
+        // Build base query for related classes (same "series")
+        $query = GymClass::where('name', $class->name)
+            ->where('type', $class->type)
+            ->where('instructor', $class->instructor)
+            ->where('time', $class->time)
+            ->where('location', $class->location);
+        
+        // Apply scope-based date filtering
+        switch ($scope) {
+            case 'day':
+                $query->whereDate('date', $referenceDateCarbon->toDateString());
+                break;
+                
+            case 'week':
+                $startOfWeek = $referenceDateCarbon->copy()->startOfWeek();
+                $endOfWeek = $referenceDateCarbon->copy()->endOfWeek();
+                $query->whereBetween('date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()]);
+                break;
+                
+            case 'month':
+                $query->whereYear('date', $referenceDateCarbon->year)
+                      ->whereMonth('date', $referenceDateCarbon->month);
+                break;
+                
+            case 'all':
+                // Delete all future occurrences (including today)
+                $query->where('date', '>=', $referenceDateCarbon->toDateString());
+                break;
+        }
+        
+        // Execute the deletion
+        $classesToDelete = $query->get();
+        $deletedCount = $classesToDelete->count();
+        
+        // Check for existing bookings before deletion
+        $classesWithBookings = [];
+        foreach ($classesToDelete as $classToDelete) {
+            $bookingCount = $classToDelete->bookings()->count();
+            if ($bookingCount > 0) {
+                $classesWithBookings[] = [
+                    'id' => $classToDelete->id,
+                    'date' => $classToDelete->date->format('Y-m-d'),
+                    'time' => $classToDelete->time,
+                    'bookings' => $bookingCount
+                ];
+            }
+        }
+        
+        // If there are bookings, return warning but still allow deletion
+        if (!empty($classesWithBookings)) {
+            $response = [
+                'message' => "Βρέθηκαν {$deletedCount} μαθήματα για διαγραφή",
+                'deleted_count' => $deletedCount,
+                'scope' => $scope,
+                'reference_date' => $referenceDate,
+                'classes_with_bookings' => $classesWithBookings,
+                'warning' => 'Κάποια μαθήματα έχουν κρατήσεις που θα ακυρωθούν'
+            ];
+        } else {
+            $response = [
+                'message' => "Διαγράφηκαν επιτυχώς {$deletedCount} μαθήματα",
+                'deleted_count' => $deletedCount,
+                'scope' => $scope,
+                'reference_date' => $referenceDate
+            ];
+        }
+        
+        // Perform the actual deletion
+        $query = GymClass::where('name', $class->name)
+            ->where('type', $class->type)
+            ->where('instructor', $class->instructor)
+            ->where('time', $class->time)
+            ->where('location', $class->location);
+            
+        // Reapply scope filtering for deletion
+        switch ($scope) {
+            case 'day':
+                $query->whereDate('date', $referenceDateCarbon->toDateString());
+                break;
+            case 'week':
+                $startOfWeek = $referenceDateCarbon->copy()->startOfWeek();
+                $endOfWeek = $referenceDateCarbon->copy()->endOfWeek();
+                $query->whereBetween('date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()]);
+                break;
+            case 'month':
+                $query->whereYear('date', $referenceDateCarbon->year)
+                      ->whereMonth('date', $referenceDateCarbon->month);
+                break;
+            case 'all':
+                $query->where('date', '>=', $referenceDateCarbon->toDateString());
+                break;
+        }
+        
+        $query->delete();
+        
+        return response()->json($response);
+    }
+    
+    /**
+     * Preview recurring class deletion (dry run)
+     */
+    public function previewRecurringDeletion(Request $request, GymClass $class)
+    {
+        $validated = $request->validate([
+            'scope' => 'required|in:day,week,month,all',
+            'date' => 'nullable|date'
+        ]);
+        
+        $scope = $validated['scope'];
+        $referenceDate = $validated['date'] ?? $class->date->toDateString();
+        $referenceDateCarbon = \Carbon\Carbon::parse($referenceDate);
+        
+        // Build base query for related classes (same "series")
+        $query = GymClass::where('name', $class->name)
+            ->where('type', $class->type)
+            ->where('instructor', $class->instructor)
+            ->where('time', $class->time)
+            ->where('location', $class->location);
+        
+        // Apply scope-based date filtering
+        switch ($scope) {
+            case 'day':
+                $query->whereDate('date', $referenceDateCarbon->toDateString());
+                break;
+            case 'week':
+                $startOfWeek = $referenceDateCarbon->copy()->startOfWeek();
+                $endOfWeek = $referenceDateCarbon->copy()->endOfWeek();
+                $query->whereBetween('date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()]);
+                break;
+            case 'month':
+                $query->whereYear('date', $referenceDateCarbon->year)
+                      ->whereMonth('date', $referenceDateCarbon->month);
+                break;
+            case 'all':
+                $query->where('date', '>=', $referenceDateCarbon->toDateString());
+                break;
+        }
+        
+        $classesToDelete = $query->get();
+        $deletedCount = $classesToDelete->count();
+        
+        // Get detailed info about each class to be deleted
+        $classDetails = [];
+        $totalBookings = 0;
+        
+        foreach ($classesToDelete as $classToDelete) {
+            $bookingCount = $classToDelete->bookings()->count();
+            $totalBookings += $bookingCount;
+            
+            $classDetails[] = [
+                'id' => $classToDelete->id,
+                'date' => $classToDelete->date->format('Y-m-d'),
+                'time' => $classToDelete->time,
+                'bookings' => $bookingCount,
+                'current_participants' => $classToDelete->current_participants,
+                'max_participants' => $classToDelete->max_participants
+            ];
+        }
+        
+        return response()->json([
+            'preview' => true,
+            'class_series' => [
+                'name' => $class->name,
+                'type' => $class->type,
+                'instructor' => $class->instructor,
+                'time' => $class->time,
+                'location' => $class->location
+            ],
+            'scope' => $scope,
+            'reference_date' => $referenceDate,
+            'classes_to_delete' => $classDetails,
+            'total_classes' => $deletedCount,
+            'total_bookings_affected' => $totalBookings,
+            'has_bookings' => $totalBookings > 0,
+            'warning' => $totalBookings > 0 ? "Θα ακυρωθούν {$totalBookings} κρατήσεις" : null
+        ]);
+    }
+    
+    /**
+     * Get recurring status and related classes info
+     */
+    public function getRecurringInfo(GymClass $class)
+    {
+        // Find all related classes (same series)
+        $relatedClasses = GymClass::where('name', $class->name)
+            ->where('type', $class->type)
+            ->where('instructor', $class->instructor)
+            ->where('time', $class->time)
+            ->where('location', $class->location)
+            ->where('date', '>=', now()->toDateString()) // Only future classes
+            ->orderBy('date')
+            ->get();
+        
+        $isRecurring = $relatedClasses->count() > 1;
+        
+        $recurringInfo = [];
+        if ($isRecurring) {
+            foreach ($relatedClasses as $relatedClass) {
+                $recurringInfo[] = [
+                    'id' => $relatedClass->id,
+                    'date' => $relatedClass->date->format('Y-m-d'),
+                    'time' => $relatedClass->time,
+                    'bookings' => $relatedClass->bookings()->count(),
+                    'current_participants' => $relatedClass->current_participants,
+                    'is_current' => $relatedClass->id === $class->id
+                ];
+            }
+        }
+        
+        return response()->json([
+            'class_id' => $class->id,
+            'is_recurring' => $isRecurring,
+            'total_related_classes' => $relatedClasses->count(),
+            'class_series' => [
+                'name' => $class->name,
+                'type' => $class->type,
+                'instructor' => $class->instructor,
+                'time' => $class->time,
+                'location' => $class->location
+            ],
+            'related_classes' => $recurringInfo
+        ]);
     }
 }

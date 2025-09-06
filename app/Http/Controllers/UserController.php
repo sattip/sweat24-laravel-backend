@@ -26,6 +26,10 @@ class UserController extends Controller
             $query->where('status', $request->status);
         }
         
+        // Sort by registration date (created_at) in descending order by default
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy('created_at', $sortOrder);
+        
         $users = $query->with('packages', 'activityLogs')->paginate(20);
         
         return response()->json($users);
