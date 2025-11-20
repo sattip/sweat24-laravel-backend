@@ -37,6 +37,10 @@ use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\MedicalHistoryController;
 use App\Http\Controllers\Api\PointsSettingsController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\TeamChatController;
+use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\ContactMessageController;
 
 // Two-Phase Registration routes (public)
 Route::prefix('v1/registration')->group(function () {
@@ -57,6 +61,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
     Route::post('/users/{id}/reject', [AdminController::class, 'rejectUser']);
     Route::get('/users/{userId}/full-profile', [AdminController::class, 'getUserFullProfile']);
+    Route::get('/users/{userId}/packages', [UserPackageController::class, 'userPackages']);
 });
 
 // Authentication routes (public)
@@ -134,7 +139,22 @@ Route::prefix('v1')->group(function () {
     // Public package routes
     Route::get('packages', [PackageController::class, 'index']);
     Route::get('packages/{package}', [PackageController::class, 'show']);
-    
+
+    // Public stores routes
+    Route::get('stores', [\App\Http\Controllers\Api\StoresController::class, 'index']);
+    Route::get('stores/{store}', [\App\Http\Controllers\Api\StoresController::class, 'show']);
+
+    // Public class types routes
+    Route::get('class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'index']);
+
+    // Public fitness classes routes
+    Route::get('fitness-classes', [\App\Http\Controllers\Api\FitnessClassesController::class, 'index']);
+    Route::get('fitness-classes/types/all', [\App\Http\Controllers\Api\FitnessClassesController::class, 'getTypes']);
+    Route::get('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'show']);
+
+    // Public questionnaire routes
+    Route::get('questionnaires/active', [\App\Http\Controllers\Api\QuestionnaireController::class, 'active']);
+
     // Public store product routes
     Route::get('store/products', [\App\Http\Controllers\StoreProductController::class, 'index']);
     Route::get('store/products/id/{id}', [\App\Http\Controllers\StoreProductController::class, 'showById']);
@@ -145,6 +165,11 @@ Route::prefix('v1')->group(function () {
 
     // Order history endpoint (accessible with user_id parameter or auth token)
     Route::get('orders/history', [\App\Http\Controllers\OrderController::class, 'orderHistory']);
+
+    // Public services routes
+    Route::get('services', [ServiceController::class, 'index']);
+    Route::get('services/{service}', [ServiceController::class, 'show']);
+    Route::get('services/{service}/trial-info', [ServiceController::class, 'getTrialInfo'])->middleware('auth:sanctum');
 
     // Public specialized services routes
     Route::get('specialized-services', [SpecializedServiceController::class, 'index']);
@@ -206,11 +231,15 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Users/Members
     Route::apiResource('users', UserController::class);
-    
+    Route::get('users/search/by-phone', [UserController::class, 'searchByPhone']);
+    Route::get('users/{id}/referral-info', [UserController::class, 'getUserReferralInfo']);
+
     // Packages (Admin management)
     Route::apiResource('packages', PackageController::class)->except(['index', 'show'])->middleware('role:admin');
-    
+
     // Bookings (authenticated routes)
+    // Specific routes must be defined BEFORE apiResource to avoid conflicts
+    Route::get('bookings/history', [BookingController::class, 'history']);
     Route::apiResource('bookings', BookingController::class)->except(['index', 'store']);
     
     // Booking Requests (authenticated routes)
@@ -225,6 +254,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/statistics', [UserPackageController::class, 'statistics']);
         Route::get('/expiring-report', [UserPackageController::class, 'expiringReport']);
         Route::get('/user/{userId}', [UserPackageController::class, 'userPackages']);
+        Route::get('/user/{userId}/partial-payments', [UserPackageController::class, 'userPartialPayments']);
         Route::get('/{userPackage}', [UserPackageController::class, 'show']);
         Route::post('/', [UserPackageController::class, 'store']);
         Route::put('/{userPackage}', [UserPackageController::class, 'update']);
@@ -233,14 +263,27 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/{userPackage}/renew', [UserPackageController::class, 'renew']);
         Route::post('/{userPackage}/send-notification', [UserPackageController::class, 'sendExpiryNotification']);
     });
+
+    // Mobile App - Get authenticated user's partial payment summary
+    Route::get('/my-partial-payments', [UserPackageController::class, 'myPartialPayments']);
+
+    // Custom Packages route alias (points to user-packages endpoint)
+    Route::get('custom-packages/user/{userId}', [UserPackageController::class, 'userPackages']);
     
     Route::post('bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
     Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+    Route::post('bookings/{booking}/mark-absent', [BookingController::class, 'markAbsent']);
     Route::get('bookings/{booking}/policy-check', [CancellationPolicyController::class, 'testPolicy']);
     Route::post('bookings/{booking}/reschedule', [CancellationPolicyController::class, 'requestReschedule']);
     
     // Instructors/Trainers
     Route::apiResource('instructors', InstructorController::class);
+
+    // Services Management (Admin/Trainer)
+    Route::apiResource('services', ServiceController::class)->except(['show', 'index']);
+    Route::post('services/{service}/toggle-active', [ServiceController::class, 'toggleActive']);
+
+    // Specialized Services Management (Admin/Trainer)
     Route::apiResource('specialized-services', SpecializedServiceController::class)->except(['show', 'index']);
     Route::get('admin/specialized-services', [SpecializedServiceController::class, 'adminIndex']);
     Route::apiResource('appointment-requests', AppointmentRequestController::class)->except(['store', 'index']); // index moved to public routes
@@ -263,22 +306,60 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Event routes
     Route::post('events/{event}/rsvp', [EventController::class, 'rsvp']);
     Route::get('events/rsvps', [EventController::class, 'getUserRSVPs']);
-    
+
+    // New Member Info routes (for clients)
+    Route::get('new-member-info', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'index']);
+    Route::get('new-member-info/category/{category}', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'getByCategory']);
+    Route::get('new-member-info/{id}', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'show']);
+
+    // Employee Manual routes (for staff)
+    Route::get('employee-manual', [\App\Http\Controllers\Api\EmployeeManualController::class, 'index']);
+    Route::get('employee-manual/category/{category}', [\App\Http\Controllers\Api\EmployeeManualController::class, 'getByCategory']);
+    Route::get('employee-manual/{id}', [\App\Http\Controllers\Api\EmployeeManualController::class, 'show']);
+
     // Classes (authenticated routes)
     Route::post('classes', [GymClassController::class, 'store']);
     Route::put('classes/{class}', [GymClassController::class, 'update']);
     Route::delete('classes/{class}', [GymClassController::class, 'destroy']);
-    
+
     // Recurring class management (Admin only)
     Route::get('admin/classes/{class}/recurring/info', [GymClassController::class, 'getRecurringInfo'])->middleware('role:admin');
     Route::get('admin/classes/{class}/recurring/preview', [GymClassController::class, 'previewRecurringDeletion'])->middleware('role:admin');
     Route::delete('admin/classes/{class}/recurring', [GymClassController::class, 'deleteRecurring'])->middleware('role:admin');
-    
+
+    // Fitness Classes (authenticated routes for admin/trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::post('fitness-classes', [\App\Http\Controllers\Api\FitnessClassesController::class, 'store']);
+        Route::put('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'update']);
+        Route::delete('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'destroy']);
+    });
+
+    // Questionnaires (authenticated routes for admin/trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::apiResource('questionnaires', \App\Http\Controllers\Api\QuestionnaireController::class);
+        Route::post('questionnaires/{questionnaire}/toggle-active', [\App\Http\Controllers\Api\QuestionnaireController::class, 'toggleActive']);
+
+        // Questionnaire Responses (admin/trainer management)
+        Route::get('questionnaire-responses', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'index']);
+        Route::get('questionnaire-responses/{questionnaireResponse}', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'show']);
+        Route::put('questionnaire-responses/{questionnaireResponse}', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'update']);
+        Route::delete('questionnaire-responses/{questionnaireResponse}', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'destroy']);
+        Route::get('questionnaires/{questionnaire}/responses', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'getQuestionnaireResponses']);
+    });
+
+    // Questionnaire Response submission (any authenticated user can submit)
+    Route::post('questionnaire-responses', [\App\Http\Controllers\Api\QuestionnaireResponseController::class, 'store']);
+
+    // Contact Messages (any authenticated user can submit)
+    Route::post('contact-messages', [ContactMessageController::class, 'store']);
+
     // Waitlist
+    Route::get('my-waitlists', [WaitlistController::class, 'myWaitlists']);
     Route::post('classes/{class}/waitlist/join', [WaitlistController::class, 'join']);
     Route::delete('classes/{class}/waitlist/leave', [WaitlistController::class, 'leave']);
+    Route::post('classes/{class}/waitlist/decline', [WaitlistController::class, 'decline']);
     Route::get('classes/{class}/waitlist/status', [WaitlistController::class, 'status']);
-    Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin');
+    Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin,trainer');
     
     // Financial Features (Admin only)
     Route::middleware(['role:admin'])->group(function () {
@@ -313,7 +394,15 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('admin/store/products/{id}', [\App\Http\Controllers\StoreProductController::class, 'update']);
         Route::delete('admin/store/products/{id}', [\App\Http\Controllers\StoreProductController::class, 'destroy']);
         Route::post('admin/store/upload-image', [ImageUploadController::class, 'uploadProductImage']);
-        
+
+        // Admin Class Types Management
+        Route::get('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'index']);
+        Route::post('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'store']);
+        Route::get('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'show']);
+        Route::post('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'update']);
+        Route::delete('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'destroy']);
+        Route::post('admin/class-types/reorder', [\App\Http\Controllers\Api\ClassTypesController::class, 'reorder']);
+
         // Admin Events Management
         Route::get('admin/events', [EventController::class, 'adminIndex']);
         Route::get('admin/event-rsvps', [EventController::class, 'adminGetAllRsvps']);
@@ -340,7 +429,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('admin/referral-rewards/{reward}', [ReferralController::class, 'adminUpdateReward']);
         Route::delete('admin/referral-rewards/{reward}', [ReferralController::class, 'adminDeleteReward']);
         Route::get('admin/referrals', [ReferralController::class, 'adminGetReferrals']);
-        
+
         // How Found Us Admin Routes
         Route::get('admin/referrals/top-referrers', [ApiReferralController::class, 'topReferrers']);
         Route::get('admin/referrals/source-statistics', [ApiReferralController::class, 'sourceStatistics']);
@@ -369,7 +458,18 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('admin/partner-offers/{offer}', [PartnerController::class, 'adminDeleteOffer']);
         Route::get('admin/partner-redemptions', [PartnerController::class, 'adminGetRedemptions']);
         
-        // Admin Booking Request Management (EMS/Personal)
+        // Admin Contact Messages Management
+        Route::get('admin/contact-messages', [ContactMessageController::class, 'index']);
+        Route::get('admin/contact-messages/stats', [ContactMessageController::class, 'stats']);
+        Route::get('admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'show']);
+        Route::put('admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'update']);
+        Route::post('admin/contact-messages/{contactMessage}/reply', [ContactMessageController::class, 'reply']);
+        Route::post('admin/contact-messages/{contactMessage}/archive', [ContactMessageController::class, 'archive']);
+        Route::delete('admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
+    });
+
+    // Booking Request Management (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::get('admin/booking-requests', [BookingRequestController::class, 'index']);
         Route::get('admin/booking-requests-calendar', [BookingRequestController::class, 'getCalendarView']);
         Route::get('admin/booking-requests/statistics', [BookingRequestController::class, 'statistics']);
@@ -377,7 +477,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('admin/booking-requests/{bookingRequest}/reject', [BookingRequestController::class, 'reject']);
         Route::post('admin/booking-requests/{bookingRequest}/complete', [BookingRequestController::class, 'markCompleted']);
     });
-    
+
     // Referral Program Routes (authenticated access)
     Route::get('referral/data', [ReferralController::class, 'getUserReferralData']);
     Route::post('referral/redeem/{reward}', [ReferralController::class, 'redeemReward']);
@@ -417,6 +517,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('classes/{class}/evaluations/stats', [EvaluationController::class, 'classStats']);
         Route::get('instructors/{instructor}/evaluations/stats', [EvaluationController::class, 'instructorStats']);
         Route::get('evaluations/pending-count', [EvaluationController::class, 'pendingCount']);
+    });
+
+    // Referral Management (Admin & Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('admin/referrals/phone-based', [UserController::class, 'getPhoneBasedReferrals']);
+    });
+
+    // Priority Booking Settings (Admin only)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('admin/priority-booking-settings', [\App\Http\Controllers\Api\PriorityBookingSettingsController::class, 'index']);
+        Route::put('admin/priority-booking-settings', [\App\Http\Controllers\Api\PriorityBookingSettingsController::class, 'update']);
     });
     
     // Cancellation Policy routes
@@ -506,26 +617,135 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [MedicalHistoryController::class, 'getMedicalHistory']);
         Route::get('/{userId}', [MedicalHistoryController::class, 'getMedicalHistory'])->where('userId', '[0-9]+')->middleware('role:admin,trainer');
         Route::put('/', [MedicalHistoryController::class, 'updateMedicalHistory']);
+        Route::post('/doctor-certificate', [MedicalHistoryController::class, 'uploadDoctorCertificate']);
+        Route::delete('/doctor-certificate', [MedicalHistoryController::class, 'deleteDoctorCertificate']);
     });
-    
-    
-    // Admin Chat Management routes
-    Route::prefix('admin/chat')->middleware(['role:admin'])->group(function () {
+
+    // ============ FITNESS MANAGEMENT SYSTEM ROUTES ============
+
+    // Fitness Levels Routes (Admin & Trainer)
+    Route::prefix('fitness-levels')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'index']);
+        Route::get('/user/{userId}', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'index']);
+        Route::get('/user/{userId}/current', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'current']);
+        Route::get('/user/{userId}/history', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'history']);
+        Route::post('/', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\FitnessLevelsController::class, 'destroy']);
+    });
+
+    // Performance Tests Routes (Admin & Trainer)
+    Route::prefix('performance-tests')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'index']);
+        Route::get('/user/{userId}', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'index']);
+        Route::get('/user/{userId}/progress/{exerciseName}', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'progress']);
+        Route::get('/user/{userId}/analytics', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'analytics']);
+        Route::post('/', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\PerformanceTestsController::class, 'destroy']);
+    });
+
+    // Exercise Library Routes
+    Route::prefix('exercises')->group(function () {
+        // Public routes for viewing exercises
+        Route::get('/', [\App\Http\Controllers\Api\ExercisesController::class, 'index']);
+        Route::get('/muscle-groups', [\App\Http\Controllers\Api\ExercisesController::class, 'muscleGroups']);
+        Route::get('/categories', [\App\Http\Controllers\Api\ExercisesController::class, 'categories']);
+        Route::get('/equipment', [\App\Http\Controllers\Api\ExercisesController::class, 'equipment']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\ExercisesController::class, 'show']);
+
+        // Admin/Trainer routes for managing exercises
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExercisesController::class, 'store']);
+            Route::put('/{id}', [\App\Http\Controllers\Api\ExercisesController::class, 'update']);
+            Route::delete('/{id}', [\App\Http\Controllers\Api\ExercisesController::class, 'destroy']);
+        });
+    });
+
+    // Training Sessions Routes (Admin & Trainer)
+    Route::prefix('training-sessions')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
+        Route::get('/user/{userId}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
+        Route::get('/user/{userId}/analytics', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'analytics']);
+        Route::post('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'destroy']);
+    });
+
+    // Body Measurements Routes (Admin & Trainer)
+    Route::prefix('body-measurements')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'index']);
+        Route::get('/user/{userId}', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'index']);
+        Route::get('/user/{userId}/latest', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'latest']);
+        Route::get('/user/{userId}/trends', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'trends']);
+        Route::post('/user/{userId}/compare', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'compare']);
+        Route::post('/', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\BodyMeasurementsController::class, 'destroy']);
+    });
+
+
+    // Admin Chat Management routes (Admin and Trainer)
+    Route::prefix('admin/chat')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('/conversations', [AdminChatController::class, 'getConversations']);
         Route::post('/conversations', [AdminChatController::class, 'createConversation']);
         Route::post('/messages', [AdminChatController::class, 'sendMessage']);
         Route::put('/conversations/{conversation}/read', [AdminChatController::class, 'markAsRead']);
         Route::put('/conversations/{conversation}/status', [AdminChatController::class, 'updateStatus']);
     });
-    
-    // Owner Notifications routes
-    Route::prefix('owner-notifications')->middleware(['role:admin'])->group(function () {
+
+    // Owner Notifications routes (Admin and Trainer)
+    Route::prefix('owner-notifications')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('/', [OwnerNotificationController::class, 'index']);
         Route::post('/{notification}/read', [OwnerNotificationController::class, 'markAsRead']);
         Route::post('/read-all', [OwnerNotificationController::class, 'markAllAsRead']);
         Route::delete('/{notification}', [OwnerNotificationController::class, 'delete']);
     });
-    
+
+    // Task Management routes (Admin and Trainer only)
+    Route::prefix('tasks')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('/', [TaskController::class, 'index']);
+        Route::post('/', [TaskController::class, 'store']);
+        Route::get('/stats', [TaskController::class, 'stats']);
+        Route::get('/assignable-users', [TaskController::class, 'getAssignableUsers']);
+        Route::get('/my-tasks', [TaskController::class, 'getMyTasks']);
+        Route::get('/my-pending-tasks', [TaskController::class, 'getMyPendingTasks']);
+        Route::get('/high-priority', [TaskController::class, 'getHighPriorityTasks']);
+        Route::get('/{task}', [TaskController::class, 'show']);
+        Route::put('/{task}', [TaskController::class, 'update']);
+        Route::delete('/{task}', [TaskController::class, 'destroy']);
+        Route::post('/{task}/mark-completed', [TaskController::class, 'markCompleted']);
+        Route::post('/{task}/acknowledge', [TaskController::class, 'acknowledgeTask']);
+    });
+
+    // Alternative task routes with hyphens (for convenience)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('tasks-stats', [TaskController::class, 'stats']);
+        Route::get('tasks-assignable-users', [TaskController::class, 'getAssignableUsers']);
+        Route::get('tasks-my-tasks', [TaskController::class, 'getMyTasks']);
+        Route::get('tasks-my-pending-tasks', [TaskController::class, 'getMyPendingTasks']);
+        Route::get('tasks-high-priority', [TaskController::class, 'getHighPriorityTasks']);
+    });
+
+    // Task routes without prefix (for frontend compatibility)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('my-pending-tasks', [TaskController::class, 'getMyPendingTasks']);
+        Route::get('assignable-users', [TaskController::class, 'getAssignableUsers']);
+    });
+
+    // Team Chat routes (Admin and Trainer only)
+    Route::prefix('team-chat')->middleware(['role:admin,trainer'])->group(function () {
+        Route::get('messages', [TeamChatController::class, 'getMessages']);
+        Route::post('messages', [TeamChatController::class, 'sendMessage']);
+        Route::get('online-users', [TeamChatController::class, 'getOnlineUsers']);
+        Route::get('stats', [TeamChatController::class, 'getStats']);
+        Route::delete('messages/{message}', [TeamChatController::class, 'deleteMessage']);
+    });
+
     // Development/Debug endpoints (available in development mode only)
     Route::prefix('debug')->middleware(['auth:sanctum', 'debug'])->group(function () {
         Route::post('notifications/simulate-receive', [App\Http\Controllers\DebugController::class, 'simulateReceiveNotification']);
@@ -664,15 +884,25 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
 // Admin Loyalty Management (Protected)
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(function () {
+    // New Member Info Management (for clients)
+    Route::post('new-member-info', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'store']);
+    Route::put('new-member-info/{id}', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'update']);
+    Route::delete('new-member-info/{id}', [\App\Http\Controllers\Api\NewMemberInfoController::class, 'destroy']);
+
+    // Employee Manual Management (for staff)
+    Route::post('employee-manual', [\App\Http\Controllers\Api\EmployeeManualController::class, 'store']);
+    Route::put('employee-manual/{id}', [\App\Http\Controllers\Api\EmployeeManualController::class, 'update']);
+    Route::delete('employee-manual/{id}', [\App\Http\Controllers\Api\EmployeeManualController::class, 'destroy']);
+
     // Loyalty Rewards CRUD
     Route::apiResource('loyalty-rewards', \App\Http\Controllers\Api\LoyaltyRewardController::class);
     Route::post('loyalty-rewards/{loyaltyReward}/toggle-status', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'toggleStatus']);
     Route::get('loyalty-rewards/{loyaltyReward}/redemptions', [\App\Http\Controllers\Api\LoyaltyRewardController::class, 'redemptions']);
-    
+
     // Loyalty Redemptions Management (MISSING ENDPOINT)
     Route::get('loyalty/redemptions', [\App\Http\Controllers\Api\LoyaltyController::class, 'adminGetRedemptions']);
     Route::get('loyalty-redemptions', [\App\Http\Controllers\Api\LoyaltyController::class, 'adminGetRedemptions']); // Alternative endpoint for admin panel
-    
+
     // Loyalty Statistics
     Route::get('loyalty/stats', [\App\Http\Controllers\Api\LoyaltyController::class, 'stats']);
 });
@@ -702,6 +932,36 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin')->group(fun
     
     // Enhanced Referral Management (extending existing)
     Route::get('referral-stats', [ReferralController::class, 'adminGetStats']);
+});
+
+// ============ WORK SESSIONS / TIME TRACKING ROUTES ============
+
+// Trainer Work Sessions (Protected - for trainers and admins)
+Route::middleware(['auth:sanctum'])->prefix('v1/work-sessions')->group(function () {
+    // Get current user's sessions
+    Route::get('/', [\App\Http\Controllers\Api\WorkSessionController::class, 'index']);
+    Route::get('/current', [\App\Http\Controllers\Api\WorkSessionController::class, 'getCurrentSession']);
+    Route::get('/today', [\App\Http\Controllers\Api\WorkSessionController::class, 'todaySummary']);
+
+    // Clock in/out
+    Route::post('/clock-in', [\App\Http\Controllers\Api\WorkSessionController::class, 'clockIn']);
+    Route::post('/clock-out', [\App\Http\Controllers\Api\WorkSessionController::class, 'clockOut']);
+
+    // Edit own sessions
+    Route::put('/{id}', [\App\Http\Controllers\Api\WorkSessionController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\WorkSessionController::class, 'destroy']);
+});
+
+// Admin Work Session Management (Protected - admin only)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/work-sessions')->group(function () {
+    // View all trainer sessions
+    Route::get('/', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminIndex']);
+    Route::get('/summary', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminSummary']);
+    Route::get('/trainer/{userId}', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminTrainerDetail']);
+
+    // Admin can edit/delete any session
+    Route::put('/{id}', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminUpdate']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminDestroy']);
 });
 
 // ============ PUBLIC TEST ENDPOINTS (για debugging) ============

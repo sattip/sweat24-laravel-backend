@@ -36,6 +36,12 @@ class ProcessSessionDeduction
     {
         $activePackage = UserPackage::where('user_id', $booking->user_id)
             ->where('status', 'active')
+            ->where('is_frozen', false) // Ensure package is not frozen
+            ->where(function($query) {
+                // Ensure package is not expired
+                $query->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', now()->toDateString());
+            })
             ->orderBy('expiry_date', 'desc')
             ->first();
             
@@ -85,6 +91,12 @@ class ProcessSessionDeduction
         
         $activePackage = UserPackage::where('user_id', $booking->user_id)
             ->where('status', 'active')
+            ->where('is_frozen', false) // Ensure package is not frozen
+            ->where(function($query) {
+                // Ensure package is not expired
+                $query->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', now()->toDateString());
+            })
             ->orderBy('expiry_date', 'desc')
             ->first();
             

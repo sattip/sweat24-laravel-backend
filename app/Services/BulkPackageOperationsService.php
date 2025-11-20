@@ -251,24 +251,47 @@ class BulkPackageOperationsService
     private function calculateNewExpiryDate(UserPackage $package, array $extensionData)
     {
         $currentExpiry = $package->expiry_date;
-        $newExpiry = $currentExpiry;
-        
-        if (!empty($extensionData['extend_days'])) {
-            $newExpiry = $newExpiry->addDays($extensionData['extend_days']);
+
+        // If no current expiry date, use today as base
+        if (!$currentExpiry) {
+            $currentExpiry = Carbon::now();
         }
-        
-        if (!empty($extensionData['extend_weeks'])) {
-            $newExpiry = $newExpiry->addWeeks($extensionData['extend_weeks']);
+
+        $newExpiry = $currentExpiry->copy();
+
+        try {
+            if (!empty($extensionData['extend_days'])) {
+                $newExpiry = $newExpiry->addDays((int) $extensionData['extend_days']);
+            }
+
+            if (!empty($extensionData['extend_weeks'])) {
+                $newExpiry = $newExpiry->addWeeks((int) $extensionData['extend_weeks']);
+            }
+
+            if (!empty($extensionData['extend_months'])) {
+                $newExpiry = $newExpiry->addMonths((int) $extensionData['extend_months']);
+            }
+
+            if (!empty($extensionData['set_expiry_date'])) {
+                $dateString = $extensionData['set_expiry_date'];
+                if (is_string($dateString) && !empty($dateString)) {
+                    $newExpiry = Carbon::createFromFormat('Y-m-d', $dateString);
+                    if (!$newExpiry) {
+                        // Fallback to parse if createFromFormat fails
+                        $newExpiry = Carbon::parse($dateString);
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            Log::error('Error calculating new expiry date', [
+                'package_id' => $package->id,
+                'extension_data' => $extensionData,
+                'error' => $e->getMessage()
+            ]);
+            // Return original expiry if calculation fails
+            return $currentExpiry;
         }
-        
-        if (!empty($extensionData['extend_months'])) {
-            $newExpiry = $newExpiry->addMonths($extensionData['extend_months']);
-        }
-        
-        if (!empty($extensionData['set_expiry_date'])) {
-            $newExpiry = Carbon::parse($extensionData['set_expiry_date']);
-        }
-        
+
         return $newExpiry;
     }
     

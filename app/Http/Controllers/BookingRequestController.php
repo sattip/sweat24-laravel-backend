@@ -96,6 +96,32 @@ class BookingRequestController extends Controller
         $admins = User::where('role', 'admin')->get();
         foreach ($admins as $admin) {
             $admin->notify(new NewBookingRequestNotification($bookingRequest));
+
+            // Also create owner notification for the bell icon
+            \App\Models\OwnerNotification::create([
+                'title' => '📅 Νέο Αίτημα Ραντεβού',
+                'message' => sprintf(
+                    "Νέο αίτημα ραντεβού από %s\n\nΥπηρεσία: %s\nΤηλέφωνο: %s\n%s",
+                    $bookingRequest->client_name,
+                    $bookingRequest->service_type === 'ems' ? 'EMS Training' : 'Personal Training',
+                    $bookingRequest->client_phone,
+                    $bookingRequest->notes ? "Σημειώσεις: {$bookingRequest->notes}" : ''
+                ),
+                'type' => 'booking_request',
+                'priority' => 'high',
+                'user_id' => $admin->id,
+                'related_model_type' => 'BookingRequest',
+                'related_model_id' => $bookingRequest->id,
+                'metadata' => json_encode([
+                    'booking_request_id' => $bookingRequest->id,
+                    'client_name' => $bookingRequest->client_name,
+                    'client_email' => $bookingRequest->client_email,
+                    'client_phone' => $bookingRequest->client_phone,
+                    'service_type' => $bookingRequest->service_type,
+                    'time_slots_count' => count($bookingRequest->preferred_time_slots ?? []),
+                    'instructor_id' => $bookingRequest->instructor_id,
+                ]),
+            ]);
         }
 
         return response()->json([
@@ -147,15 +173,18 @@ class BookingRequestController extends Controller
         }
 
         $validated = $request->validate([
-            'confirmed_date' => 'required|date|after_or_equal:today',
+            'confirmed_date' => 'required|date',
             'confirmed_time' => 'required|date_format:H:i',
             'instructor_id' => 'nullable|exists:instructors,id',
             'admin_notes' => 'nullable|string|max:1000',
         ]);
 
-        DB::transaction(function () use ($bookingRequest, $validated) {
+        $booking = null;
+        $isUpdate = $bookingRequest->status === BookingRequest::STATUS_CONFIRMED;
+
+        DB::transaction(function () use ($bookingRequest, $validated, &$booking, $isUpdate) {
             $previousStatus = $bookingRequest->status;
-            
+
             $bookingRequest->confirm(
                 $validated['confirmed_date'],
                 $validated['confirmed_time'],
@@ -163,21 +192,110 @@ class BookingRequestController extends Controller
                 $validated['admin_notes'] ?? null
             );
 
+            // Get instructor details
+            $instructorName = null;
+            if ($bookingRequest->instructor_id) {
+                $instructor = Instructor::find($bookingRequest->instructor_id);
+                $instructorName = $instructor ? $instructor->name : 'Χωρίς Προπονητή';
+            }
+
+            // Calculate end time based on service type duration
+            $startTime = \Carbon\Carbon::parse($validated['confirmed_time']);
+            $endTime = $startTime->copy()->addMinutes($bookingRequest->getDurationMinutes());
+
+            // Determine service name
+            $serviceName = $bookingRequest->service_type === BookingRequest::SERVICE_EMS
+                ? 'EMS Training'
+                : 'Personal Training';
+
+            // If updating, find and update existing booking, otherwise create new
+            if ($isUpdate) {
+                // Find existing booking for this request
+                $booking = \App\Models\Booking::where('customer_name', $bookingRequest->client_name)
+                    ->where('booking_type', $bookingRequest->service_type)
+                    ->whereDate('date', $bookingRequest->confirmed_date)
+                    ->latest()
+                    ->first();
+
+                if ($booking) {
+                    $booking->update([
+                        'instructor' => $instructorName,
+                        'date' => $validated['confirmed_date'],
+                        'time' => $validated['confirmed_time'],
+                        'start_time' => $validated['confirmed_time'],
+                        'end_time' => $endTime->format('H:i'),
+                    ]);
+                } else {
+                    // If no existing booking found, create new one
+                    $booking = \App\Models\Booking::create([
+                        'user_id' => $bookingRequest->user_id,
+                        'customer_name' => $bookingRequest->user_id && $bookingRequest->user
+                            ? $bookingRequest->user->name
+                            : $bookingRequest->client_name,
+                        'customer_email' => $bookingRequest->user_id && $bookingRequest->user
+                            ? $bookingRequest->user->email
+                            : $bookingRequest->client_email,
+                        'class_name' => $serviceName,
+                        'instructor' => $instructorName,
+                        'date' => $validated['confirmed_date'],
+                        'time' => $validated['confirmed_time'],
+                        'start_time' => $validated['confirmed_time'],
+                        'end_time' => $endTime->format('H:i'),
+                        'status' => 'confirmed',
+                        'type' => 'personal', // Both EMS and Personal are personal sessions
+                        'booking_type' => $bookingRequest->service_type, // Store original service type
+                        'attended' => false,
+                        'is_priority_booking' => false,
+                        'booking_time' => now(),
+                        'location' => 'Main Floor', // Required field
+                        'store_id' => 1, // Default to first store - could be made configurable
+                    ]);
+                }
+            } else {
+                // First time confirmation - create new booking
+                $booking = \App\Models\Booking::create([
+                    'user_id' => $bookingRequest->user_id,
+                    'customer_name' => $bookingRequest->user_id && $bookingRequest->user
+                        ? $bookingRequest->user->name
+                        : $bookingRequest->client_name,
+                    'customer_email' => $bookingRequest->user_id && $bookingRequest->user
+                        ? $bookingRequest->user->email
+                        : $bookingRequest->client_email,
+                    'class_name' => $serviceName,
+                    'instructor' => $instructorName,
+                    'date' => $validated['confirmed_date'],
+                    'time' => $validated['confirmed_time'],
+                    'start_time' => $validated['confirmed_time'],
+                    'end_time' => $endTime->format('H:i'),
+                    'status' => 'confirmed',
+                    'type' => 'personal', // Both EMS and Personal are personal sessions
+                    'booking_type' => $bookingRequest->service_type, // Store original service type
+                    'attended' => false,
+                    'is_priority_booking' => false,
+                    'booking_time' => now(),
+                    'location' => 'Main Floor', // Required field
+                    'store_id' => 1, // Default to first store - could be made configurable
+                ]);
+            }
+
             // Log activity
             ActivityLog::create([
                 'user_id' => Auth::id(),
                 'activity_type' => 'booking_request',
-                'action' => 'confirmed',
+                'action' => $isUpdate ? 'updated' : 'confirmed',
                 'model_type' => BookingRequest::class,
                 'model_id' => $bookingRequest->id,
                 'properties' => [
                     'confirmed_date' => $validated['confirmed_date'],
                     'confirmed_time' => $validated['confirmed_time'],
+                    'booking_id' => $booking->id,
                 ],
             ]);
 
             // Dispatch event for push notification
-            \App\Events\BookingRequestStatusChanged::dispatch($bookingRequest, $previousStatus, 'confirmed');
+            if (!$isUpdate) {
+                \App\Events\BookingRequestStatusChanged::dispatch($bookingRequest, $previousStatus, 'confirmed');
+            }
         });
 
         // Send appointment scheduled email notification to user
@@ -192,6 +310,7 @@ class BookingRequestController extends Controller
         return response()->json([
             'message' => 'Booking request confirmed successfully',
             'data' => $bookingRequest->fresh()->load(['user', 'instructor', 'processedBy']),
+            'booking' => $booking, // Return the created booking as well
         ]);
     }
 

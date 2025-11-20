@@ -33,25 +33,33 @@ class GymClassController extends Controller
             $query->where('instructor', '=', (string)$request->instructor);
         }
         
-        $classes = $query->orderBy('date')->orderBy('time')->get();
-        
+        $classes = $query->with('service')->orderBy('date')->orderBy('time')->get();
+
         // Map instructor IDs to names
         $instructors = \App\Models\Instructor::pluck('name', 'id');
-        
+
         $classes->transform(function($class) use ($instructors) {
             // Map instructor ID to name
             $instructorId = $class->instructor;
             $class->instructor_name = $instructors[$instructorId] ?? 'Χωρίς Προπονητή';
             $class->trainer_id = $instructorId;
             $class->trainer_name = $class->instructor_name;
-            
+
+            // Add service information
+            $class->service_id = $class->service_id;
+            $class->service = $class->service ? [
+                'id' => $class->service->id,
+                'name' => $class->service->name,
+                'slug' => $class->service->slug
+            ] : null;
+
             // Ensure we send the actual class name, not type
             $class->class_type = $class->name; // Send the class name as class_type for the calendar
-            
+
             // Format times properly
             $class->start_time = $class->time;
             $class->end_time = \Carbon\Carbon::parse($class->time)->addMinutes($class->duration)->format('H:i');
-            
+
             return $class;
         });
         
@@ -67,6 +75,7 @@ class GymClassController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string',
             'instructor' => 'required|exists:instructors,id',
+            'service_id' => 'nullable|exists:services,id',
             'date' => 'required|date|after_or_equal:today',
             'time' => 'required|string',
             'duration' => 'required|integer|min:1',
@@ -85,16 +94,25 @@ class GymClassController extends Controller
         }
         
         $class = GymClass::create($validated);
-        
+
+        // Load service relationship
+        $class->load('service');
+
         // Transform the response to include all necessary fields
         $instructors = \App\Models\Instructor::pluck('name', 'id');
-        
+
         // Create a new array with the transformed data
         $response = [
             'id' => $class->id,
             'name' => $class->name,
             'type' => $class->type,
             'instructor' => $class->instructor,
+            'service_id' => $class->service_id,
+            'service' => $class->service ? [
+                'id' => $class->service->id,
+                'name' => $class->service->name,
+                'slug' => $class->service->slug
+            ] : null,
             'date' => $class->date->format('Y-m-d'),
             'time' => $class->time,
             'duration' => $class->duration,
@@ -113,7 +131,7 @@ class GymClassController extends Controller
             'start_time' => $class->time,
             'end_time' => \Carbon\Carbon::parse($class->time)->addMinutes($class->duration)->format('H:i')
         ];
-        
+
         return response()->json($response, 201);
     }
 

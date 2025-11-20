@@ -18,6 +18,7 @@ class CashRegisterEntry extends Model
         'payment_method',
         'related_entity_id',
         'related_entity_type',
+        'store_id',
     ];
 
     protected function casts(): array
@@ -25,5 +26,15 @@ class CashRegisterEntry extends Model
         return [
             'amount' => 'decimal:2',
         ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
     }
 }

@@ -213,6 +213,7 @@ class MedicalHistoryController extends Controller
                     'ems_interest' => $user->ems_interest,
                     'ems_contraindications' => $user->ems_contraindications,
                     'ems_liability_accepted' => $user->ems_liability_accepted,
+                    'doctor_certificate_path' => $user->doctor_certificate_path,
                     'has_ems_contraindications' => $user->hasEmsContraindications(),
                     'ems_contraindications_list' => $user->getEmsContraindicationsList()
                 ]
@@ -345,5 +346,158 @@ class MedicalHistoryController extends Controller
             }
         }
         return $result;
+    }
+
+    /**
+     * Upload doctor certificate file
+     */
+    public function uploadDoctorCertificate(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return $this->unauthorizedResponse('Authentication required');
+        }
+
+        // Log request details
+        Log::info('Doctor certificate upload attempt', [
+            'user_id' => $user->id,
+            'has_file' => $request->hasFile('doctor_certificate'),
+            'files' => $request->allFiles(),
+            'all_inputs' => $request->all()
+        ]);
+
+        try {
+            $validated = $request->validate([
+                'doctor_certificate' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120', // Max 5MB
+                'user_id' => 'sometimes|exists:users,id'
+            ]);
+
+            // Check if admin/trainer is uploading for another user
+            $targetUserId = $validated['user_id'] ?? $user->id;
+            if ($targetUserId != $user->id) {
+                // Only admins and trainers can upload for other users
+                if (!$user->isAdmin() && !$user->isTrainer()) {
+                    return $this->forbiddenResponse('Insufficient permissions');
+                }
+                $targetUser = User::find($targetUserId);
+                if (!$targetUser) {
+                    return $this->notFoundResponse('Target user not found');
+                }
+            } else {
+                $targetUser = $user;
+            }
+
+            // Delete old certificate if exists
+            if ($targetUser->doctor_certificate_path) {
+                $oldPath = storage_path('app/public/' . $targetUser->doctor_certificate_path);
+                if (file_exists($oldPath)) {
+                    unlink($oldPath);
+                }
+            }
+
+            // Store the file
+            $file = $request->file('doctor_certificate');
+            $fileName = 'doctor_cert_' . $targetUser->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $filePath = $file->storeAs('doctor_certificates', $fileName, 'public');
+
+            // Update user record
+            $targetUser->update([
+                'doctor_certificate_path' => $filePath
+            ]);
+
+            Log::info('Doctor certificate uploaded', [
+                'user_id' => $targetUser->id,
+                'uploaded_by' => $user->id,
+                'file_path' => $filePath
+            ]);
+
+            return $this->successResponse([
+                'success' => true,
+                'message' => 'Το χαρτί γιατρού μεταφορτώθηκε επιτυχώς',
+                'data' => [
+                    'doctor_certificate_path' => $filePath,
+                    'doctor_certificate_url' => asset('storage/' . $filePath)
+                ]
+            ], 'Το χαρτί γιατρού μεταφορτώθηκε επιτυχώς');
+
+        } catch (ValidationException $e) {
+            Log::warning('Doctor certificate validation failed', [
+                'user_id' => $user->id,
+                'errors' => $e->errors(),
+                'has_file' => $request->hasFile('doctor_certificate')
+            ]);
+            return $this->validationErrorResponse($e->errors(), 'Μη έγκυρο αρχείο');
+        } catch (\Exception $e) {
+            Log::error('Doctor certificate upload failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->serverErrorResponse('Σφάλμα κατά τη μεταφόρτωση του αρχείου');
+        }
+    }
+
+    /**
+     * Delete doctor certificate file
+     */
+    public function deleteDoctorCertificate(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return $this->unauthorizedResponse('Authentication required');
+        }
+
+        try {
+            $validated = $request->validate([
+                'user_id' => 'sometimes|exists:users,id'
+            ]);
+
+            // Check if admin/trainer is deleting for another user
+            $targetUserId = $validated['user_id'] ?? $user->id;
+            if ($targetUserId != $user->id) {
+                // Only admins and trainers can delete for other users
+                if (!$user->isAdmin() && !$user->isTrainer()) {
+                    return $this->forbiddenResponse('Insufficient permissions');
+                }
+                $targetUser = User::find($targetUserId);
+                if (!$targetUser) {
+                    return $this->notFoundResponse('Target user not found');
+                }
+            } else {
+                $targetUser = $user;
+            }
+
+            // Delete file if exists
+            if ($targetUser->doctor_certificate_path) {
+                $filePath = storage_path('app/public/' . $targetUser->doctor_certificate_path);
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+
+                // Clear database record
+                $targetUser->update([
+                    'doctor_certificate_path' => null
+                ]);
+
+                Log::info('Doctor certificate deleted', [
+                    'user_id' => $targetUser->id,
+                    'deleted_by' => $user->id
+                ]);
+
+                return $this->successResponse([
+                    'success' => true,
+                    'message' => 'Το χαρτί γιατρού διαγράφηκε επιτυχώς'
+                ], 'Το χαρτί γιατρού διαγράφηκε επιτυχώς');
+            }
+
+            return $this->notFoundResponse('Δεν βρέθηκε χαρτί γιατρού');
+
+        } catch (\Exception $e) {
+            Log::error('Doctor certificate deletion failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            return $this->serverErrorResponse('Σφάλμα κατά τη διαγραφή του αρχείου');
+        }
     }
 }

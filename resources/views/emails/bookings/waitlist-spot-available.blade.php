@@ -5,7 +5,7 @@
 @section('content')
 <h1>Εξαιρετικά Νέα! Μια Θέση Ελευθερώθηκε!</h1>
 
-<p>Γεια σου {{ $user->first_name }},</p>
+<p>Γεια σου {{ $user->name ?? 'Φίλε Χρήστη' }},</p>
 
 <p>Μια θέση ελευθερώθηκε στο μάθημα στο οποίο βρίσκεστε στη λίστα αναμονής. Έχετε περιορισμένο χρόνο να δεσμεύσετε αυτή τη θέση πριν προσφερθεί στον επόμενο άνθρωπο στη λίστα αναμονής.</p>
 
@@ -15,10 +15,10 @@
 
 <div class="info-box">
     <h3>Λεπτομέρειες Μαθήματος</h3>
-    <p><strong>Μάθημα:</strong> {{ $gymClass->name }}</p>
-    <p><strong>Ημερομηνία:</strong> {{ $gymClass->date->format('l, j F Y') }}</p>
-    <p><strong>Ώρα:</strong> {{ $gymClass->time }} - {{ \Carbon\Carbon::parse($gymClass->time)->addMinutes($gymClass->duration ?? 60)->format('H:i') }}</p>
-    <p><strong>Προπονητής:</strong> {{ $gymClass->instructor->name ?? $gymClass->instructor ?? 'TBA' }}</p>
+    <p><strong>Μάθημα:</strong> {{ $gymClass->name ?? 'Μάθημα' }}</p>
+    <p><strong>Ημερομηνία:</strong> {{ $gymClass->date ? $gymClass->date->format('l, j F Y') : 'TBA' }}</p>
+    <p><strong>Ώρα:</strong> {{ $gymClass->time ?? 'TBA' }} @if($gymClass->time) - {{ \Carbon\Carbon::parse($gymClass->time)->addMinutes($gymClass->duration ?? 60)->format('H:i') }}@endif</p>
+    <p><strong>Προπονητής:</strong> {{ $gymClass->instructor ? ($gymClass->instructor->name ?? 'TBA') : 'TBA' }}</p>
     <p><strong>Τοποθεσία:</strong> {{ $gymClass->location ?? 'Κύριος Χώρος Γυμναστηρίου' }}</p>
     <p><strong>Διαθέσιμες Θέσεις:</strong> 1</p>
 </div>

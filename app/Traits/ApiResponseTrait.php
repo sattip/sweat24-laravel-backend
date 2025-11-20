@@ -103,6 +103,25 @@ trait ApiResponseTrait
     }
 
     /**
+     * Business validation error response
+     */
+    protected function businessValidationErrorResponse(string $message, string $errorCode = null): JsonResponse
+    {
+        $response = [
+            'success' => false,
+            'message' => $message,
+            'error_type' => 'business_validation',
+            'timestamp' => now()->toISOString(),
+        ];
+
+        if ($errorCode) {
+            $response['error_code'] = $errorCode;
+        }
+
+        return response()->json($response, 422);
+    }
+
+    /**
      * Server error response
      */
     protected function serverErrorResponse(string $message = 'Internal server error'): JsonResponse

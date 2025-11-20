@@ -189,12 +189,15 @@ class AuthController extends Controller
                 'last_visit' => $user->last_visit,
                 'medical_history' => $user->medical_history,
                 'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ? 
+                'has_signed_terms' => $user->approved_at ?
                     $user->signatures()
                         ->where('document_type', 'terms_and_conditions')
                         ->where('signed_at', '>', $user->approved_at)
                         ->exists() : false,
                 'terms_accepted_at' => $user->terms_accepted_at,
+                // Priority Booking fields
+                'has_priority_booking' => $user->has_priority_booking,
+                'priority_booking_expires_at' => $user->priority_booking_expires_at ? $user->priority_booking_expires_at->format('Y-m-d') : null,
                 'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
                 'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
             ],
@@ -232,12 +235,17 @@ class AuthController extends Controller
         } catch (ValidationException $e) {
             // Custom error message for liability declaration
             $errors = $e->errors();
-            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
-                $errors['medicalHistory.ems_liability_accepted'] = [
-                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση για να συνεχίσετε'
+            if (isset($errors['medicalHistory.liability_declaration_accepted'])) {
+                $errors['medicalHistory.liability_declaration_accepted'] = [
+                    'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική'
                 ];
             }
-            
+            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
+                $errors['medicalHistory.ems_liability_accepted'] = [
+                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση EMS για να συνεχίσετε'
+                ];
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
@@ -320,7 +328,8 @@ class AuthController extends Controller
             $user->update([
                 'medical_history' => json_encode($medicalHistoryData),
                 'ems_interest' => $medicalHistory['ems_interest'] ?? false,
-                'ems_liability_accepted' => $medicalHistory['ems_liability_accepted'],
+                'liability_declaration_accepted' => $medicalHistory['liability_declaration_accepted'] ?? false,
+                'ems_liability_accepted' => $medicalHistory['ems_liability_accepted'] ?? false,
                 'ems_contraindications' => $medicalHistory['ems_contraindications'] ?? null,
                 'emergency_contact' => $medicalHistory['emergency_contact']['name'] ?? null,
                 'emergency_phone' => $medicalHistory['emergency_contact']['phone'] ?? null,
@@ -442,7 +451,8 @@ class AuthController extends Controller
             'medicalHistory.emergency_contact.name' => 'nullable|string|max:255',
             'medicalHistory.emergency_contact.phone' => 'nullable|string|max:20',
             'medicalHistory.ems_interest' => 'sometimes|boolean',
-            'medicalHistory.ems_liability_accepted' => 'required|accepted',
+            'medicalHistory.liability_declaration_accepted' => 'required|boolean|accepted',
+            'medicalHistory.ems_liability_accepted' => 'sometimes|boolean',
             'medicalHistory.submitted_at' => 'sometimes|date'
         ];
         
@@ -476,12 +486,17 @@ class AuthController extends Controller
         } catch (ValidationException $e) {
             // Custom error message for liability declaration
             $errors = $e->errors();
-            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
-                $errors['medicalHistory.ems_liability_accepted'] = [
-                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση για να συνεχίσετε'
+            if (isset($errors['medicalHistory.liability_declaration_accepted'])) {
+                $errors['medicalHistory.liability_declaration_accepted'] = [
+                    'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική'
                 ];
             }
-            
+            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
+                $errors['medicalHistory.ems_liability_accepted'] = [
+                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση EMS για να συνεχίσετε'
+                ];
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
@@ -533,7 +548,8 @@ class AuthController extends Controller
                 $user->update([
                     'medical_history' => json_encode($medicalHistoryData),
                     'ems_interest' => $medicalHistory['ems_interest'] ?? false,
-                    'ems_liability_accepted' => $validated['medicalHistory']['ems_liability_accepted'],
+                    'liability_declaration_accepted' => $validated['medicalHistory']['liability_declaration_accepted'],
+                    'ems_liability_accepted' => $medicalHistory['ems_liability_accepted'] ?? false,
                     'ems_contraindications' => $medicalHistory['ems_contraindications'] ?? null,
                     'emergency_contact' => $medicalHistory['emergency_contact']['name'] ?? null,
                     'emergency_phone' => $medicalHistory['emergency_contact']['phone'] ?? null,

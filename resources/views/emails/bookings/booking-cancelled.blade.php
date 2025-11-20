@@ -5,7 +5,7 @@
 @section('content')
 <h1>Κράτηση Ακυρώθηκε</h1>
 
-<p>Γεια σου {{ $user->first_name }},</p>
+<p>Γεια σου {{ $user->name ?? 'Φίλε Χρήστη' }},</p>
 
 <p>Η κράτηση του μαθήματός σας ακυρώθηκε επιτυχώς. Ελπίζουμε να σας δούμε σε άλλο μάθημα σύντομα!</p>
 
@@ -15,12 +15,12 @@
 
 <div class="info-box">
     <h3>Λεπτομέρειες Ακυρωμένης Κράτησης</h3>
-    <p><strong>Μάθημα:</strong> {{ $booking->gymClass->name }}</p>
-    <p><strong>Ημερομηνία:</strong> {{ $booking->gymClass->date->format('l, j F Y') }}</p>
-    <p><strong>Ώρα:</strong> {{ $booking->gymClass->time }} - {{ \Carbon\Carbon::parse($booking->gymClass->time)->addMinutes($booking->gymClass->duration ?? 60)->format('H:i') }}</p>
-    <p><strong>Προπονητής:</strong> {{ $booking->gymClass->instructor->name ?? $booking->instructor ?? 'TBA' }}</p>
+    <p><strong>Μάθημα:</strong> {{ $booking->gymClass->name ?? $booking->class_name ?? 'Μάθημα' }}</p>
+    <p><strong>Ημερομηνία:</strong> {{ $booking->gymClass && $booking->gymClass->date ? $booking->gymClass->date->format('l, j F Y') : ($booking->date ? \Carbon\Carbon::parse($booking->date)->format('l, j F Y') : 'TBA') }}</p>
+    <p><strong>Ώρα:</strong> {{ $booking->gymClass->time ?? $booking->time ?? 'TBA' }} @if($booking->gymClass && $booking->gymClass->time) - {{ \Carbon\Carbon::parse($booking->gymClass->time)->addMinutes($booking->gymClass->duration ?? 60)->format('H:i') }}@endif</p>
+    <p><strong>Προπονητής:</strong> {{ $instructorName ?? ($booking->instructor ?? 'TBA') }}</p>
     <p><strong>Αριθμός Κράτησης:</strong> #{{ $booking->id }}</p>
-    <p><strong>Ακυρώθηκε στις:</strong> {{ now()->format('j F Y \s\τ\ι\ς g:i A') }}</p>
+    <p><strong>Ακυρώθηκε στις:</strong> {{ now()->format('j F Y \s\τ\ι\varsigma g:i A') }}</p>
 </div>
 
 @if($refund_info ?? false)

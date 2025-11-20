@@ -21,6 +21,11 @@ Broadcast::channel('chat.{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
 
+// Private chat channels
+Broadcast::channel('private-chat.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
+
 // Booking request channels - for users
 Broadcast::channel('booking-request.user.{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;

@@ -12,25 +12,30 @@ class BusinessExpenseController extends Controller
      */
     public function index(Request $request)
     {
-        $query = BusinessExpense::query();
-        
+        $query = BusinessExpense::with('store');
+
+        // Filter by store if provided, otherwise show all stores
+        if ($request->has('store_id') && $request->store_id) {
+            $query->where('store_id', $request->store_id);
+        }
+
         if ($request->has('category')) {
             $query->where('category', $request->category);
         }
-        
+
         if ($request->has('approved')) {
             $query->where('approved', $request->boolean('approved'));
         }
-        
+
         if ($request->has('date_from')) {
             $query->whereDate('date', '>=', $request->date_from);
         }
-        
+
         if ($request->has('date_to')) {
             $query->whereDate('date', '<=', $request->date_to);
         }
-        
-        $expenses = $query->orderBy('date', 'desc')->get();
+
+        $expenses = $query->orderBy('date', 'desc')->paginate($request->get('per_page', 15));
         return response()->json($expenses);
     }
 
@@ -40,6 +45,7 @@ class BusinessExpenseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'store_id' => 'required|exists:stores,id',
             'category' => 'required|in:utilities,equipment,maintenance,supplies,marketing,other',
             'subcategory' => 'required|string|max:255',
             'description' => 'required|string',
@@ -50,11 +56,11 @@ class BusinessExpenseController extends Controller
             'payment_method' => 'required|in:cash,card,transfer,iris,cash_a',
             'notes' => 'nullable|string',
         ]);
-        
+
         $validated['approved'] = false; // Default to not approved
-        
+
         $expense = BusinessExpense::create($validated);
-        return response()->json($expense, 201);
+        return response()->json($expense->load('store'), 201);
     }
 
     /**
@@ -62,7 +68,7 @@ class BusinessExpenseController extends Controller
      */
     public function show(BusinessExpense $businessExpense)
     {
-        return response()->json($businessExpense);
+        return response()->json($businessExpense->load('store'));
     }
 
     /**
@@ -71,6 +77,7 @@ class BusinessExpenseController extends Controller
     public function update(Request $request, BusinessExpense $businessExpense)
     {
         $validated = $request->validate([
+            'store_id' => 'sometimes|exists:stores,id',
             'category' => 'sometimes|in:utilities,equipment,maintenance,supplies,marketing,other',
             'subcategory' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
@@ -83,9 +90,9 @@ class BusinessExpenseController extends Controller
             'approved_by' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
         ]);
-        
+
         $businessExpense->update($validated);
-        return response()->json($businessExpense);
+        return response()->json($businessExpense->load('store'));
     }
 
     /**

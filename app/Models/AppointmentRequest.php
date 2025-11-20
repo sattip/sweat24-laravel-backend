@@ -13,6 +13,7 @@ class AppointmentRequest extends Model
         'user_id',
         'specialized_service_id',
         'instructor_id',
+        'service_id',
         'client_name',
         'client_email',
         'client_phone',
@@ -41,5 +42,10 @@ class AppointmentRequest extends Model
     public function instructor()
     {
         return $this->belongsTo(Instructor::class);
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
     }
 }

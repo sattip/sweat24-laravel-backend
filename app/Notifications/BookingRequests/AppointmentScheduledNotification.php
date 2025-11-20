@@ -63,16 +63,20 @@ class AppointmentScheduledNotification extends Notification implements ShouldQue
 
         $serviceTypeName = $serviceTypeNames[$this->bookingRequest->service_type] ?? 'Appointment';
 
+        $confirmedDate = $this->bookingRequest->confirmed_date ?? 'TBA';
+        $confirmedTime = $this->bookingRequest->confirmed_time ?? 'TBA';
+        $instructorName = $this->bookingRequest->instructor ? $this->bookingRequest->instructor->name : '';
+
         return [
             'title' => 'Appointment Scheduled',
-            'message' => "Your {$serviceTypeName} appointment has been scheduled for {$this->bookingRequest->confirmed_date} at {$this->bookingRequest->confirmed_time}" . 
-                        ($this->bookingRequest->instructor ? " with {$this->bookingRequest->instructor->name}" : ''),
+            'message' => "Your {$serviceTypeName} appointment has been scheduled for {$confirmedDate} at {$confirmedTime}" .
+                        ($instructorName ? " with {$instructorName}" : ''),
             'booking_request_id' => $this->bookingRequest->id,
             'service_type' => $this->bookingRequest->service_type,
             'service_type_name' => $serviceTypeName,
             'confirmed_date' => $this->bookingRequest->confirmed_date,
             'confirmed_time' => $this->bookingRequest->confirmed_time,
-            'instructor_name' => $this->bookingRequest->instructor->name ?? null,
+            'instructor_name' => $this->bookingRequest->instructor ? $this->bookingRequest->instructor->name : null,
             'instructor_id' => $this->bookingRequest->instructor_id,
             'admin_notes' => $this->bookingRequest->admin_notes,
             'status' => $this->bookingRequest->status,

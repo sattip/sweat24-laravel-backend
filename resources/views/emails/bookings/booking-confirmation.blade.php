@@ -5,7 +5,7 @@
 @section('content')
 <h1>Η Κράτηση Επιβεβαιώθηκε!</h1>
 
-<p>Εξαιρετικά νέα, {{ $user->first_name }}! Η κράτηση του μαθήματός σας έχει επιβεβαιωθεί. Είμαστε ενθουσιασμένοι να σας δούμε στο γυμναστήριο!</p>
+<p>Εξαιρετικά νέα, {{ $user->name ?? 'Φίλε Χρήστη' }}! Η κράτηση του μαθήματός σας έχει επιβεβαιωθεί. Είμαστε ενθουσιασμένοι να σας δούμε στο γυμναστήριο!</p>
 
 <div class="alert alert-success">
     <strong>Η θέση σας έχει δεσμευτεί!</strong> Παρακαλούμε φτάστε 10 λεπτά νωρίτερα για check-in και προετοιμασία εξοπλισμού.
@@ -13,15 +13,15 @@
 
 <div class="info-box">
     <h3>Λεπτομέρειες Κράτησης</h3>
-    <p><strong>Μάθημα:</strong> {{ $booking->gymClass->name }}</p>
-    <p><strong>Ημερομηνία:</strong> {{ $booking->gymClass->date->format('l, j F Y') }}</p>
-    <p><strong>Ώρα:</strong> {{ $booking->gymClass->time }} - {{ \Carbon\Carbon::parse($booking->gymClass->time)->addMinutes($booking->gymClass->duration ?? 60)->format('H:i') }}</p>
-    <p><strong>Προπονητής:</strong> {{ $booking->gymClass->instructor->name ?? $booking->instructor ?? 'TBA' }}</p>
+    <p><strong>Μάθημα:</strong> {{ $booking->gymClass->name ?? $booking->class_name ?? 'Μάθημα' }}</p>
+    <p><strong>Ημερομηνία:</strong> {{ $booking->gymClass && $booking->gymClass->date ? $booking->gymClass->date->format('l, j F Y') : ($booking->date ? \Carbon\Carbon::parse($booking->date)->format('l, j F Y') : 'TBA') }}</p>
+    <p><strong>Ώρα:</strong> {{ $booking->gymClass->time ?? $booking->time ?? 'TBA' }} @if($booking->gymClass && $booking->gymClass->time) - {{ \Carbon\Carbon::parse($booking->gymClass->time)->addMinutes($booking->gymClass->duration ?? 60)->format('H:i') }}@endif</p>
+    <p><strong>Προπονητής:</strong> {{ $instructorName ?? ($booking->instructor ?? 'TBA') }}</p>
     <p><strong>Τοποθεσία:</strong> {{ $booking->gymClass->location ?? $booking->location ?? 'Κύριος Χώρος Γυμναστηρίου' }}</p>
     <p><strong>Αριθμός Κράτησης:</strong> #{{ $booking->id }}</p>
 </div>
 
-@if($booking->gymClass->description)
+@if($booking->gymClass && $booking->gymClass->description)
 <h2>Σχετικά με αυτό το Μάθημα</h2>
 <p>{{ $booking->gymClass->description }}</p>
 @endif
@@ -49,7 +49,7 @@
     </tr>
     <tr>
         <td>Όνομα Μέλους</td>
-        <td>{{ $user->first_name }} {{ $user->last_name }}</td>
+        <td>{{ $user->name ?? 'Χρήστης' }}</td>
     </tr>
     <tr>
         <td>Email</td>
@@ -57,7 +57,7 @@
     </tr>
     <tr>
         <td>Ημερομηνία Κράτησης</td>
-        <td>{{ $booking->created_at->format('j F Y \s\τ\ι\ς g:i A') }}</td>
+        <td>{{ $booking->created_at ? $booking->created_at->format('j F Y \s\τ\ι\ς g:i A') : now()->format('j F Y \s\τ\ι\ς g:i A') }}</td>
     </tr>
     <tr>
         <td>Κατάσταση</td>

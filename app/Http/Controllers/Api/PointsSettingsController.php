@@ -164,7 +164,7 @@ class PointsSettingsController extends Controller
             $userPoints = [];
 
             foreach ($userIds as $userId) {
-                $balance = $pointsService->getUserPointsBalance($userId);
+                $balance = $pointsService->getUserBalance($userId);
                 $userPoints[$userId] = $balance;
             }
 
