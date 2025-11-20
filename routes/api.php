@@ -1078,6 +1078,25 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/statistics')
     // Export functionality
     Route::get('export', [\App\Http\Controllers\Api\StatisticsController::class, 'export']);
 });
+
+// Financial Reports (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/financial-reports')->group(function () {
+    Route::get('dashboard', [\App\Http\Controllers\FinancialReportsController::class, 'dashboard']);
+    Route::get('total-revenue', [\App\Http\Controllers\FinancialReportsController::class, 'totalRevenue']);
+    Route::get('revenue-per-customer', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerCustomer']);
+    Route::get('revenue-per-service', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerService']);
+    Route::get('revenue-per-store', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerStore']);
+    Route::get('top-customers', [\App\Http\Controllers\FinancialReportsController::class, 'topCustomers']);
+    Route::get('package-statistics', [\App\Http\Controllers\FinancialReportsController::class, 'packageStatistics']);
+    Route::get('product-statistics', [\App\Http\Controllers\FinancialReportsController::class, 'productStatistics']);
+    Route::get('expense-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'expenseAnalysis']);
+    Route::get('revenue-trends', [\App\Http\Controllers\FinancialReportsController::class, 'revenueTrends']);
+    Route::get('payment-methods', [\App\Http\Controllers\FinancialReportsController::class, 'paymentMethods']);
+    Route::get('profitability-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'profitabilityAnalysis']);
+    Route::get('customer-conversion', [\App\Http\Controllers\FinancialReportsController::class, 'customerConversion']);
+    Route::get('customer-ltv', [\App\Http\Controllers\FinancialReportsController::class, 'customerLTV']);
+    Route::get('retention-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'retentionAnalysis']);
+});
 // Debug endpoint to see exactly what the admin panel is sending
 Route::any('/debug/admin-requests', function(Request $request) {
     return response()->json([
