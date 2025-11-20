@@ -1,0 +1,5454 @@
+openapi: 3.0.3
+info:
+  title: Sweat93 Multi-Store Gym Management API
+  description: |
+    Complete API documentation for the Sweat93 Gym Management System featuring multi-store cash register, packages, appointments, and comprehensive admin functionality.
+
+    ## Authentication
+    All protected endpoints require Bearer token authentication:
+    ```
+    Authorization: Bearer {token}
+    ```
+
+    ## Multi-Store System
+    The system supports multiple stores ("Βάρη", "Λαγονήσι") with:
+    - Store-specific cash registers
+    - Package usage tracking
+    - Automated income posting per completed training
+    - Per-store financial reports
+  version: "1.0.0"
+  contact:
+    name: API Support
+    email: support@sweat93.gr
+
+servers:
+  - url: https://api.sweat93.gr
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ============ AUTHENTICATION ============
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@sweat93.gr
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    example: "1|abc123def456"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Revoke the current access token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Get authenticated user information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ============ REGISTRATION ============
+  /api/v1/registration/initial:
+    post:
+      tags:
+        - Registration
+      summary: Initial registration
+      description: Start the two-phase registration process
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - phone
+              properties:
+                name:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                phone:
+                  type: string
+                  example: "+306971234567"
+      responses:
+        '200':
+          description: Registration initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  registration_token:
+                    type: string
+                    example: "reg_abc123"
+
+  /api/v1/registration/accept-terms:
+    post:
+      tags:
+        - Registration
+      summary: Accept terms and conditions
+      description: Second phase of registration - accept terms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - registration_token
+                - accepted_terms
+              properties:
+                registration_token:
+                  type: string
+                  example: "reg_abc123"
+                accepted_terms:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Terms accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /api/v1/registration/complete:
+    post:
+      tags:
+        - Registration
+      summary: Complete registration
+      description: Final phase of registration - set password and complete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - registration_token
+                - password
+                - password_confirmation
+              properties:
+                registration_token:
+                  type: string
+                  example: "reg_abc123"
+                password:
+                  type: string
+                  format: password
+                  example: "secure123"
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: "secure123"
+      responses:
+        '200':
+          description: Registration completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    example: "1|abc123def456"
+
+  # ============ CASH REGISTER MANAGEMENT ============
+  /api/v1/cash-register:
+    get:
+      tags:
+        - Cash Register
+      summary: List cash register entries
+      description: Get paginated list of cash register entries (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store_id
+          in: query
+          schema:
+            type: integer
+          description: Filter entries by store ID (optional - shows all stores if not provided)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+          description: Items per page
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [income, withdrawal]
+          description: Filter by entry type
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter entries from this date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter entries until this date
+      responses:
+        '200':
+          description: Cash register entries retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CashRegisterEntry'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Cash Register
+      summary: Create cash register entry
+      description: Create a new cash register entry (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - store_id
+                - type
+                - amount
+                - description
+                - category
+              properties:
+                store_id:
+                  type: integer
+                  description: Store ID where the entry belongs
+                  example: 1
+                type:
+                  type: string
+                  enum: [income, withdrawal]
+                  example: "income"
+                amount:
+                  type: number
+                  format: decimal
+                  example: 50.00
+                description:
+                  type: string
+                  example: "Manual cash entry"
+                category:
+                  type: string
+                  example: "manual_entry"
+                user_id:
+                  type: integer
+                  description: User ID for the entry
+                  example: 1
+                payment_method:
+                  type: string
+                  enum: [cash, card, transfer]
+                  example: "cash"
+      responses:
+        '201':
+          description: Cash register entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CashRegisterEntry'
+
+  /api/v1/cash-register/limited:
+    get:
+      tags:
+        - Cash Register
+      summary: Limited cash register access
+      description: Get recent cash register entries with limited access (Trainer/Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Limited cash register entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CashRegisterEntry'
+
+  /api/v1/cash-register/{cash_register}:
+    get:
+      tags:
+        - Cash Register
+      summary: Get cash register entry
+      description: Get detailed information about a specific cash register entry (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cash_register
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Cash register entry ID
+      responses:
+        '200':
+          description: Cash register entry details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CashRegisterEntry'
+
+    put:
+      tags:
+        - Cash Register
+      summary: Update cash register entry
+      description: Update cash register entry information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cash_register
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Cash register entry ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [income, withdrawal]
+                  example: "income"
+                amount:
+                  type: number
+                  format: decimal
+                  example: 75.00
+                description:
+                  type: string
+                  example: "Updated entry description"
+                category:
+                  type: string
+                  example: "service"
+      responses:
+        '200':
+          description: Cash register entry updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CashRegisterEntry'
+
+    delete:
+      tags:
+        - Cash Register
+      summary: Delete cash register entry
+      description: Delete a cash register entry (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cash_register
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Cash register entry ID
+      responses:
+        '200':
+          description: Cash register entry deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Cash register entry deleted successfully"
+
+  /api/v1/cash-register/summary:
+    get:
+      tags:
+        - Cash Register
+      summary: Get cash register summary by store
+      description: Get summary of cash register entries grouped by store (Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cash register summary by store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        store_id:
+                          type: integer
+                          example: 1
+                        store_name:
+                          type: string
+                          example: "Βάρη"
+                        store_color:
+                          type: string
+                          example: "#10B981"
+                        total_entries:
+                          type: integer
+                          example: 8
+                        total_income:
+                          type: number
+                          format: decimal
+                          example: 1000.00
+                        total_expenses:
+                          type: number
+                          format: decimal
+                          example: 0.00
+                  unknown:
+                    type: object
+                    properties:
+                      total_entries:
+                        type: integer
+                        example: 0
+                      total_income:
+                        type: number
+                        format: decimal
+                        example: 0.00
+                      total_expenses:
+                        type: number
+                        format: decimal
+                        example: 0.00
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  # ============ EXPENSE CATEGORIES ============
+  /api/v1/expense-categories:
+    get:
+      tags:
+        - Expense Categories
+      summary: List expense categories
+      description: Get paginated list of expense categories (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [main, subcategory]
+          description: Filter by category type
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: parent_id
+          in: query
+          schema:
+            type: integer
+          description: Filter subcategories by parent ID
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by category name
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of expense categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpenseCategory'
+                  links:
+                    type: object
+                  meta:
+                    type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+    post:
+      tags:
+        - Expense Categories
+      summary: Create expense category
+      description: Create a new expense category (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - category_type
+              properties:
+                name:
+                  type: string
+                  example: "New Category"
+                description:
+                  type: string
+                  example: "Category description"
+                category_type:
+                  type: string
+                  enum: [main, subcategory]
+                  example: "main"
+                parent_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: true
+                sort_order:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '422':
+          description: Validation failed
+
+  /api/v1/expense-categories/tree:
+    get:
+      tags:
+        - Expense Categories
+      summary: Get expense categories tree
+      description: Get hierarchical structure of expense categories (Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Hierarchical expense categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        category_type:
+                          type: string
+                        is_active:
+                          type: boolean
+                        sort_order:
+                          type: integer
+                        subcategories:
+                          type: array
+                          items:
+                            type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/expense-categories/options:
+    get:
+      tags:
+        - Expense Categories
+      summary: Get expense categories options
+      description: Get categories formatted for dropdown/select options (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [main, subcategory]
+          description: Filter by category type
+      responses:
+        '200':
+          description: Categories formatted for dropdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  options:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          type: integer
+                        label:
+                          type: string
+                        type:
+                          type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/expense-categories/{expenseCategory}:
+    get:
+      tags:
+        - Expense Categories
+      summary: Get expense category
+      description: Get detailed information about a specific expense category (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseCategory
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Expense category ID
+      responses:
+        '200':
+          description: Expense category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Category not found
+    put:
+      tags:
+        - Expense Categories
+      summary: Update expense category
+      description: Update expense category information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseCategory
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Expense category ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Updated Category"
+                description:
+                  type: string
+                  example: "Updated description"
+                category_type:
+                  type: string
+                  enum: [main, subcategory]
+                  example: "main"
+                parent_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: true
+                sort_order:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Category not found
+        '422':
+          description: Validation failed
+    delete:
+      tags:
+        - Expense Categories
+      summary: Delete expense category
+      description: Delete an expense category (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseCategory
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Expense category ID
+      responses:
+        '200':
+          description: Category deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Category not found
+        '422':
+          description: Cannot delete category with dependencies
+
+  /api/v1/expense-categories/{expenseCategory}/toggle-status:
+    post:
+      tags:
+        - Expense Categories
+      summary: Toggle category status
+      description: Toggle active/inactive status of an expense category (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseCategory
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Expense category ID
+      responses:
+        '200':
+          description: Category status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Category not found
+
+  # ============ BUSINESS EXPENSES ============
+  /api/v1/business-expenses:
+    get:
+      tags:
+        - Business Expenses
+      summary: List business expenses
+      description: Get paginated list of business expenses (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store_id
+          in: query
+          schema:
+            type: integer
+          description: Filter expenses by store ID (optional - shows all stores if not provided)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+          description: Items per page
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by expense category
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses from this date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses until this date
+      responses:
+        '200':
+          description: Business expenses retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BusinessExpense'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Business Expenses
+      summary: Create business expense
+      description: Create a new business expense entry (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - store_id
+                - amount
+                - category
+                - description
+              properties:
+                store_id:
+                  type: integer
+                  description: Store ID where expense occurred
+                  example: 1
+                amount:
+                  type: number
+                  format: decimal
+                  example: 150.00
+                category:
+                  type: string
+                  example: "Rent"
+                description:
+                  type: string
+                  example: "Monthly office rent payment"
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-01"
+                payment_method:
+                  type: string
+                  enum: [cash, card, transfer]
+                  example: "transfer"
+      responses:
+        '201':
+          description: Business expense created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/BusinessExpense'
+
+  /api/v1/business-expenses/{business_expense}:
+    get:
+      tags:
+        - Business Expenses
+      summary: Get business expense
+      description: Get detailed information about a specific business expense (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: business_expense
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Business expense ID
+      responses:
+        '200':
+          description: Business expense details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/BusinessExpense'
+
+    put:
+      tags:
+        - Business Expenses
+      summary: Update business expense
+      description: Update business expense information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: business_expense
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Business expense ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  format: decimal
+                  example: 175.00
+                category:
+                  type: string
+                  example: "Utilities"
+                description:
+                  type: string
+                  example: "Updated expense description"
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-15"
+      responses:
+        '200':
+          description: Business expense updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/BusinessExpense'
+
+    delete:
+      tags:
+        - Business Expenses
+      summary: Delete business expense
+      description: Delete a business expense entry (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: business_expense
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Business expense ID
+      responses:
+        '200':
+          description: Business expense deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Business expense deleted successfully"
+
+  # ============ STORE MANAGEMENT ============
+
+  /api/v1/admin/stores:
+    get:
+      tags:
+        - Store Management
+      summary: List stores
+      description: Get paginated list of stores (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+          description: Items per page
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by store name
+      responses:
+        '200':
+          description: Stores retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_page:
+                    type: integer
+                    example: 1
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Store'
+                  total:
+                    type: integer
+                    example: 2
+
+    post:
+      tags:
+        - Store Management
+      summary: Create store
+      description: Create a new store (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "Γλυφάδα"
+                address:
+                  type: string
+                  example: "Λεωφόρος Γλυφάδας 150"
+                is_active:
+                  type: boolean
+                  example: true
+                color:
+                  type: string
+                  description: Hex color code for the store
+                  example: "#EF4444"
+      responses:
+        '201':
+          description: Store created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Store created successfully"
+                  store:
+                    $ref: '#/components/schemas/Store'
+
+  /api/v1/admin/stores/{store}:
+    get:
+      tags:
+        - Store Management
+      summary: Get store
+      description: Get detailed information about a specific store (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+      responses:
+        '200':
+          description: Store retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  store:
+                    allOf:
+                      - $ref: '#/components/schemas/Store'
+                      - type: object
+                        properties:
+                          cash_register_entries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/CashRegisterEntry'
+                          bookings:
+                            type: array
+                            items:
+                              type: object
+                              description: Recent bookings for the store
+                          business_expenses:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/BusinessExpense'
+
+    put:
+      tags:
+        - Store Management
+      summary: Update store
+      description: Update store information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Γλυφάδα"
+                address:
+                  type: string
+                  example: "Λεωφόρος Γλυφάδας 150"
+                is_active:
+                  type: boolean
+                  example: true
+                color:
+                  type: string
+                  description: Hex color code for the store
+                  example: "#EF4444"
+      responses:
+        '200':
+          description: Store updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Store updated successfully"
+                  store:
+                    $ref: '#/components/schemas/Store'
+
+    delete:
+      tags:
+        - Store Management
+      summary: Delete store
+      description: Delete a store (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+      responses:
+        '200':
+          description: Store deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Store deleted successfully"
+        '422':
+          description: Cannot delete store with existing records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Cannot delete store with existing records"
+                  details:
+                    type: object
+                    properties:
+                      bookings:
+                        type: boolean
+                        example: true
+                      cash_entries:
+                        type: boolean
+                        example: true
+                      expenses:
+                        type: boolean
+                        example: true
+
+  /api/v1/admin/stores/{store}/toggle-status:
+    post:
+      tags:
+        - Store Management
+      summary: Toggle store status
+      description: Toggle store active/inactive status (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+      responses:
+        '200':
+          description: Store status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Store status updated successfully"
+                  store:
+                    $ref: '#/components/schemas/Store'
+
+  /api/v1/admin/stores/{store}/statistics:
+    get:
+      tags:
+        - Store Management
+      summary: Get store statistics
+      description: Get comprehensive statistics for a specific store (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+      responses:
+        '200':
+          description: Store statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  store:
+                    $ref: '#/components/schemas/Store'
+                  statistics:
+                    type: object
+                    properties:
+                      total_bookings:
+                        type: integer
+                        example: 150
+                      active_bookings:
+                        type: integer
+                        example: 45
+                      total_revenue:
+                        type: number
+                        format: decimal
+                        example: 12500.50
+                      total_expenses:
+                        type: number
+                        format: decimal
+                        example: 3200.75
+                      cash_register_entries:
+                        type: integer
+                        example: 89
+                      recent_activity:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CashRegisterEntry'
+
+  # ============ MULTI-STORE CASH REGISTER ============
+  /api/v1/bookings/{booking}/complete:
+    post:
+      tags:
+        - Multi-Store System
+      summary: Complete booking and record income
+      description: |
+        Complete a booking, deduct package sessions, and automatically record income to the store's cash register.
+
+        **Business Logic:**
+        - Validates store assignment
+        - Decrements remaining package sessions
+        - Calculates per-training cost: `package_price / total_sessions`
+        - Handles rounding for last session to match package total
+        - Creates cash register entry with income type
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: booking
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Booking ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - completed_by
+              properties:
+                completed_by:
+                  type: integer
+                  description: User ID who completed the booking
+                  example: 1
+      responses:
+        '200':
+          description: Booking completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Booking completed successfully"
+                  data:
+                    type: object
+                    properties:
+                      booking:
+                        $ref: '#/components/schemas/Booking'
+                      user_package:
+                        $ref: '#/components/schemas/UserPackage'
+                      cash_entry:
+                        $ref: '#/components/schemas/CashRegisterEntry'
+        '400':
+          description: Validation error or business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/stores/{storeId}/cash-entries:
+    get:
+      tags:
+        - Multi-Store System
+      summary: Get store cash register entries
+      description: Retrieve cash register entries for a specific store with optional filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter entries from this date (YYYY-MM-DD)
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter entries until this date (YYYY-MM-DD)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [income, withdrawal]
+          description: Filter by entry type
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Number of entries per page
+      responses:
+        '200':
+          description: Cash register entries retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                        example: 1
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CashRegisterEntry'
+                      per_page:
+                        type: integer
+                        example: 50
+                      total:
+                        type: integer
+                        example: 150
+                  store:
+                    $ref: '#/components/schemas/Store'
+
+  /api/v1/stores/{storeId}/report:
+    get:
+      tags:
+        - Multi-Store System
+      summary: Get store financial report
+      description: Get income, expenses, and net profit for a specific store
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Store ID
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Report start date (YYYY-MM-DD)
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Report end date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Store financial report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      store_id:
+                        type: integer
+                        example: 1
+                      income:
+                        type: number
+                        format: decimal
+                        example: 2500.50
+                      expenses:
+                        type: number
+                        format: decimal
+                        example: 380.25
+                      net:
+                        type: number
+                        format: decimal
+                        example: 2120.25
+                      entries_count:
+                        type: integer
+                        example: 45
+                  store:
+                    $ref: '#/components/schemas/Store'
+
+  /api/v1/expenses:
+    post:
+      tags:
+        - Multi-Store System
+      summary: Record expense
+      description: Record a new expense in the cash register for a specific store
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - store_id
+                - amount
+                - category
+                - description
+              properties:
+                store_id:
+                  type: integer
+                  description: Store ID where expense occurred
+                  example: 1
+                amount:
+                  type: number
+                  format: decimal
+                  description: Expense amount in EUR
+                  example: 150.00
+                category:
+                  type: string
+                  enum: [Rent, Utilities, Supplies, Misc]
+                  description: Expense category
+                  example: "Rent"
+                description:
+                  type: string
+                  description: Detailed expense description
+                  example: "Monthly office rent payment"
+                payment_method:
+                  type: string
+                  enum: [cash, card, transfer]
+                  description: Payment method used
+                  example: "transfer"
+      responses:
+        '201':
+          description: Expense recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Expense recorded successfully"
+                  data:
+                    $ref: '#/components/schemas/CashRegisterEntry'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/customers/{userId}/packages:
+    get:
+      tags:
+        - Multi-Store System
+      summary: Get user packages with usage info
+      description: Retrieve all packages for a specific user with remaining sessions and usage statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User packages retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 123
+                          name:
+                            type: string
+                            example: "John Doe"
+                          email:
+                            type: string
+                            format: email
+                            example: "john@example.com"
+                      packages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 456
+                            name:
+                              type: string
+                              example: "Premium Package"
+                            total_sessions:
+                              type: integer
+                              example: 10
+                            remaining_sessions:
+                              type: integer
+                              example: 7
+                            used_sessions:
+                              type: integer
+                              example: 3
+                            per_training_cost:
+                              type: number
+                              format: decimal
+                              example: 25.00
+                            status:
+                              type: string
+                              enum: [active, expired, frozen]
+                              example: "active"
+                            expiry_date:
+                              type: string
+                              format: date
+                              example: "2024-12-31"
+
+  /api/v1/packages/{packageId}/report:
+    get:
+      tags:
+        - Multi-Store System
+      summary: Get package consumption report
+      description: Get detailed consumption report for a specific user package
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User Package ID
+      responses:
+        '200':
+          description: Package report retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user_package_id:
+                        type: integer
+                        example: 456
+                      package_name:
+                        type: string
+                        example: "Premium Package"
+                      user_name:
+                        type: string
+                        example: "John Doe"
+                      total_sessions:
+                        type: integer
+                        example: 10
+                      used_sessions:
+                        type: integer
+                        example: 3
+                      remaining_sessions:
+                        type: integer
+                        example: 7
+                      per_training_cost:
+                        type: number
+                        format: decimal
+                        example: 25.00
+                      total_revenue:
+                        type: number
+                        format: decimal
+                        example: 75.00
+
+  # ============ BOOKINGS ============
+  /api/v1/bookings:
+    get:
+      tags:
+        - Bookings
+      summary: List bookings
+      description: Get paginated list of bookings with optional filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: store_id
+          in: query
+          schema:
+            type: integer
+          description: Filter bookings by store ID (optional - shows all stores if not provided)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+          description: Items per page
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [confirmed, pending, cancelled, completed]
+          description: Filter by booking status
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by booking date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Bookings list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Bookings
+      summary: Create booking
+      description: Create a new booking (public endpoint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - store_id
+                - user_id
+                - class_id
+                - customer_name
+                - customer_email
+                - date
+                - time
+              properties:
+                store_id:
+                  type: integer
+                  description: Store ID where the booking is made
+                  example: 1
+                user_id:
+                  type: integer
+                  description: User ID (optional for guest bookings)
+                  example: 123
+                class_id:
+                  type: integer
+                  description: Gym Class ID
+                  example: 456
+                customer_name:
+                  type: string
+                  example: "John Doe"
+                customer_email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-15"
+                time:
+                  type: string
+                  example: "10:00"
+                service_id:
+                  type: integer
+                  nullable: true
+                  description: Service ID for this booking
+                  example: 1
+                instructor_id:
+                  type: integer
+                  nullable: true
+                  description: Instructor ID for this booking
+                  example: 123
+                notes:
+                  type: string
+                  example: "VIP customer - special requirements"
+      responses:
+        '201':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Booking'
+        '400':
+          description: Validation error or business rule violation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Δεν έχετε ενεργό πακέτο με διαθέσιμες συνεδρίες για EMS TRAINING (ανιχνεύθηκε αυτόματα)."
+                  error_code:
+                    type: string
+                    enum: ["INSUFFICIENT_SESSIONS_FOR_SERVICE", "NO_SESSIONS_REMAINING", "INSUFFICIENT_SESSIONS", "DUPLICATE_PACKAGE"]
+                    example: "INSUFFICIENT_SESSIONS_FOR_SERVICE"
+                  notes:
+                    type: string
+                    example: "Smart service detection automatically identified the service from class_name when service_id was not provided."
+
+  /api/v1/bookings/{booking}:
+    get:
+      tags:
+        - Bookings
+      summary: Get booking details
+      description: Get detailed information about a specific booking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: booking
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Booking ID
+      responses:
+        '200':
+          description: Booking details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Bookings
+      summary: Update booking
+      description: Update booking information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: booking
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Booking ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, pending, cancelled, completed]
+                  example: "confirmed"
+                notes:
+                  type: string
+                  example: "Updated booking notes"
+      responses:
+        '200':
+          description: Booking updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Booking'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Bookings
+      summary: Cancel booking
+      description: Cancel a booking (soft delete)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: booking
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Booking ID
+      responses:
+        '200':
+          description: Booking cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Booking cancelled successfully"
+
+  # ============ PACKAGES ============
+  /api/v1/packages:
+    get:
+      tags:
+        - Packages
+      summary: List packages
+      description: Get all available packages (public endpoint)
+      responses:
+        '200':
+          description: Packages list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Package'
+
+    post:
+      tags:
+        - Packages
+      summary: Create package
+      description: Create a new package (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - price
+                - sessions
+              properties:
+                name:
+                  type: string
+                  example: "Premium Package"
+                price:
+                  type: number
+                  format: decimal
+                  example: 250.00
+                sessions:
+                  type: integer
+                  example: 10
+                duration:
+                  type: integer
+                  description: Duration in days
+                  example: 30
+                service_ids:
+                  type: array
+                  items:
+                    type: integer
+                  nullable: true
+                  description: Array of service IDs this package belongs to (supports multiple services)
+                  example: [1, 2, 3]
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  default: "active"
+                  example: "active"
+                description:
+                  type: string
+                  example: "Premium personal training package"
+      responses:
+        '201':
+          description: Package created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Package'
+
+  /api/v1/packages/{package}:
+    get:
+      tags:
+        - Packages
+      summary: Get package details
+      description: Get detailed information about a specific package (public endpoint)
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Package ID
+      responses:
+        '200':
+          description: Package details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Package'
+
+    put:
+      tags:
+        - Packages
+      summary: Update package
+      description: Update package information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Package ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Updated Premium Package"
+                price:
+                  type: number
+                  format: decimal
+                  example: 275.00
+                sessions:
+                  type: integer
+                  example: 12
+                duration:
+                  type: integer
+                  description: Duration in days
+                  example: 30
+                service_ids:
+                  type: array
+                  items:
+                    type: integer
+                  nullable: true
+                  description: Array of service IDs this package belongs to (supports multiple services)
+                  example: [1, 2]
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  example: "active"
+                description:
+                  type: string
+                  example: "Updated premium personal training package"
+      responses:
+        '200':
+          description: Package updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Package'
+
+    delete:
+      tags:
+        - Packages
+      summary: Delete package
+      description: Delete a package (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Package ID
+      responses:
+        '200':
+          description: Package deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Package deleted successfully"
+
+  # ============ ADMIN USER PACKAGES ============
+  /api/v1/admin/users/{userId}/packages:
+    get:
+      tags:
+        - Admin
+        - User Packages
+      summary: Get all packages for a user (Admin only)
+      description: Retrieve all packages assigned to a specific user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User packages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User packages retrieved successfully"
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        example: 69
+                      user_name:
+                        type: string
+                        example: "Maria Alexiou"
+                      total_packages:
+                        type: integer
+                        example: 2
+                      packages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 19
+                            package_name:
+                              type: string
+                              example: "VIP Personal Training Package"
+                            service_name:
+                              type: string
+                              example: "PERSONAL TRAINING"
+                            status:
+                              type: string
+                              example: "active"
+                            remaining_sessions:
+                              type: integer
+                              example: 25
+                            total_sessions:
+                              type: integer
+                              example: 25
+                            assigned_date:
+                              type: string
+                              format: date
+                              example: "2025-09-07"
+                            expiry_date:
+                              type: string
+                              format: date
+                              example: "2025-12-07"
+                            is_custom_package:
+                              type: boolean
+                              example: true
+                            custom_price:
+                              type: number
+                              format: decimal
+                              example: 15000.00
+                            custom_sessions:
+                              type: integer
+                              example: 25
+                            custom_duration_days:
+                              type: integer
+                              example: 90
+                            assigned_by:
+                              type: string
+                              example: "Admin Demo"
+                            custom_assigned_at:
+                              type: string
+                              format: datetime
+                              example: "2025-09-07T14:43:43Z"
+
+  # ============ PACKAGE FREEZE/UNFREEZE ============
+  /api/user-packages/{userPackage}/freeze:
+    post:
+      tags:
+        - User Packages
+        - Package Management
+      summary: Freeze (pause) a user package
+      description: |
+        Freeze a package to pause its expiration. When unfrozen, the frozen days will be added to the expiry date.
+        This is useful when the gym is closed or a member is on vacation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userPackage
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User Package ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                duration_days:
+                  type: integer
+                  minimum: 1
+                  maximum: 90
+                  example: 10
+                  description: Maximum days the package can be frozen (optional)
+      responses:
+        '200':
+          description: Package frozen successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Package frozen successfully"
+                  user_package:
+                    $ref: '#/components/schemas/UserPackage'
+
+  /api/user-packages/{userPackage}/unfreeze:
+    post:
+      tags:
+        - User Packages
+        - Package Management
+      summary: Unfreeze (resume) a user package
+      description: |
+        Unfreeze a package and automatically extend its expiry date by the number of frozen days.
+        The system calculates how many days the package was frozen and adds them to the expiry date.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userPackage
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User Package ID
+      responses:
+        '200':
+          description: Package unfrozen successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Package unfrozen successfully"
+                  user_package:
+                    $ref: '#/components/schemas/UserPackage'
+
+  # ============ CUSTOM PACKAGES ============
+  /api/v1/custom-packages/users:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get eligible users for custom packages
+      description: Get list of users who can receive custom packages (Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 69
+                        name:
+                          type: string
+                          example: "Maria Alexiou"
+                        email:
+                          type: string
+                          example: "maria@obstechnologies.gr"
+                        active_packages_count:
+                          type: integer
+                          example: 1
+                        custom_packages_count:
+                          type: integer
+                          example: 0
+                        has_custom_treatment:
+                          type: boolean
+                          example: false
+
+  /api/v1/custom-packages/available-packages:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get available packages for custom assignment
+      description: Get list of available packages that can be assigned as custom packages (Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Packages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: "Premium Package"
+                        service:
+                          type: string
+                          example: "PERSONAL TRAINING"
+                        original_price:
+                          type: number
+                          format: decimal
+                          example: 200.00
+                        original_sessions:
+                          type: integer
+                          example: 20
+                        original_duration:
+                          type: integer
+                          example: 60
+
+  /api/v1/custom-packages/user/{userId}:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get user's custom packages
+      description: Get all custom packages assigned to a specific user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Custom packages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 19
+                        package_name:
+                          type: string
+                          example: "Premium Package"
+                        service_name:
+                          type: string
+                          example: "PERSONAL TRAINING"
+                        custom_details:
+                          type: object
+                          properties:
+                            custom_price:
+                              type: number
+                              format: decimal
+                              example: 15000.00
+                            custom_sessions:
+                              type: integer
+                              example: 25
+                            custom_duration_days:
+                              type: integer
+                              example: 90
+                        status:
+                          type: string
+                          example: "active"
+                        remaining_sessions:
+                          type: integer
+                          example: 25
+                        expiry_date:
+                          type: string
+                          format: date
+                          example: "2025-12-07"
+                        assigned_at:
+                          type: string
+                          format: datetime
+                          example: "2025-09-07T14:43:43Z"
+                        assigned_by:
+                          type: string
+                          example: "Admin Demo"
+
+  /api/v1/custom-packages:
+    post:
+      tags:
+        - Custom Packages
+      summary: Create custom package
+      description: Assign a custom package to a user with personalized pricing and terms (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - package_id
+                - custom_price
+                - custom_sessions
+                - custom_duration_days
+              properties:
+                user_id:
+                  type: integer
+                  example: 69
+                  description: User ID to assign the custom package to
+                package_id:
+                  type: integer
+                  example: 1
+                  description: Base package ID to customize
+                custom_price:
+                  type: number
+                  format: decimal
+                  example: 15000.00
+                  description: Custom price for this user (in cents)
+                custom_sessions:
+                  type: integer
+                  example: 25
+                  description: Custom number of sessions
+                custom_duration_days:
+                  type: integer
+                  example: 90
+                  description: Custom duration in days
+                custom_notes:
+                  type: string
+                  example: "VIP customer - ειδική τιμή για μακροχρόνια συνεργασία"
+                  description: Optional notes about this custom assignment
+                assigned_by:
+                  type: string
+                  example: "Admin Demo"
+                  description: Admin who assigned this custom package
+      responses:
+        '201':
+          description: Custom package created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      custom_package:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 19
+                          name:
+                            type: string
+                            example: "Custom VIP Package για Maria Alexiou"
+                          custom_price:
+                            type: number
+                            format: decimal
+                            example: 15000.00
+                      summary:
+                        type: object
+                        properties:
+                          custom_price:
+                            type: number
+                            format: decimal
+                            example: 15000.00
+                          savings:
+                            type: number
+                            format: decimal
+                            example: 13500.00
+                          original_price:
+                            type: number
+                            format: decimal
+                            example: 200.00
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/custom-packages/{userPackage}:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get custom package details
+      description: Get detailed information about a specific custom package (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userPackage
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: UserPackage ID
+      responses:
+        '200':
+          description: Custom package details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      custom_package:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 19
+                          name:
+                            type: string
+                            example: "Custom VIP Package για Maria Alexiou"
+                      custom_details:
+                        type: object
+                        properties:
+                          custom_price:
+                            type: number
+                            format: decimal
+                            example: 15000.00
+                          savings:
+                            type: number
+                            format: decimal
+                            example: 13500.00
+                      effective_values:
+                        type: object
+                        properties:
+                          price:
+                            type: number
+                            format: decimal
+                            example: 15000.00
+                          sessions:
+                            type: integer
+                            example: 25
+                          duration_days:
+                            type: integer
+                            example: 90
+                      savings:
+                        type: number
+                        format: decimal
+                        example: 13500.00
+
+    put:
+      tags:
+        - Custom Packages
+      summary: Update custom package
+      description: Update custom package terms and pricing (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userPackage
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: UserPackage ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                custom_price:
+                  type: number
+                  format: decimal
+                  example: 18000.00
+                  description: Updated custom price
+                custom_sessions:
+                  type: integer
+                  example: 30
+                  description: Updated custom sessions
+                custom_duration_days:
+                  type: integer
+                  example: 120
+                  description: Updated custom duration
+                custom_notes:
+                  type: string
+                  example: "Updated VIP terms"
+                  description: Updated notes
+                status:
+                  type: string
+                  enum: [active, inactive, expired, cancelled]
+                  example: "active"
+                  description: Package status
+      responses:
+        '200':
+          description: Custom package updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      custom_package:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 19
+                      custom_details:
+                        type: object
+                        properties:
+                          custom_price:
+                            type: number
+                            format: decimal
+                            example: 18000.00
+                      savings:
+                        type: number
+                        format: decimal
+                        example: 12000.00
+
+    delete:
+      tags:
+        - Custom Packages
+      summary: Delete custom package
+      description: Delete a custom package assignment (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userPackage
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: UserPackage ID
+      responses:
+        '200':
+          description: Custom package deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Custom package deleted successfully"
+
+  /api/v1/custom-packages/check-special-pricing:
+    get:
+      tags:
+        - Custom Packages
+      summary: Check if user has special pricing for a service
+      description: Check if a user has custom pricing for a specific service (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: User ID
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Special pricing check completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      has_special_pricing:
+                        type: boolean
+                        example: true
+                      service_id:
+                        type: integer
+                        example: 2
+                      user_id:
+                        type: integer
+                        example: 69
+
+  /api/v1/custom-packages/special-pricing-details:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get special pricing details for a user and service
+      description: Get detailed special pricing information for a user and service (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: User ID
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Special pricing details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      has_special_pricing:
+                        type: boolean
+                        example: true
+                      custom_package_id:
+                        type: integer
+                        example: 19
+                      package_name:
+                        type: string
+                        example: "VIP Personal Training Package"
+                      service_name:
+                        type: string
+                        example: "PERSONAL TRAINING"
+                      original_price:
+                        type: number
+                        format: decimal
+                        example: 200.00
+                      custom_price:
+                        type: number
+                        format: decimal
+                        example: 15000.00
+                      price_difference:
+                        type: number
+                        format: decimal
+                        example: 50.00
+                      original_sessions:
+                        type: integer
+                        example: 20
+                      custom_sessions:
+                        type: integer
+                        example: 25
+                      sessions_difference:
+                        type: integer
+                        example: 5
+                      original_duration:
+                        type: integer
+                        example: 60
+                      custom_duration:
+                        type: integer
+                        example: 90
+                      duration_difference:
+                        type: integer
+                        example: 30
+                      remaining_sessions:
+                        type: integer
+                        example: 25
+                      expiry_date:
+                        type: string
+                        format: date
+                        example: "2025-12-07"
+                      assigned_by:
+                        type: string
+                        example: "Admin Demo"
+                      assigned_at:
+                        type: string
+                        format: datetime
+                        example: "2025-09-07T14:43:43Z"
+                      custom_notes:
+                        type: string
+                        example: "VIP customer - special pricing for long-term commitment"
+
+  /api/v1/custom-packages/user/{userId}/special-pricing-summary:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get user's special pricing summary
+      description: Get complete summary of all user's custom packages and savings (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User special pricing summary retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      has_special_pricing:
+                        type: boolean
+                        example: true
+                      total_custom_packages:
+                        type: integer
+                        example: 2
+                      total_savings:
+                        type: number
+                        format: decimal
+                        example: 150.00
+                      packages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            package_id:
+                              type: integer
+                              example: 19
+                            package_name:
+                              type: string
+                              example: "VIP Personal Training Package"
+                            service_name:
+                              type: string
+                              example: "PERSONAL TRAINING"
+                            original_price:
+                              type: number
+                              format: decimal
+                              example: 200.00
+                            custom_price:
+                              type: number
+                              format: decimal
+                              example: 15000.00
+                            savings:
+                              type: number
+                              format: decimal
+                              example: 50.00
+                            remaining_sessions:
+                              type: integer
+                              example: 25
+                            expiry_date:
+                              type: string
+                              format: date
+                              example: "2025-12-07"
+                            status:
+                              type: string
+                              example: "active"
+
+  /api/v1/custom-packages/user/{userId}/special-pricing-comparison:
+    get:
+      tags:
+        - Custom Packages
+      summary: Get special pricing comparison for all user's packages
+      description: Compare custom vs standard pricing for all user's packages (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Special pricing comparison retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        example: 69
+                      total_packages:
+                        type: integer
+                        example: 3
+                      custom_packages_count:
+                        type: integer
+                        example: 2
+                      regular_packages_count:
+                        type: integer
+                        example: 1
+                      packages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            package_id:
+                              type: integer
+                              example: 19
+                            package_name:
+                              type: string
+                              example: "VIP Personal Training Package"
+                            service_name:
+                              type: string
+                              example: "PERSONAL TRAINING"
+                            is_custom_package:
+                              type: boolean
+                              example: true
+                            status:
+                              type: string
+                              example: "active"
+                            remaining_sessions:
+                              type: integer
+                              example: 25
+                            expiry_date:
+                              type: string
+                              format: date
+                              example: "2025-12-07"
+                            pricing:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                  example: "custom"
+                                original_price:
+                                  type: number
+                                  format: decimal
+                                  example: 200.00
+                                custom_price:
+                                  type: number
+                                  format: decimal
+                                  example: 15000.00
+                                savings:
+                                  type: number
+                                  format: decimal
+                                  example: 50.00
+                                original_sessions:
+                                  type: integer
+                                  example: 20
+                                custom_sessions:
+                                  type: integer
+                                  example: 25
+                                original_duration:
+                                  type: integer
+                                  example: 60
+                                custom_duration:
+                                  type: integer
+                                  example: 90
+
+  # ============ USERS ============
+  /api/v1/users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      description: Get paginated list of users (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+          description: Items per page
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, trainer, member]
+          description: Filter by user role
+      responses:
+        '200':
+          description: Users list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Create a new user (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+                - role
+              properties:
+                name:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "secure123"
+                role:
+                  type: string
+                  enum: [admin, trainer, member]
+                  default: "member"
+                  example: "member"
+                phone:
+                  type: string
+                  example: "+306971234567"
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /api/v1/users/{user}:
+    get:
+      tags:
+        - Users
+      summary: Get user details
+      description: Get detailed information about a specific user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update user information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "John Smith"
+                email:
+                  type: string
+                  format: email
+                  example: "johnsmith@example.com"
+                phone:
+                  type: string
+                  example: "+306971234567"
+                role:
+                  type: string
+                  enum: [admin, trainer, member]
+                  example: "trainer"
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete a user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "User deleted successfully"
+
+  # ============ CLASSES ============
+  /api/v1/classes:
+    get:
+      tags:
+        - Classes
+      summary: List gym classes
+      description: Get all available gym classes (public endpoint)
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter classes by date (YYYY-MM-DD)
+        - name: instructor_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by instructor ID
+      responses:
+        '200':
+          description: Classes list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GymClass'
+
+    post:
+      tags:
+        - Classes
+      summary: Create gym class
+      description: Create a new gym class (Authenticated users)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - instructor_id
+                - date
+                - time
+                - capacity
+              properties:
+                name:
+                  type: string
+                  example: "HIIT Morning Class"
+                instructor_id:
+                  type: integer
+                  example: 123
+                service_id:
+                  type: integer
+                  nullable: true
+                  description: Service ID this class belongs to
+                  example: 1
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-15"
+                time:
+                  type: string
+                  example: "09:00"
+                capacity:
+                  type: integer
+                  example: 15
+                duration:
+                  type: integer
+                  description: Duration in minutes
+                  default: 60
+                  example: 60
+                description:
+                  type: string
+                  example: "High intensity interval training class"
+      responses:
+        '201':
+          description: Class created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/GymClass'
+
+  /api/v1/classes/{class}:
+    get:
+      tags:
+        - Classes
+      summary: Get class details
+      description: Get detailed information about a specific gym class (public endpoint)
+      parameters:
+        - name: class
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Class ID
+      responses:
+        '200':
+          description: Class details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/GymClass'
+
+    put:
+      tags:
+        - Classes
+      summary: Update class
+      description: Update class information (Authenticated users)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: class
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Class ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Updated HIIT Class"
+                capacity:
+                  type: integer
+                  example: 20
+                description:
+                  type: string
+                  example: "Updated class description"
+      responses:
+        '200':
+          description: Class updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/GymClass'
+
+    delete:
+      tags:
+        - Classes
+      summary: Delete class
+      description: Delete a gym class (Authenticated users)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: class
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Class ID
+      responses:
+        '200':
+          description: Class deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Class deleted successfully"
+
+  # ============ DASHBOARD ============
+  /api/v1/dashboard/stats:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard statistics
+      description: Get basic statistics for the dashboard (authenticated users)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_members:
+                    type: integer
+                    example: 150
+                  active_members:
+                    type: integer
+                    example: 142
+                  total_revenue:
+                    type: number
+                    format: decimal
+                    example: 12500.50
+                  monthly_revenue:
+                    type: number
+                    format: decimal
+                    example: 2100.75
+                  pending_payments:
+                    type: integer
+                    example: 5
+                  overdue_payments:
+                    type: integer
+                    example: 2
+
+  # ============ SERVICES MANAGEMENT ============
+  /api/v1/services:
+    get:
+      tags:
+        - Services
+      summary: List services
+      description: Get paginated list of gym services (public endpoint)
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Filter only active services
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, display_order, created_at]
+            default: display_order
+          description: Sort field
+        - name: sort_direction
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort direction
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+            maximum: 100
+          description: Items per page
+      responses:
+        '200':
+          description: Services list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Services
+      summary: Create service
+      description: Create a new gym service (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "Personal Training"
+                slug:
+                  type: string
+                  example: "personal-training"
+                description:
+                  type: string
+                  example: "Personal training sessions with certified trainers"
+                icon:
+                  type: string
+                  example: "person"
+                trial_price:
+                  type: number
+                  format: decimal
+                  example: 25.00
+                is_active:
+                  type: boolean
+                  default: true
+                  example: true
+                display_order:
+                  type: integer
+                  default: 0
+                  example: 1
+                allows_trial:
+                  type: boolean
+                  default: true
+                  example: true
+                max_trial_per_user:
+                  type: integer
+                  default: 1
+                  example: 1
+      responses:
+        '201':
+          description: Service created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '422':
+          description: Validation failed
+
+  /api/v1/services/{service}:
+    get:
+      tags:
+        - Services
+      summary: Get service details
+      description: Get detailed information about a specific service (public endpoint)
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Service details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '404':
+          description: Service not found
+
+    put:
+      tags:
+        - Services
+      summary: Update service
+      description: Update service information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Updated Personal Training"
+                slug:
+                  type: string
+                  example: "personal-training"
+                description:
+                  type: string
+                  example: "Updated description for personal training"
+                icon:
+                  type: string
+                  example: "person"
+                trial_price:
+                  type: number
+                  format: decimal
+                  example: 30.00
+                is_active:
+                  type: boolean
+                  example: true
+                display_order:
+                  type: integer
+                  example: 2
+                allows_trial:
+                  type: boolean
+                  example: true
+                max_trial_per_user:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Service updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Service not found
+        '422':
+          description: Validation failed
+
+    delete:
+      tags:
+        - Services
+      summary: Delete service
+      description: Delete a service (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Service deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Service deleted successfully"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Service not found
+        '422':
+          description: Cannot delete service with dependencies
+
+  /api/v1/services/{service}/toggle-active:
+    post:
+      tags:
+        - Services
+      summary: Toggle service status
+      description: Toggle service active/inactive status (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Service status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Service'
+                  message:
+                    type: string
+                    example: "Service activated successfully"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Service not found
+
+  /api/v1/services/{service}/trial-info:
+    get:
+      tags:
+        - Services
+      summary: Get trial information for service
+      description: Get trial booking information for a specific service including user's eligibility
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Service ID
+      responses:
+        '200':
+          description: Trial information retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      service:
+                        $ref: '#/components/schemas/Service'
+                      allows_trial:
+                        type: boolean
+                        example: true
+                      trial_price:
+                        type: number
+                        format: decimal
+                        example: 25.00
+                      max_trial_per_user:
+                        type: integer
+                        example: 1
+                      user_trial_count:
+                        type: integer
+                        example: 0
+                      can_book_trial:
+                        type: boolean
+                        example: true
+                      has_active_subscription:
+                        type: boolean
+                        example: false
+                      subscription_reason:
+                        type: string
+                        example: "Δεν έχετε ενεργή συνδρομή - ισχύει ο περιορισμός δοκιμαστικών"
+        '401':
+          description: Unauthorized
+        '404':
+          description: Service not found
+
+  # ============ TRIAL APPOINTMENTS ============
+  /api/v1/trial-appointments:
+    get:
+      tags:
+        - Trial Appointments
+      summary: List trial appointments
+      description: Get paginated list of trial appointments (Admin/Trainer see all, Members see their own)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+            maximum: 100
+          description: Items per page
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, completed, cancelled, no_show]
+          description: Filter by appointment status
+        - name: service_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by service ID
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter appointments from this date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter appointments until this date
+      responses:
+        '200':
+          description: Trial appointments retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrialAppointment'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Trial Appointments
+      summary: Create trial appointment
+      description: Create a new trial appointment for a service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - service_id
+                - appointment_date
+                - appointment_time
+              properties:
+                service_id:
+                  type: integer
+                  description: Service ID for the trial
+                  example: 1
+                appointment_date:
+                  type: string
+                  format: date
+                  description: Appointment date (must be today or future)
+                  example: "2024-12-15"
+                appointment_time:
+                  type: string
+                  description: Appointment time (HH:MM format)
+                  example: "14:30"
+                notes:
+                  type: string
+                  description: Additional notes for the appointment
+                  example: "First time client - needs introduction"
+      responses:
+        '201':
+          description: Trial appointment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '400':
+          description: Validation error or business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Insufficient permissions
+
+  /api/v1/trial-appointments/{trialAppointment}:
+    get:
+      tags:
+        - Trial Appointments
+      summary: Get trial appointment details
+      description: Get detailed information about a specific trial appointment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      responses:
+        '200':
+          description: Trial appointment details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Cannot access other users' appointments
+        '404':
+          description: Trial appointment not found
+
+    put:
+      tags:
+        - Trial Appointments
+      summary: Update trial appointment
+      description: Update trial appointment information (users can update their own appointments)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointment_date:
+                  type: string
+                  format: date
+                  description: New appointment date (must be today or future)
+                  example: "2024-12-16"
+                appointment_time:
+                  type: string
+                  description: New appointment time (HH:MM format)
+                  example: "15:00"
+                notes:
+                  type: string
+                  description: Updated notes for the appointment
+                  example: "Updated appointment notes"
+      responses:
+        '200':
+          description: Trial appointment updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '400':
+          description: Validation error or cannot modify confirmed/completed appointments
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Cannot modify other users' appointments
+        '404':
+          description: Trial appointment not found
+
+    delete:
+      tags:
+        - Trial Appointments
+      summary: Cancel trial appointment
+      description: Cancel a trial appointment (users can cancel their own appointments)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      responses:
+        '200':
+          description: Trial appointment cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Trial appointment cancelled successfully"
+        '400':
+          description: Cannot cancel completed appointment
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Cannot cancel other users' appointments
+        '404':
+          description: Trial appointment not found
+
+  /api/v1/trial-appointments/{trialAppointment}/confirm:
+    post:
+      tags:
+        - Trial Appointments
+      summary: Confirm trial appointment
+      description: Confirm a pending trial appointment (Admin/Trainer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      responses:
+        '200':
+          description: Trial appointment confirmed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '400':
+          description: Cannot confirm non-pending appointment
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin/Trainer access required
+        '404':
+          description: Trial appointment not found
+
+  /api/v1/trial-appointments/{trialAppointment}/cancel:
+    post:
+      tags:
+        - Trial Appointments
+      summary: Cancel trial appointment
+      description: Cancel a trial appointment (users can cancel their own, admin/trainer can cancel any)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      responses:
+        '200':
+          description: Trial appointment cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '400':
+          description: Cannot cancel completed appointment
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Cannot cancel other users' appointments
+        '404':
+          description: Trial appointment not found
+
+  /api/v1/trial-appointments/{trialAppointment}/complete:
+    post:
+      tags:
+        - Trial Appointments
+      summary: Mark trial appointment as completed
+      description: Mark a confirmed trial appointment as completed (Admin/Trainer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: trialAppointment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Trial appointment ID
+      responses:
+        '200':
+          description: Trial appointment marked as completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/TrialAppointment'
+        '400':
+          description: Cannot complete non-confirmed appointment
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin/Trainer access required
+        '404':
+          description: Trial appointment not found
+
+  /api/v1/trial-appointments/user/my-trials:
+    get:
+      tags:
+        - Trial Appointments
+      summary: Get user's trial appointments
+      description: Get current user's trial appointments with optional status filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, completed, cancelled, no_show]
+          description: Filter by appointment status
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+            maximum: 100
+          description: Items per page
+      responses:
+        '200':
+          description: User's trial appointments retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrialAppointment'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Unauthorized
+
+  # ============ APPOINTMENT REQUESTS ============
+  /api/v1/appointment-requests:
+    get:
+      tags:
+        - Appointment Requests
+      summary: List appointment requests
+      description: Get paginated list of appointment requests (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
+            maximum: 100
+          description: Items per page
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled, completed]
+          description: Filter by request status
+        - name: service_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by service ID
+      responses:
+        '200':
+          description: Appointment requests retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AppointmentRequest'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Appointment Requests
+      summary: Create appointment request
+      description: Create a new appointment request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - specialized_service_id
+                - client_name
+                - client_phone
+                - preferred_time_slots
+              properties:
+                specialized_service_id:
+                  type: integer
+                  description: Specialized service ID
+                  example: 1
+                service_id:
+                  type: integer
+                  nullable: true
+                  description: Service ID for this request
+                  example: 1
+                client_name:
+                  type: string
+                  description: Client full name
+                  example: "John Doe"
+                client_phone:
+                  type: string
+                  description: Client phone number
+                  example: "+306971234567"
+                client_email:
+                  type: string
+                  format: email
+                  nullable: true
+                  description: Client email address
+                  example: "john@example.com"
+                preferred_time_slots:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                        example: "2024-12-15"
+                      time:
+                        type: string
+                        example: "14:30"
+                  description: Array of preferred date/time slots
+                  example: [{"date": "2024-12-15", "time": "14:30"}, {"date": "2024-12-16", "time": "10:00"}]
+                notes:
+                  type: string
+                  nullable: true
+                  description: Additional notes
+                  example: "First time client - needs introduction"
+      responses:
+        '201':
+          description: Appointment request created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AppointmentRequest'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+
+  /api/v1/appointment-requests/{appointmentRequest}:
+    get:
+      tags:
+        - Appointment Requests
+      summary: Get appointment request details
+      description: Get detailed information about a specific appointment request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appointmentRequest
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Appointment request ID
+      responses:
+        '200':
+          description: Appointment request details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AppointmentRequest'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Appointment request not found
+
+    put:
+      tags:
+        - Appointment Requests
+      summary: Update appointment request
+      description: Update appointment request information (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appointmentRequest
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Appointment request ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_id:
+                  type: integer
+                  nullable: true
+                  description: Service ID for this request
+                  example: 1
+                instructor_id:
+                  type: integer
+                  nullable: true
+                  description: Instructor ID to assign
+                  example: 123
+                status:
+                  type: string
+                  enum: [pending, confirmed, cancelled, completed]
+                  example: "confirmed"
+                confirmed_date:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Confirmed appointment date
+                  example: "2024-12-15"
+                confirmed_time:
+                  type: string
+                  nullable: true
+                  description: Confirmed appointment time
+                  example: "14:30"
+                notes:
+                  type: string
+                  nullable: true
+                  description: Update notes
+                  example: "Appointment confirmed for 15th December"
+      responses:
+        '200':
+          description: Appointment request updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AppointmentRequest'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Appointment request not found
+
+    delete:
+      tags:
+        - Appointment Requests
+      summary: Delete appointment request
+      description: Delete an appointment request (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appointmentRequest
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Appointment request ID
+      responses:
+        '200':
+          description: Appointment request deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Appointment request deleted successfully"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Appointment request not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        role:
+          type: string
+          enum: [admin, trainer, member]
+          example: "member"
+        phone:
+          type: string
+          example: "+306971234567"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T14:20:00Z"
+
+    Store:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Βάρη"
+        address:
+          type: string
+          nullable: true
+          example: "Λεωφόρος Βάρης 123"
+        is_active:
+          type: boolean
+          example: true
+        color:
+          type: string
+          description: Hex color code for the store
+          example: "#10B981"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Package:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 456
+        name:
+          type: string
+          example: "Premium Package"
+        price:
+          type: number
+          format: decimal
+          example: 250.00
+        sessions:
+          type: integer
+          example: 10
+        duration:
+          type: integer
+          description: Duration in days
+          example: 30
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+          description: Array of services this package belongs to (supports multiple services)
+          example: [{"id": 1, "name": "PERSONAL TRAINING"}, {"id": 2, "name": "PILATES PERSONAL"}]
+        status:
+          type: string
+          enum: [active, inactive]
+          example: "active"
+        description:
+          type: string
+          example: "Premium personal training package"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserPackage:
+      description: |
+        Package assigned to a user with enhanced error handling for bulk operations.
+        All date fields are safely parsed and Carbon objects are converted to ISO strings for JSON serialization.
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 789
+        user_id:
+          type: integer
+          example: 123
+        package_id:
+          type: integer
+          example: 456
+        name:
+          type: string
+          example: "Premium Package"
+        remaining_sessions:
+          type: integer
+          example: 7
+        total_sessions:
+          type: integer
+          example: 10
+        status:
+          type: string
+          enum: [active, expired, expiring_soon, frozen]
+          example: "active"
+        expiry_date:
+          type: string
+          format: date
+          example: "2024-12-31"
+        is_custom_package:
+          type: boolean
+          example: false
+        custom_price:
+          type: number
+          format: decimal
+          example: 200.00
+          nullable: true
+        custom_sessions:
+          type: integer
+          example: 8
+          nullable: true
+        custom_duration_days:
+          type: integer
+          example: 30
+          nullable: true
+        custom_notes:
+          type: string
+          example: "Custom package for VIP client"
+          nullable: true
+        assigned_by:
+          type: string
+          example: "Admin"
+          nullable: true
+        custom_assigned_at:
+          type: string
+          format: date-time
+          example: "2024-09-07T13:43:59.000000Z"
+          nullable: true
+        package:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 456
+            name:
+              type: string
+              example: "PERSONAL TRAINING"
+            price:
+              type: number
+              format: decimal
+              example: 240.00
+            sessions:
+              type: integer
+              example: 8
+            duration:
+              type: integer
+              example: 30
+        original_package_price:
+          type: number
+          format: decimal
+          example: 240.00
+        original_package_sessions:
+          type: integer
+          example: 8
+        original_package_duration:
+          type: integer
+          example: 30
+        is_frozen:
+          type: boolean
+          example: false
+          description: Whether the package is currently frozen (paused)
+        frozen_at:
+          type: string
+          format: date-time
+          example: "2024-09-07T12:00:00Z"
+          nullable: true
+          description: When the package was frozen
+        unfrozen_at:
+          type: string
+          format: date-time
+          example: "2024-09-17T12:00:00Z"
+          nullable: true
+          description: When the package was unfrozen
+        freeze_duration_days:
+          type: integer
+          example: 10
+          nullable: true
+          description: How many days the package can be frozen
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        user_id:
+          type: integer
+          example: 123
+        customer_name:
+          type: string
+          example: "John Doe"
+        customer_email:
+          type: string
+          format: email
+          example: "john@example.com"
+        class_id:
+          type: integer
+          example: 456
+        class_name:
+          type: string
+          example: "HIIT Morning Class"
+        instructor:
+          type: string
+          example: "Maria Trainer"
+        service_id:
+          type: integer
+          nullable: true
+          description: Service ID this booking belongs to
+          example: 1
+        service:
+          $ref: '#/components/schemas/Service'
+        store_id:
+          type: integer
+          example: 1
+        store:
+          $ref: '#/components/schemas/Store'
+        date:
+          type: string
+          format: date
+          example: "2024-12-15"
+        time:
+          type: string
+          example: "09:00"
+        status:
+          type: string
+          enum: [confirmed, pending, cancelled, completed]
+          example: "confirmed"
+        type:
+          type: string
+          enum: [group, personal]
+          example: "personal"
+        booking_type:
+          type: string
+          enum: [regular, trial, loyalty_gift, referral_gift, free, promotional]
+          example: "regular"
+        attended:
+          type: boolean
+          nullable: true
+          example: null
+        location:
+          type: string
+          example: "Βάρη"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CashRegisterEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 202
+        type:
+          type: string
+          enum: [income, withdrawal]
+          example: "income"
+        amount:
+          type: number
+          format: decimal
+          example: 33.33
+        description:
+          type: string
+          example: "Package usage - Premium Package"
+        category:
+          type: string
+          example: "package_usage"
+        store_id:
+          type: integer
+          example: 1
+        store:
+          $ref: '#/components/schemas/Store'
+        user_id:
+          type: integer
+          example: 123
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 123
+            name:
+              type: string
+              example: "John Doe"
+            email:
+              type: string
+              format: email
+              example: "john@example.com"
+        payment_method:
+          type: string
+          enum: [cash, card, transfer, package_credit]
+          example: "package_credit"
+        related_entity_id:
+          type: integer
+          nullable: true
+          example: 789
+        related_entity_type:
+          type: string
+          enum: [customer, package, expense, other]
+          example: "user_package"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BusinessExpense:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 202
+        amount:
+          type: number
+          format: decimal
+          example: 150.00
+        category:
+          type: string
+          example: "Rent"
+        description:
+          type: string
+          example: "Monthly office rent payment"
+        date:
+          type: string
+          format: date
+          example: "2024-12-01"
+        payment_method:
+          type: string
+          enum: [cash, card, transfer]
+          example: "transfer"
+        user_id:
+          type: integer
+          description: User who created the expense
+          example: 1
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: "Admin User"
+            email:
+              type: string
+              format: email
+              example: "admin@sweat93.gr"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GymClass:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 456
+        name:
+          type: string
+          example: "HIIT Morning Class"
+        instructor_id:
+          type: integer
+          example: 123
+        instructor:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 123
+            name:
+              type: string
+              example: "Maria Trainer"
+        service_id:
+          type: integer
+          nullable: true
+          description: Service ID this class belongs to
+          example: 1
+        service:
+          $ref: '#/components/schemas/Service'
+        date:
+          type: string
+          format: date
+          example: "2024-12-15"
+        time:
+          type: string
+          example: "09:00"
+        capacity:
+          type: integer
+          example: 15
+        duration:
+          type: integer
+          description: Duration in minutes
+          example: 60
+        current_participants:
+          type: integer
+          example: 8
+        status:
+          type: string
+          enum: [active, cancelled, completed]
+          example: "active"
+        description:
+          type: string
+          example: "High intensity interval training class"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 15
+        total:
+          type: integer
+          example: 150
+        last_page:
+          type: integer
+          example: 10
+        from:
+          type: integer
+          example: 1
+        to:
+          type: integer
+          example: 15
+
+    ExpenseCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Ενοίκιο & Πάγια Έξοδα Χώρου"
+        description:
+          type: string
+          example: "Ενοίκιο και πάγια έξοδα εγκαταστάσεων"
+        category_type:
+          type: string
+          enum: [main, subcategory]
+          example: "main"
+        parent_id:
+          type: integer
+          nullable: true
+          example: null
+        is_active:
+          type: boolean
+          example: true
+        sort_order:
+          type: integer
+          example: 1
+        parent:
+          $ref: '#/components/schemas/ExpenseCategory'
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseCategory'
+        full_name:
+          type: string
+          example: "Ενοίκιο & Πάγια Έξοδα Χώρου"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Personal Training"
+        slug:
+          type: string
+          example: "personal-training"
+        description:
+          type: string
+          example: "Personal training sessions with certified trainers. Επιτρέπεται 1 δοκιμαστικό ανά χρήστη που δεν έχει ενεργή συνδρομή."
+        icon:
+          type: string
+          nullable: true
+          example: "person"
+        trial_price:
+          type: number
+          format: decimal
+          nullable: true
+          example: 25.00
+        is_active:
+          type: boolean
+          example: true
+        display_order:
+          type: integer
+          example: 1
+        allows_trial:
+          type: boolean
+          example: true
+        max_trial_per_user:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T10:00:00Z"
+
+    TrialAppointment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        user_id:
+          type: integer
+          example: 456
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 456
+            name:
+              type: string
+              example: "John Doe"
+            email:
+              type: string
+              format: email
+              example: "john@example.com"
+        service_id:
+          type: integer
+          example: 1
+        service:
+          $ref: '#/components/schemas/Service'
+        instructor_id:
+          type: integer
+          nullable: true
+          example: 789
+        instructor:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 789
+            name:
+              type: string
+              example: "Maria Trainer"
+        appointment_date:
+          type: string
+          format: date
+          example: "2024-12-15"
+        appointment_time:
+          type: string
+          example: "14:30"
+        price:
+          type: number
+          format: decimal
+          nullable: true
+          example: 25.00
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled, no_show]
+          example: "confirmed"
+        notes:
+          type: string
+          nullable: true
+          example: "First time client - needs introduction"
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-12-10T09:00:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-12-15T15:00:00Z"
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-10T09:00:00Z"
+
+    AppointmentRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        user_id:
+          type: integer
+          nullable: true
+          example: 456
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 456
+            name:
+              type: string
+              example: "John Doe"
+            email:
+              type: string
+              format: email
+              example: "john@example.com"
+        specialized_service_id:
+          type: integer
+          example: 1
+        specialized_service:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: "Personal Training"
+        service_id:
+          type: integer
+          nullable: true
+          description: Service ID this request belongs to
+          example: 2
+        service:
+          $ref: '#/components/schemas/Service'
+        instructor_id:
+          type: integer
+          nullable: true
+          example: 789
+        instructor:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 789
+            name:
+              type: string
+              example: "Maria Trainer"
+        client_name:
+          type: string
+          example: "John Doe"
+        client_email:
+          type: string
+          format: email
+          nullable: true
+          example: "john@example.com"
+        client_phone:
+          type: string
+          example: "+306971234567"
+        preferred_time_slots:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                example: "2024-12-15"
+              time:
+                type: string
+                example: "14:30"
+          description: Array of preferred date/time slots
+          example: [{"date": "2024-12-15", "time": "14:30"}, {"date": "2024-12-16", "time": "10:00"}]
+        notes:
+          type: string
+          nullable: true
+          example: "First time client - needs introduction"
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+          example: "confirmed"
+        confirmed_date:
+          type: string
+          format: date
+          nullable: true
+          example: "2024-12-15"
+        confirmed_time:
+          type: string
+          nullable: true
+          example: "14:30"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-10T09:00:00Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Validation failed"
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            email: ["The email field is required."]
+            password: ["The password must be at least 8 characters."]

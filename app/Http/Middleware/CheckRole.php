@@ -19,25 +19,13 @@ class CheckRole
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Map roles to membership types
-        $userRole = $this->mapMembershipTypeToRole($request->user()->membership_type);
-        
+        // Use the role field directly from the user model
+        $userRole = $request->user()->role;
+
         if (!in_array($userRole, $roles)) {
             return response()->json(['message' => 'Forbidden. You do not have permission to access this resource.'], 403);
         }
 
         return $next($request);
-    }
-
-    /**
-     * Map membership type to role
-     */
-    private function mapMembershipTypeToRole(?string $membershipType): string
-    {
-        if ($membershipType === 'Admin') {
-            return 'admin';
-        }
-        
-        return 'user'; // Default role for non-admin users
     }
 }

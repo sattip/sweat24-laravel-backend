@@ -128,6 +128,106 @@ class WaitlistController extends Controller
     }
     
     /**
+     * Decline the waitlist spot notification
+     */
+    public function decline(Request $request, GymClass $class)
+    {
+        $user = auth()->user();
+
+        // Validate that user has a notified waitlist entry
+        $waitlistEntry = ClassWaitlist::where('user_id', $user->id)
+            ->where('class_id', $class->id)
+            ->where('status', 'notified')
+            ->first();
+
+        if (!$waitlistEntry) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Δεν βρέθηκε ενεργή ειδοποίηση για αυτό το μάθημα'
+            ], 404);
+        }
+
+        // Check if request includes preference to stay in waitlist
+        $stayInWaitlist = $request->input('stay_in_waitlist', false);
+
+        DB::beginTransaction();
+        try {
+            if ($stayInWaitlist) {
+                // Move to back of waitlist
+                $lastPosition = ClassWaitlist::where('class_id', $class->id)
+                    ->max('position') ?? 0;
+
+                $waitlistEntry->update([
+                    'status' => 'waiting',
+                    'position' => $lastPosition + 1,
+                    'notified_at' => null,
+                    'expires_at' => null
+                ]);
+
+                \Log::info('User declined waitlist spot but stayed in waitlist', [
+                    'user_id' => $user->id,
+                    'class_id' => $class->id,
+                    'new_position' => $lastPosition + 1
+                ]);
+
+                $message = 'Η θέση σας επιστράφηκε στη λίστα αναμονής';
+            } else {
+                // Remove from waitlist entirely
+                $position = $waitlistEntry->position;
+                $waitlistEntry->delete();
+
+                // Update positions for users after this one
+                ClassWaitlist::where('class_id', $class->id)
+                    ->where('position', '>', $position)
+                    ->decrement('position');
+
+                \Log::info('User declined waitlist spot and left waitlist', [
+                    'user_id' => $user->id,
+                    'class_id' => $class->id
+                ]);
+
+                $message = 'Αφαιρεθήκατε από τη λίστα αναμονής';
+            }
+
+            // Cancel the associated waitlist booking if it exists
+            $waitlistBooking = Booking::where('class_id', $class->id)
+                ->where('user_id', $user->id)
+                ->where('status', 'confirmed')
+                ->first();
+
+            if ($waitlistBooking) {
+                $waitlistBooking->update(['status' => 'cancelled']);
+            }
+
+            DB::commit();
+
+            // Process next person in line (outside transaction)
+            if ($class->hasAvailableSpots()) {
+                $this->processNextInLine($class);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'stayed_in_waitlist' => $stayInWaitlist
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            \Log::error('Error declining waitlist spot', [
+                'user_id' => $user->id,
+                'class_id' => $class->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Σφάλμα κατά την επεξεργασία του αιτήματος'
+            ], 500);
+        }
+    }
+
+    /**
      * Get waitlist status for a user
      */
     public function status(Request $request, GymClass $class)
@@ -154,18 +254,72 @@ class WaitlistController extends Controller
     }
     
     /**
-     * Get full waitlist for a class (admin only)
+     * Get all waitlists for the authenticated user
      */
-    public function index(Request $request, GymClass $class)
+    public function myWaitlists(Request $request)
     {
-        if (!auth()->user()->isAdmin()) {
+        $user = auth()->user();
+
+        $waitlists = ClassWaitlist::where('user_id', $user->id)
+            ->whereIn('status', ['waiting', 'notified'])
+            ->with(['gymClass' => function($query) {
+                $query->select('id', 'name', 'date', 'time', 'instructor', 'location', 'max_participants', 'current_participants');
+            }])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($entry) {
+                return [
+                    'waitlist_id' => $entry->id,
+                    'position' => $entry->position,
+                    'status' => $entry->status,
+                    'notified_at' => $entry->notified_at,
+                    'expires_at' => $entry->expires_at,
+                    'created_at' => $entry->created_at,
+                    'class' => [
+                        'id' => $entry->gymClass->id,
+                        'name' => $entry->gymClass->name,
+                        'date' => $entry->gymClass->date->format('Y-m-d'),
+                        'time' => $entry->gymClass->time,
+                        'instructor' => $entry->gymClass->instructor,
+                        'location' => $entry->gymClass->location,
+                        'available_spots' => $entry->gymClass->max_participants - $entry->gymClass->current_participants,
+                        'is_full' => $entry->gymClass->isFull(),
+                    ]
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $waitlists,
+            'total' => $waitlists->count()
+        ]);
+    }
+
+    /**
+     * Get full waitlist for a class (admin and trainer)
+     */
+    public function index(Request $request, $classId)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->isTrainer()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
+
+        // Find class, return empty response if not found
+        $class = GymClass::find($classId);
+
+        if (!$class) {
+            return response()->json([
+                'class' => null,
+                'waitlist' => [],
+                'total' => 0
+            ]);
+        }
+
         $waitlist = $class->waitlist()
             ->with('user:id,name,email,phone')
             ->get();
-            
+
         return response()->json([
             'class' => $class->only(['id', 'name', 'date', 'time']),
             'waitlist' => $waitlist,

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Instructor;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\TrainerCredentials;
 
 class InstructorController extends Controller
 {
@@ -18,11 +20,11 @@ class InstructorController extends Controller
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'nullable|email|unique:instructors',
+                'email' => 'required|email|unique:instructors|unique:users,email',
                 'phone' => 'nullable|string',
                 'specialties' => 'nullable',
                 'certifications' => 'nullable|string',
-                'experience' => 'nullable|string', 
+                'experience' => 'nullable|string',
                 'bio' => 'nullable|string',
                 'image_url' => 'nullable|string',
             ]);
@@ -67,7 +69,7 @@ class InstructorController extends Controller
             
             // Create the instructor record
             $instructor = Instructor::create($validated);
-            
+
             // Log the created credentials
             \Log::info('Trainer user created', [
                 'instructor_id' => $instructor->id,
@@ -75,17 +77,46 @@ class InstructorController extends Controller
                 'email' => $user->email,
                 'temporary_password' => $temporaryPassword
             ]);
-            
+
+            // Send email with credentials to the trainer
+            try {
+                if ($validated['email']) {
+                    Mail::to($validated['email'])->send(
+                        new TrainerCredentials(
+                            $validated['name'],
+                            $validated['email'],
+                            $temporaryPassword
+                        )
+                    );
+                    \Log::info('Credentials email sent to trainer', ['email' => $validated['email']]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to send credentials email', [
+                    'email' => $validated['email'],
+                    'error' => $e->getMessage()
+                ]);
+                // Don't fail the request if email fails
+            }
+
             return response()->json([
                 'instructor' => $instructor,
-                'message' => 'Trainer created successfully. Login credentials: ' . $user->email . ' / ' . $temporaryPassword
+                'message' => 'Trainer created successfully. Credentials sent via email to ' . $user->email
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Instructor validation failed', [
+                'errors' => $e->errors(),
+                'input' => $request->all()
+            ]);
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
+            \Log::error('Error creating instructor', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'input' => $request->all()
+            ]);
             return response()->json([
                 'message' => 'Error creating instructor',
                 'error' => $e->getMessage()
@@ -121,7 +152,30 @@ class InstructorController extends Controller
 
     public function destroy(Instructor $instructor)
     {
-        $instructor->delete();
-        return response()->json(['message' => 'Instructor deleted successfully']);
+        try {
+            // Find and delete the associated User account
+            if ($instructor->email) {
+                $user = \App\Models\User::where('email', $instructor->email)->first();
+                if ($user) {
+                    $user->delete();
+                    \Log::info('Deleted user account for instructor', [
+                        'instructor_id' => $instructor->id,
+                        'user_email' => $instructor->email
+                    ]);
+                }
+            }
+
+            $instructor->delete();
+            return response()->json(['message' => 'Instructor deleted successfully']);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting instructor', [
+                'instructor_id' => $instructor->id,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Error deleting instructor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

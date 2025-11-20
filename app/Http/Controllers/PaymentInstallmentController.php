@@ -106,6 +106,7 @@ class PaymentInstallmentController extends Controller
     {
         $validated = $request->validate([
             'payment_method' => 'required|in:cash,card,transfer,iris,cash_a',
+            'store_id' => 'required|exists:stores,id',
             'paid_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
@@ -121,6 +122,19 @@ class PaymentInstallmentController extends Controller
             'payment_method' => $validated['payment_method'],
             'paid_date' => $validated['paid_date'] ?? now(),
             'notes' => $validated['notes'] ?? $paymentInstallment->notes,
+        ]);
+
+        // Record payment in cash register
+        \App\Models\CashRegisterEntry::create([
+            'type' => 'income',
+            'amount' => $paymentInstallment->amount,
+            'description' => "Πληρωμή δόσης: {$paymentInstallment->package_name} - {$paymentInstallment->customer_name} (Δόση {$paymentInstallment->installment_number}/{$paymentInstallment->total_installments})",
+            'category' => 'Installment Payment',
+            'user_id' => auth()->id() ?? 1, // Who recorded the payment
+            'payment_method' => $validated['payment_method'],
+            'related_entity_id' => $paymentInstallment->id,
+            'related_entity_type' => 'other',
+            'store_id' => $validated['store_id'],
         ]);
 
         // Send payment received notification

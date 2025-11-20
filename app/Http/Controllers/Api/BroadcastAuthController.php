@@ -13,7 +13,7 @@ class BroadcastAuthController extends Controller
     {
         // The user should already be authenticated via Sanctum middleware
         $user = Auth::user();
-        
+
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
@@ -25,12 +25,63 @@ class BroadcastAuthController extends Controller
             return response()->json(['error' => 'Missing channel_name or socket_id'], 400);
         }
 
-        try {
-            // Use Laravel's broadcasting system to authorize the channel
-            $broadcastAuth = Broadcast::auth($request);
-            return $broadcastAuth;
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Authorization failed'], 403);
+        // Manually authorize the channel since Broadcast::auth() has issues with Sanctum
+        $isAuthorized = $this->authorizeChannel($user, $channelName);
+
+        if (!$isAuthorized) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
+
+        // Return the auth response that broadcasting expects
+        return response()->json([
+            'auth' => $this->generateAuthResponse($channelName, $socketId)
+        ]);
+    }
+
+    private function authorizeChannel($user, $channelName)
+    {
+        // Parse channel name to extract parameters
+        if (preg_match('/^private-chat\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        // Order channels
+        if (preg_match('/^private-order\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        // User channels
+        if (preg_match('/^private-user\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        // Booking request channels for users
+        if (preg_match('/^private-booking-request\.user\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        // Add other channel types as needed
+        if (preg_match('/^chat\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        if (preg_match('/^user\.(\d+)$/', $channelName, $matches)) {
+            $userId = $matches[1];
+            return (int) $user->id === (int) $userId;
+        }
+
+        return false;
+    }
+
+    private function generateAuthResponse($channelName, $socketId)
+    {
+        // For Pusher or similar services, you'd generate a signature here
+        // For now, return a basic auth response
+        return hash_hmac('sha256', $channelName . ':' . $socketId, config('app.key'));
     }
 }

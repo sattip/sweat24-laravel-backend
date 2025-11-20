@@ -44,16 +44,25 @@ class User extends Authenticatable
         'medical_history',
         'ems_interest',
         'ems_contraindications',
+        'liability_declaration_accepted',
         'ems_liability_accepted',
+        'doctor_certificate_path',
         'emergency_contact',
         'emergency_phone',
         'notes',
+        'trainer_notes',
+        'discontinuation_notes',
+        'has_priority_booking',
+        'priority_booking_expires_at',
+        'priority_booking_hours_advance',
         'notification_preferences',
         'privacy_settings',
         'avatar',
         'password',
         'found_us_via',
         'referrer_id',
+        'referral_phone',
+        'referral_points',
         'social_platform',
         'referral_code_or_name',
         'referral_validated',
@@ -100,6 +109,10 @@ class User extends Authenticatable
             'referral_validated_at' => 'datetime',
             'weight' => 'decimal:2',
             'height' => 'decimal:2',
+            'last_seen' => 'datetime',
+            'has_priority_booking' => 'boolean',
+            'priority_booking_expires_at' => 'datetime',
+            'priority_booking_hours_advance' => 'integer',
         ];
     }
 
@@ -153,6 +166,11 @@ class User extends Authenticatable
     public function userPackages()
     {
         return $this->hasMany(UserPackage::class);
+    }
+
+    public function customPackages()
+    {
+        return $this->hasMany(UserPackage::class)->where('is_custom_package', true);
     }
     
     public function notifications()
@@ -271,6 +289,46 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\BodyMeasurement::class);
     }
+
+    /**
+     * Get the fitness levels for the user
+     */
+    public function fitnessLevels()
+    {
+        return $this->hasMany(\App\Models\FitnessLevel::class);
+    }
+
+    /**
+     * Get the current fitness level for the user
+     */
+    public function currentFitnessLevel()
+    {
+        return $this->hasOne(\App\Models\FitnessLevel::class)->latestOfMany('assessment_date');
+    }
+
+    /**
+     * Get the performance tests for the user
+     */
+    public function performanceTests()
+    {
+        return $this->hasMany(\App\Models\PerformanceTest::class);
+    }
+
+    /**
+     * Get the training sessions for the user
+     */
+    public function trainingSessions()
+    {
+        return $this->hasMany(\App\Models\TrainingSession::class);
+    }
+
+    /**
+     * Get the training sessions conducted by this trainer
+     */
+    public function trainingSessionsAsTrainer()
+    {
+        return $this->hasMany(\App\Models\TrainingSession::class, 'trainer_id');
+    }
     
     /**
      * Get formatted gender for display
@@ -381,6 +439,66 @@ class User extends Authenticatable
                    ->where('expires_at', '<=', now()->addDays(30))
                    ->where('expires_at', '>', now())
                    ->sum('amount');
+    }
+
+    /**
+     * Check if user has active priority booking
+     */
+    public function hasActivePriorityBooking(): bool
+    {
+        if (!$this->has_priority_booking) {
+            return false;
+        }
+
+        if ($this->priority_booking_expires_at && $this->priority_booking_expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if user can book a specific class with priority
+     */
+    public function canBookWithPriority($gymClass): bool
+    {
+        if (!$this->hasActivePriorityBooking()) {
+            return false;
+        }
+
+        // Check if class has priority booking enabled
+        if (!$gymClass->priority_booking_enabled) {
+            return false;
+        }
+
+        // Check if class is within priority booking window
+        $classDateTime = \Carbon\Carbon::parse($gymClass->date . ' ' . $gymClass->time);
+        $hoursUntilClass = now()->diffInHours($classDateTime, false);
+        
+        return $hoursUntilClass >= 0 && $hoursUntilClass <= $this->priority_booking_hours_advance;
+    }
+
+    /**
+     * Grant priority booking to user
+     */
+    public function grantPriorityBooking($expiresAt = null, $hoursAdvance = 48): void
+    {
+        $this->update([
+            'has_priority_booking' => true,
+            'priority_booking_expires_at' => $expiresAt,
+            'priority_booking_hours_advance' => $hoursAdvance,
+        ]);
+    }
+
+    /**
+     * Revoke priority booking from user
+     */
+    public function revokePriorityBooking(): void
+    {
+        $this->update([
+            'has_priority_booking' => false,
+            'priority_booking_expires_at' => null,
+        ]);
     }
     
     /**

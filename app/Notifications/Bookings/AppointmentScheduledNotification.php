@@ -53,6 +53,8 @@ class AppointmentScheduledNotification extends Notification implements ShouldQue
      */
     public function toDatabase(object $notifiable): array
     {
+        $gymClass = $this->booking->gymClass;
+
         $typeNames = [
             'personal_training' => 'Προσωπική Προπόνηση',
             'consultation' => 'Συμβουλευτική',
@@ -60,18 +62,21 @@ class AppointmentScheduledNotification extends Notification implements ShouldQue
         ];
 
         $typeName = $typeNames[$this->appointmentType] ?? 'Ραντεβού';
+        $instructorName = ($gymClass && $gymClass->instructor) ? $gymClass->instructor->name : 'προπονητή';
+        $classDate = $gymClass && $gymClass->date ? $gymClass->date->format('d/m/Y') : 'TBA';
+        $classTime = $gymClass ? $gymClass->time : 'TBA';
 
         return [
             'title' => 'Προγραμματισμός ραντεβού',
-            'message' => "Το ραντεβού σας για {$typeName} με τον/την {$this->booking->gymClass->instructor->name ?? 'προπονητή'} προγραμματίστηκε για τις {$this->booking->gymClass->date->format('d/m/Y')} στις {$this->booking->gymClass->time}.",
+            'message' => "Το ραντεβού σας για {$typeName} με τον/την {$instructorName} προγραμματίστηκε για τις {$classDate} στις {$classTime}.",
             'booking_id' => $this->booking->id,
-            'class_id' => $this->booking->gymClass->id,
+            'class_id' => $gymClass ? $gymClass->id : null,
             'appointment_type' => $this->appointmentType,
             'appointment_type_name' => $typeName,
-            'class_date' => $this->booking->gymClass->date->format('Y-m-d'),
-            'class_time' => $this->booking->gymClass->time,
-            'instructor_name' => $this->booking->gymClass->instructor->name ?? null,
-            'instructor_id' => $this->booking->gymClass->instructor->id ?? null,
+            'class_date' => $gymClass && $gymClass->date ? $gymClass->date->format('Y-m-d') : null,
+            'class_time' => $classTime,
+            'instructor_name' => ($gymClass && $gymClass->instructor) ? $gymClass->instructor->name : null,
+            'instructor_id' => ($gymClass && $gymClass->instructor) ? $gymClass->instructor->id : null,
             'booking_status' => $this->booking->status,
             'action_url' => '/appointments/' . $this->booking->id,
             'icon' => 'user-check',

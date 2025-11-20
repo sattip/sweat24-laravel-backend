@@ -10,6 +10,7 @@ class BusinessExpense extends Model
     use HasFactory;
 
     protected $fillable = [
+        'category_id',
         'category',
         'subcategory',
         'description',
@@ -21,6 +22,7 @@ class BusinessExpense extends Model
         'approved',
         'approved_by',
         'notes',
+        'store_id',
     ];
 
     protected function casts(): array
@@ -30,5 +32,15 @@ class BusinessExpense extends Model
             'date' => 'date',
             'approved' => 'boolean',
         ];
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    public function expenseCategory()
+    {
+        return $this->belongsTo(ExpenseCategory::class, 'category_id');
     }
 }

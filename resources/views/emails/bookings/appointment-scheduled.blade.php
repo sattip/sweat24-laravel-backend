@@ -5,7 +5,7 @@
 @section('content')
 <h1>Το Ραντεβού Προγραμματίστηκε!</h1>
 
-<p>Εξαιρετικά νέα, {{ $user->first_name }}! Το ραντεβού σας για {{ $appointment->type === 'ems' ? 'Προπόνηση EMS' : 'Προσωπική Προπόνηση' }} έχει προγραμματιστεί.</p>
+<p>Εξαιρετικά νέα, {{ $user->name ?? 'Φίλε Χρήστη' }}! Το ραντεβού σας για {{ $appointment->type === 'ems' ? 'Προπόνηση EMS' : 'Προσωπική Προπόνηση' }} έχει προγραμματιστεί.</p>
 
 <div class="alert alert-success">
     <strong>Το ραντεβού σας επιβεβαιώθηκε!</strong> Παρακαλούμε φτάστε 10 λεπτά νωρίτερα για την προετοιμασία της συνεδρίας σας.
@@ -14,9 +14,9 @@
 <div class="info-box">
     <h3>Λεπτομέρειες Ραντεβού</h3>
     <p><strong>Υπηρεσία:</strong> {{ $appointment->type === 'ems' ? 'Συνεδρία Προπόνησης EMS' : 'Συνεδρία Προσωπικής Προπόνησης' }}</p>
-    <p><strong>Προπονητής:</strong> {{ $appointment->trainer->first_name }} {{ $appointment->trainer->last_name }}</p>
-    <p><strong>Ημερομηνία:</strong> {{ $appointment->scheduled_at->format('l, j F Y') }}</p>
-    <p><strong>Ώρα:</strong> {{ $appointment->scheduled_at->format('g:i A') }} - {{ $appointment->scheduled_at->addMinutes($appointment->duration)->format('g:i A') }}</p>
+    <p><strong>Προπονητής:</strong> {{ $appointment->trainer ? ($appointment->trainer->name ?? 'TBA') : 'TBA' }}</p>
+    <p><strong>Ημερομηνία:</strong> {{ $appointment->scheduled_at ? $appointment->scheduled_at->format('l, j F Y') : 'TBA' }}</p>
+    <p><strong>Ώρα:</strong> @if($appointment->scheduled_at){{ $appointment->scheduled_at->format('g:i A') }} @if($appointment->duration)- {{ $appointment->scheduled_at->addMinutes($appointment->duration)->format('g:i A') }}@endif @else TBA @endif</p>
     <p><strong>Διάρκεια:</strong> {{ $appointment->duration }} λεπτά</p>
     <p><strong>Τοποθεσία:</strong> {{ $appointment->room ?? 'Αίθουσα Προσωπικής Προπόνησης' }}</p>
     <p><strong>ID Ραντεβού:</strong> #{{ $appointment->id }}</p>

@@ -13,12 +13,12 @@
 
 <div class="info-box">
     <h3>Στοιχεία Εγγραφής Χρήστη</h3>
-    <p><strong>Όνομα:</strong> {{ $user->first_name }} {{ $user->last_name }}</p>
+    <p><strong>Όνομα:</strong> {{ $user->name ?? 'Χρήστης' }}</p>
     <p><strong>Email:</strong> {{ $user->email }}</p>
     <p><strong>Τηλέφωνο:</strong> {{ $user->phone ?? 'Δεν είναι διαθέσιμο' }}</p>
     <p><strong>Ημερομηνία Γέννησης:</strong> {{ $user->date_of_birth ? $user->date_of_birth->format('F j, Y') : 'Δεν είναι διαθέσιμη' }}</p>
     <p><strong>Φύλο:</strong> {{ $user->gender ? ucfirst($user->gender) : 'Δεν είναι καθορισμένο' }}</p>
-    <p><strong>Ημερομηνία Εγγραφής:</strong> {{ $user->created_at->format('F j, Y \a\t g:i A') }}</p>
+    <p><strong>Ημερομηνία Εγγραφής:</strong> {{ $user->created_at ? $user->created_at->format('F j, Y \a\t g:i A') : 'Δεν είναι διαθέσιμη' }}</p>
 </div>
 
 @if($user->emergency_contact_name || $user->emergency_contact_phone)

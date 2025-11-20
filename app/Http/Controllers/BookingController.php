@@ -398,9 +398,8 @@ class BookingController extends Controller
             try {
                 $gymClass = GymClass::with('instructor')->find($validated['class_id']);
                 if ($gymClass) {
-                    // Override date and time with the actual class values
-                    $validated['date'] = $gymClass->date;
-                    $validated['time'] = $gymClass->time;
+                    // Use the requested date and time from the frontend, not the class template
+                    // Only copy class metadata like name, instructor, and location
                     $validated['class_name'] = $gymClass->name;
                     $validated['instructor'] = $gymClass->instructor ? $gymClass->instructor->name : 'TBD';
                     $validated['location'] = $gymClass->location;
@@ -709,6 +708,135 @@ class BookingController extends Controller
         }
 
         return array_unique($allowedClassTypes);
+    }
+
+    /**
+     * Mark booking as no-show/absent
+     */
+    public function markAbsent(Request $request, Booking $booking)
+    {
+        // Validate request
+        $validated = $request->validate([
+            'with_charge' => 'required|boolean',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $withCharge = $validated['with_charge'];
+        $reason = $validated['reason'] ?? 'Απουσία χρήστη';
+
+        // Check if booking can be marked as absent
+        if ($booking->status === 'no-show') {
+            return $this->errorResponse('Η κράτηση έχει ήδη σημειωθεί ως απουσία', 400);
+        }
+
+        if ($booking->status === 'cancelled') {
+            return $this->errorResponse('Η κράτηση έχει ακυρωθεί', 400);
+        }
+
+        if ($booking->status === 'completed') {
+            return $this->errorResponse('Η κράτηση έχει ολοκληρωθεί', 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $previousStatus = $booking->status;
+
+            // Update booking status
+            $booking->update([
+                'status' => 'no-show',
+                'absence_reason' => $reason,
+                'absence_with_charge' => $withCharge,
+                'absence_marked_at' => now(),
+                'absence_marked_by' => $request->user() ? $request->user()->id : null,
+            ]);
+
+            // If "without charge", refund the session
+            if (!$withCharge && $booking->user_id) {
+                // Find active user package and refund session
+                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+                    ->where('status', 'active')
+                    ->whereDate('start_date', '<=', now())
+                    ->where(function($query) {
+                        $query->whereNull('expiry_date')
+                            ->orWhereDate('expiry_date', '>=', now());
+                    })
+                    ->first();
+
+                if ($userPackage && $userPackage->total_sessions !== null) {
+                    // Refund one session
+                    $userPackage->increment('remaining_sessions', 1);
+
+                    \Log::info('Session refunded due to no-show without charge', [
+                        'booking_id' => $booking->id,
+                        'user_id' => $booking->user_id,
+                        'package_id' => $userPackage->id,
+                        'new_remaining' => $userPackage->remaining_sessions,
+                    ]);
+                }
+            }
+
+            // Log activity
+            ActivityLogger::log('booking_marked_absent', [
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
+                'with_charge' => $withCharge,
+                'reason' => $reason,
+                'marked_by' => $request->user() ? $request->user()->name : 'System',
+            ]);
+
+            // If "without charge", notify admins
+            if (!$withCharge) {
+                $admins = \App\Models\User::where('role', 'admin')->get();
+                $className = $booking->gymClass->name ?? $booking->fitnessClass->name ?? 'μάθημα';
+                $message = "Απουσία χωρίς χρέωση: {$booking->user->name} για {$className} στις " . $booking->date->format('d/m/Y H:i');
+
+                foreach ($admins as $admin) {
+                    // Create notification in database
+                    $admin->notifications()->create([
+                        'type' => 'App\\Notifications\\AbsenceWithoutChargeNotification',
+                        'data' => [
+                            'booking_id' => $booking->id,
+                            'user_name' => $booking->user->name,
+                            'user_id' => $booking->user_id,
+                            'class_name' => $className,
+                            'date' => $booking->date->format('d/m/Y H:i'),
+                            'reason' => $reason,
+                            'message' => $message,
+                        ],
+                    ]);
+                }
+
+                \Log::info('Admin notified about absence without charge', [
+                    'booking_id' => $booking->id,
+                    'admin_count' => $admins->count(),
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $withCharge
+                    ? 'Η κράτηση σημειώθηκε ως απουσία με χρέωση'
+                    : 'Η κράτηση σημειώθηκε ως απουσία χωρίς χρέωση. Η συνεδρία επιστράφηκε.',
+                'data' => [
+                    'booking' => $booking->fresh(),
+                    'with_charge' => $withCharge,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to mark booking as absent', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Αποτυχία σημείωσης απουσίας: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

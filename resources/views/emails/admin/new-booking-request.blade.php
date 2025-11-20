@@ -15,8 +15,8 @@
     <h3>Στοιχεία Booking Request</h3>
     <p><strong>Τύπος Υπηρεσίας:</strong> {{ $booking->type === 'ems' ? 'EMS Training Session' : 'Personal Training Session' }}</p>
     <p><strong>Request ID:</strong> #{{ $booking->id }}</p>
-    <p><strong>Πελάτης:</strong> {{ $booking->user->first_name }} {{ $booking->user->last_name }}</p>
-    <p><strong>Ζητούμενη Ημερομηνία:</strong> {{ $booking->requested_date->format('l, F j, Y') }}</p>
+    <p><strong>Πελάτης:</strong> {{ $booking->user->name ?? 'Χρήστης' }}</p>
+    <p><strong>Ζητούμενη Ημερομηνία:</strong> {{ $booking->requested_date ? $booking->requested_date->format('l, F j, Y') : 'Δεν έχει οριστεί' }}</p>
     <p><strong>Προτιμώμενη Ώρα:</strong> {{ $booking->preferred_time ?? 'Ευέλικτη' }}</p>
     <p><strong>Διάρκεια:</strong> {{ $booking->duration ?? '60' }} λεπτά</p>
     <p><strong>Ημερομηνία Request:</strong> {{ $booking->created_at->format('F j, Y \a\t g:i A') }}</p>
@@ -25,10 +25,10 @@
 
 <div class="info-box">
     <h3>Στοιχεία Πελάτη</h3>
-    <p><strong>Όνομα:</strong> {{ $booking->user->first_name }} {{ $booking->user->last_name }}</p>
+    <p><strong>Όνομα:</strong> {{ $booking->user->name ?? 'Χρήστης' }}</p>
     <p><strong>Email:</strong> {{ $booking->user->email }}</p>
     <p><strong>Τηλέφωνο:</strong> {{ $booking->user->phone ?? 'Δεν είναι διαθέσιμο' }}</p>
-    <p><strong>Μέλος από:</strong> {{ $booking->user->created_at->format('F j, Y') }}</p>
+    <p><strong>Μέλος από:</strong> {{ $booking->user->created_at ? $booking->user->created_at->format('F j, Y') : 'Δεν είναι διαθέσιμο' }}</p>
     @if($booking->user->experience_level)
     <p><strong>Επίπεδο Εμπειρίας:</strong> {{ ucfirst($booking->user->experience_level) }}</p>
     @endif
@@ -108,18 +108,18 @@
     </tr>
     <tr>
         <td>Κύρια Ημερομηνία/Ώρα</td>
-        <td>{{ $booking->requested_date->format('l, F j, Y') }} at {{ $booking->preferred_time ?? 'Ευέλικτη χρονική στιγμή' }}</td>
+        <td>{{ $booking->requested_date ? $booking->requested_date->format('l, F j, Y') : 'Δεν έχει οριστεί' }} at {{ $booking->preferred_time ?? 'Ευέλικτη χρονική στιγμή' }}</td>
     </tr>
     @if($booking->alternative_date_1)
     <tr>
         <td>Εναλλακτική 1</td>
-        <td>{{ $booking->alternative_date_1->format('l, F j, Y') }} at {{ $booking->alternative_time_1 ?? 'Ευέλικτη χρονική στιγμή' }}</td>
+        <td>{{ $booking->alternative_date_1 ? $booking->alternative_date_1->format('l, F j, Y') : 'Δεν έχει οριστεί' }} at {{ $booking->alternative_time_1 ?? 'Ευέλικτη χρονική στιγμή' }}</td>
     </tr>
     @endif
     @if($booking->alternative_date_2)
     <tr>
         <td>Εναλλακτική 2</td>
-        <td>{{ $booking->alternative_date_2->format('l, F j, Y') }} at {{ $booking->alternative_time_2 ?? 'Ευέλικτη χρονική στιγμή' }}</td>
+        <td>{{ $booking->alternative_date_2 ? $booking->alternative_date_2->format('l, F j, Y') : 'Δεν έχει οριστεί' }} at {{ $booking->alternative_time_2 ?? 'Ευέλικτη χρονική στιγμή' }}</td>
     </tr>
     @endif
     <tr>

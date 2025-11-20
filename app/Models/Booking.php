@@ -18,14 +18,26 @@ class Booking extends Model
         'instructor',
         'date',
         'time',
+        'start_time',
+        'end_time',
         'status',
         'type',
         'booking_type',
         'attended',
+        'is_priority_booking',
         'booking_time',
         'location',
         'avatar',
         'cancellation_reason',
+        'absence_reason',
+        'absence_with_charge',
+        'absence_marked_at',
+        'absence_marked_by',
+        'store_id',
+        'service_id',
+        'points_used',
+        'cash_paid',
+        'total_cost',
     ];
 
     protected function casts(): array
@@ -33,6 +45,9 @@ class Booking extends Model
         return [
             'date' => 'date:Y-m-d',
             'booking_time' => 'datetime',
+            'absence_marked_at' => 'datetime',
+            'is_priority_booking' => 'boolean',
+            'absence_with_charge' => 'boolean',
         ];
     }
 
@@ -44,6 +59,21 @@ class Booking extends Model
     public function gymClass()
     {
         return $this->belongsTo(GymClass::class, 'class_id');
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    public function muscleGroups()
+    {
+        return $this->hasOne(WorkoutMuscleGroup::class);
     }
 
     // Add accessors for better formatting
@@ -72,5 +102,11 @@ class Booking extends Model
             return \Carbon\Carbon::parse($value)->format('H:i');
         }
         return $value;
+    }
+
+    // Relationship to FitnessClass (new model)
+    public function fitnessClass()
+    {
+        return $this->belongsTo(FitnessClass::class, 'class_id');
     }
 }

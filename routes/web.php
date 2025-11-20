@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientProfileController;
+use App\Http\Controllers\Api\ApiDocsController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -54,6 +55,15 @@ Route::get('/test-signatures', function () {
         'count' => $signatures->count(),
         'signatures' => $signatures
     ]);
+});
+
+// ============ API DOCUMENTATION ROUTES ============
+// Public API documentation routes (accessible at root level)
+Route::prefix('api-docs')->group(function () {
+    Route::get('/', [ApiDocsController::class, 'index']);
+    Route::get('/spec', [ApiDocsController::class, 'specification']);
+    Route::get('/postman', [ApiDocsController::class, 'postman']);
+    Route::get('/info', [ApiDocsController::class, 'info']);
 });
 
 // Admin Routes

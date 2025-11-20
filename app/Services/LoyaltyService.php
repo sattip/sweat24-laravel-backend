@@ -151,4 +151,133 @@ class LoyaltyService
             })->count(),
         ];
     }
+
+    /**
+     * Αφαίρεση πόντων από χρήστη
+     */
+    public function deductPoints($userId, $points, $source, $sourceId = null, $description = null)
+    {
+        $user = User::findOrFail($userId);
+        $currentPoints = $user->loyalty_points_balance ?? 0;
+
+        if ($currentPoints < $points) {
+            throw new \Exception('Ανεπαρκείς πόντοι. Διαθέσιμοι: ' . $currentPoints . ', Απαιτούνται: ' . $points);
+        }
+
+        // Χρήση της υπάρχουσας μεθόδου addLoyaltyPoints με αρνητικό αριθμό
+        $user->addLoyaltyPoints(
+            -$points,
+            $description ?? "Αφαίρεση πόντων: {$source}",
+            $source,
+            $sourceId
+        );
+
+        // Δημιουργία transaction record
+        $balanceAfter = $user->fresh()->loyalty_points_balance ?? 0;
+
+        DB::table('loyalty_transactions')->insert([
+            'user_id' => $userId,
+            'points' => -$points,
+            'type' => 'deduction',
+            'source' => $source,
+            'source_id' => $sourceId,
+            'description' => $description,
+            'balance_after' => $balanceAfter,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('Loyalty points deducted', [
+            'user_id' => $userId,
+            'points' => $points,
+            'source' => $source,
+            'source_id' => $sourceId,
+            'balance_after' => $balanceAfter,
+        ]);
+
+        return $balanceAfter;
+    }
+
+    /**
+     * Προσθήκη πόντων σε χρήστη (για χειροκίνητες προσθήκες)
+     */
+    public function addPoints($userId, $points, $source, $sourceId = null, $description = null)
+    {
+        $user = User::findOrFail($userId);
+
+        $user->addLoyaltyPoints(
+            $points,
+            $description ?? "Προσθήκη πόντων: {$source}",
+            $source,
+            $sourceId
+        );
+
+        // Δημιουργία transaction record
+        $balanceAfter = $user->fresh()->loyalty_points_balance ?? 0;
+
+        DB::table('loyalty_transactions')->insert([
+            'user_id' => $userId,
+            'points' => $points,
+            'type' => 'earn',
+            'source' => $source,
+            'source_id' => $sourceId,
+            'description' => $description,
+            'balance_after' => $balanceAfter,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('Loyalty points added', [
+            'user_id' => $userId,
+            'points' => $points,
+            'source' => $source,
+            'source_id' => $sourceId,
+            'balance_after' => $balanceAfter,
+        ]);
+
+        return $balanceAfter;
+    }
+
+    /**
+     * Έλεγχος αν ο χρήστης μπορεί να αντέξει οικονομικά την αγορά με πόντους
+     */
+    public function canAfford($userId, $pointsCost)
+    {
+        $user = User::findOrFail($userId);
+        return ($user->loyalty_points_balance ?? 0) >= $pointsCost;
+    }
+
+    /**
+     * Υπολογισμός μικτής πληρωμής (πόντοι + μετρητά)
+     */
+    public function calculateMixedPayment($userId, $totalPrice, $pointsToUse)
+    {
+        $user = User::findOrFail($userId);
+        $availablePoints = $user->loyalty_points_balance ?? 0;
+
+        // Περιορισμός πόντων στο διαθέσιμο και στο συνολικό κόστος
+        $pointsToUse = min($pointsToUse, $availablePoints, $totalPrice);
+        $cashRequired = max(0, $totalPrice - $pointsToUse);
+
+        return [
+            'total_price' => $totalPrice,
+            'points_available' => $availablePoints,
+            'points_to_use' => $pointsToUse,
+            'points_value_eur' => $pointsToUse, // 1 πόντος = 1 EUR
+            'cash_required' => $cashRequired,
+            'can_complete' => $pointsToUse <= $availablePoints,
+        ];
+    }
+
+    /**
+     * Λήψη ιστορικού συναλλαγών πόντων για χρήστη
+     */
+    public function getTransactionHistory($userId, $limit = 50)
+    {
+        return DB::table('loyalty_transactions')
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
 } 

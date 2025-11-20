@@ -36,12 +36,27 @@ class BookingConfirmationNotification extends Notification implements ShouldQueu
      */
     public function toMail(object $notifiable): MailMessage
     {
+        // Ensure all necessary relationships are loaded
+        $booking = $this->booking->load(['gymClass', 'user']);
+        $gymClass = $booking->gymClass;
+
+        // Handle instructor data - it might be a string or an object
+        $instructorName = 'TBA';
+        if ($gymClass) {
+            if ($gymClass->instructor instanceof \App\Models\Instructor) {
+                $instructorName = $gymClass->instructor->name;
+            } elseif (is_string($gymClass->instructor)) {
+                $instructorName = $gymClass->instructor;
+            }
+        }
+
         return (new MailMessage)
-            ->subject('Booking Confirmed - Sweat93')
+            ->subject('Κράτηση Επιβεβαιώθηκε - Sweat93')
             ->view('emails.bookings.booking-confirmation', [
-                'booking' => $this->booking->load('gymClass.instructor'),
+                'booking' => $booking,
                 'user' => $notifiable,
-                'gymClass' => $this->booking->gymClass,
+                'gymClass' => $gymClass,
+                'instructorName' => $instructorName,
             ]);
     }
 
@@ -50,15 +65,33 @@ class BookingConfirmationNotification extends Notification implements ShouldQueu
      */
     public function toDatabase(object $notifiable): array
     {
+        $gymClass = $this->booking->gymClass;
+
+        $className = $gymClass ? ($gymClass->name ?? $this->booking->class_name ?? 'Μάθημα') : ($this->booking->class_name ?? 'Μάθημα');
+        $classDate = $gymClass && $gymClass->date ? $gymClass->date->format('d/m/Y') : ($this->booking->date ?? 'TBA');
+        $classTime = $gymClass ? ($gymClass->time ?? $this->booking->time ?? 'TBA') : ($this->booking->time ?? 'TBA');
+
+        // Handle instructor name safely
+        $instructorName = null;
+        if ($gymClass) {
+            if ($gymClass->instructor instanceof \App\Models\Instructor) {
+                $instructorName = $gymClass->instructor->name;
+            } elseif (is_string($gymClass->instructor)) {
+                $instructorName = $gymClass->instructor;
+            }
+        }
+
         return [
             'title' => 'Επιβεβαίωση κράτησης',
-            'message' => "Η κράτησή σας για το μάθημα \"{$this->booking->gymClass->name}\" στις {$this->booking->gymClass->date->format('d/m/Y')} στις {$this->booking->gymClass->time} επιβεβαιώθηκε με επιτυχία.",
+            'message' => "Η κράτησή σας για το μάθημα \"" . $className . "\" " .
+                        "στις " . $classDate . " " .
+                        "στις " . $classTime . " επιβεβαιώθηκε με επιτυχία.",
             'booking_id' => $this->booking->id,
-            'class_id' => $this->booking->gymClass->id,
-            'class_name' => $this->booking->gymClass->name,
-            'class_date' => $this->booking->gymClass->date->format('Y-m-d'),
-            'class_time' => $this->booking->gymClass->time,
-            'instructor_name' => $this->booking->gymClass->instructor->name ?? null,
+            'class_id' => $gymClass ? $gymClass->id : null,
+            'class_name' => $className,
+            'class_date' => $gymClass && $gymClass->date ? $gymClass->date->format('Y-m-d') : ($this->booking->date ?? null),
+            'class_time' => $classTime,
+            'instructor_name' => $instructorName ?? ($this->booking->instructor ?? null),
             'booking_status' => $this->booking->status,
             'action_url' => '/bookings/' . $this->booking->id,
             'icon' => 'calendar-check',

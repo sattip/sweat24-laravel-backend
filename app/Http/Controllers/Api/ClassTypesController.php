@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ClassTypesController extends Controller
@@ -125,9 +126,18 @@ class ClassTypesController extends Controller
             'value' => 'required|string|max:255|unique:class_types,value',
             'description' => 'nullable|string',
             'color' => 'nullable|string|max:50',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'boolean',
             'sort_order' => 'integer|min:0',
         ]);
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $filename = 'class-type-' . time() . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
+            $path = $image->storeAs('class-types', $filename, 'public');
+            $validated['image'] = '/storage/' . $path;
+        }
 
         $classType = ClassType::create($validated);
 
@@ -169,9 +179,33 @@ class ClassTypesController extends Controller
             ],
             'description' => 'nullable|string',
             'color' => 'nullable|string|max:50',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'boolean',
             'sort_order' => 'integer|min:0',
         ]);
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($classType->image) {
+                $oldPath = str_replace('/storage/', '', $classType->image);
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $image = $request->file('image');
+            $filename = 'class-type-' . time() . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
+            $path = $image->storeAs('class-types', $filename, 'public');
+            $validated['image'] = '/storage/' . $path;
+        }
+
+        // Handle image removal
+        if ($request->has('remove_image') && $request->remove_image) {
+            if ($classType->image) {
+                $oldPath = str_replace('/storage/', '', $classType->image);
+                Storage::disk('public')->delete($oldPath);
+            }
+            $validated['image'] = null;
+        }
 
         $classType->update($validated);
 

@@ -14,11 +14,19 @@ return new class extends Migration
         // Change registration_status to string for flexibility
         Schema::table('users', function (Blueprint $table) {
             $table->string('registration_status')->default('pending_approval')->change();
-            $table->timestamp('approved_at')->nullable()->after('registration_completed_at');
-            $table->unsignedBigInteger('approved_by')->nullable()->after('approved_at');
-            $table->foreign('approved_by')->references('id')->on('users')->onDelete('set null');
+
+            // Only add approved_at if it doesn't exist
+            if (!Schema::hasColumn('users', 'approved_at')) {
+                $table->timestamp('approved_at')->nullable()->after('registration_completed_at');
+            }
+
+            // Only add approved_by if it doesn't exist
+            if (!Schema::hasColumn('users', 'approved_by')) {
+                $table->unsignedBigInteger('approved_by')->nullable()->after('approved_at');
+                $table->foreign('approved_by')->references('id')->on('users')->onDelete('set null');
+            }
         });
-        
+
         // Update existing users
         \DB::table('users')
             ->where('registration_status', 'pending_terms')

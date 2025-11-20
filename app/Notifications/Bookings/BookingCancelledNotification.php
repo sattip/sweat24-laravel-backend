@@ -40,12 +40,25 @@ class BookingCancelledNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $gymClass = $this->booking->gymClass;
+
+        // Handle instructor data - it might be a string or an object
+        $instructorName = 'TBA';
+        if ($gymClass) {
+            if ($gymClass->instructor instanceof \App\Models\Instructor) {
+                $instructorName = $gymClass->instructor->name;
+            } elseif (is_string($gymClass->instructor)) {
+                $instructorName = $gymClass->instructor;
+            }
+        }
+
         return (new MailMessage)
             ->subject('Booking Cancelled - Sweat93')
             ->view('emails.bookings.booking-cancelled', [
-                'booking' => $this->booking->load('gymClass.instructor'),
+                'booking' => $this->booking,
                 'user' => $notifiable,
-                'gymClass' => $this->booking->gymClass,
+                'gymClass' => $gymClass,
+                'instructorName' => $instructorName,
                 'reason' => $this->reason,
                 'cancelledBy' => $this->cancelledBy,
             ]);
@@ -56,8 +69,23 @@ class BookingCancelledNotification extends Notification implements ShouldQueue
      */
     public function toDatabase(object $notifiable): array
     {
-        $message = "Η κράτησή σας για το μάθημα \"{$this->booking->gymClass->name}\" στις {$this->booking->gymClass->date->format('d/m/Y')} στις {$this->booking->gymClass->time} ακυρώθηκε.";
-        
+        $gymClass = $this->booking->gymClass;
+        $className = $gymClass ? $gymClass->name : 'Μάθημα';
+        $classDate = $gymClass && $gymClass->date ? $gymClass->date->format('d/m/Y') : 'TBA';
+        $classTime = $gymClass ? $gymClass->time : 'TBA';
+
+        // Handle instructor name safely
+        $instructorName = null;
+        if ($gymClass) {
+            if ($gymClass->instructor instanceof \App\Models\Instructor) {
+                $instructorName = $gymClass->instructor->name;
+            } elseif (is_string($gymClass->instructor)) {
+                $instructorName = $gymClass->instructor;
+            }
+        }
+
+        $message = "Η κράτησή σας για το μάθημα \"" . $className . "\" στις " . $classDate . " στις " . $classTime . " ακυρώθηκε.";
+
         if ($this->reason) {
             $message .= " Λόγος: {$this->reason}";
         }
@@ -66,11 +94,11 @@ class BookingCancelledNotification extends Notification implements ShouldQueue
             'title' => 'Ακύρωση κράτησης',
             'message' => $message,
             'booking_id' => $this->booking->id,
-            'class_id' => $this->booking->gymClass->id,
-            'class_name' => $this->booking->gymClass->name,
-            'class_date' => $this->booking->gymClass->date->format('Y-m-d'),
-            'class_time' => $this->booking->gymClass->time,
-            'instructor_name' => $this->booking->gymClass->instructor->name ?? null,
+            'class_id' => $gymClass ? $gymClass->id : null,
+            'class_name' => $className,
+            'class_date' => $gymClass && $gymClass->date ? $gymClass->date->format('Y-m-d') : null,
+            'class_time' => $classTime,
+            'instructor_name' => $instructorName,
             'booking_status' => $this->booking->status,
             'cancellation_reason' => $this->reason,
             'cancelled_by' => $this->cancelledBy,

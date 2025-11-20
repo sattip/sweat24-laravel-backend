@@ -302,7 +302,21 @@ class AdminController extends Controller
                 'guardian_details' => null,
                 'medical_history' => null,
                 'found_us_via' => null,
+                'trainer_notes' => $user->trainer_notes,
+                'discontinuation_notes' => $user->discontinuation_notes,
+
+                // Priority Booking fields
+                'has_priority_booking' => $user->has_priority_booking,
+                'priority_booking_expires_at' => $user->priority_booking_expires_at ? $user->priority_booking_expires_at->format('Y-m-d') : null,
+                'priority_booking_hours_advance' => $user->priority_booking_hours_advance,
             ];
+
+            \Log::info('getUserFullProfile response', [
+                'user_id' => $userId,
+                'has_trainer_notes' => !empty($user->trainer_notes),
+                'trainer_notes_length' => strlen($user->trainer_notes ?? ''),
+                'trainer_notes_preview' => substr($user->trainer_notes ?? '', 0, 100),
+            ]);
 
             // Add user's signature URL if exists
             $userSignature = $user->signatures()
@@ -346,7 +360,7 @@ class AdminController extends Controller
 
             // Add medical history (ALWAYS present)
             $medicalHistoryData = $user->medical_history ? json_decode($user->medical_history, true) : [];
-            
+
             $response['medical_history'] = [
                 'has_ems_interest' => $user->ems_interest ?? false,
                 'ems_contraindications' => $user->ems_contraindications ?? [],
@@ -362,6 +376,9 @@ class AdminController extends Controller
                 ],
                 'submitted_at' => $medicalHistoryData['submitted_at'] ?? null
             ];
+
+            // Add doctor_certificate_path to response root level for frontend access
+            $response['doctor_certificate_path'] = $user->doctor_certificate_path;
 
             // Add referral/how found us information
             if ($user->found_us_via) {
@@ -396,6 +413,38 @@ class AdminController extends Controller
 
                 $response['found_us_via'] = $foundUsData;
             }
+
+            // Add custom packages information
+            $customPackages = $user->customPackages()
+                ->with(['package.service'])
+                ->orderBy('custom_assigned_at', 'desc')
+                ->get()
+                ->map(function ($userPackage) {
+                    return [
+                        'id' => $userPackage->id,
+                        'package_name' => $userPackage->package->name,
+                        'service_name' => $userPackage->package->service->name,
+                        'custom_price' => $userPackage->custom_price,
+                        'custom_sessions' => $userPackage->custom_sessions,
+                        'custom_duration_days' => $userPackage->custom_duration_days,
+                        'remaining_sessions' => $userPackage->remaining_sessions,
+                        'expiry_date' => $userPackage->expiry_date,
+                        'status' => $userPackage->status,
+                        'assigned_by' => $userPackage->assigned_by,
+                        'assigned_at' => $userPackage->custom_assigned_at,
+                        'custom_notes' => $userPackage->custom_notes,
+                        'savings' => $userPackage->getSavings(),
+                        'original_price' => $userPackage->package->price,
+                        'original_sessions' => $userPackage->package->sessions,
+                    ];
+                });
+
+            $response['custom_packages'] = [
+                'has_custom_treatment' => $customPackages->count() > 0,
+                'total_custom_packages' => $customPackages->count(),
+                'packages' => $customPackages,
+                'total_savings' => $customPackages->sum('savings'),
+            ];
 
             return $this->successResponse($response);
 
