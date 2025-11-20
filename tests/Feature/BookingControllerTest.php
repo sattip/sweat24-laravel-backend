@@ -51,8 +51,8 @@ class BookingControllerTest extends TestCase
             'duration' => 30,
             'description' => 'Test package',
             'price' => 100,
-            'credits' => 10,
-            'active' => true
+            'sessions' => 10,
+            'status' => 'active'
         ]);
 
         $this->userPackage = UserPackage::create([

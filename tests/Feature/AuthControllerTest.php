@@ -41,15 +41,16 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
+                'success',
+                'message',
                 'user' => [
                     'id',
                     'name',
                     'email',
-                    'phone',
-                    'created_at',
-                    'updated_at'
-                ],
-                'token'
+                    'membership_type',
+                    'registration_status',
+                    'status'
+                ]
             ]);
 
         $this->assertDatabaseHas('users', [
@@ -79,7 +80,9 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
+            'status' => 'active',
+            'registration_status' => 'approved'
         ]);
 
         $response = $this->postJson('/api/v1/auth/login', [
@@ -89,6 +92,8 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
+                'success',
+                'message',
                 'user' => [
                     'id',
                     'name',
@@ -102,7 +107,9 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
+            'status' => 'active',
+            'registration_status' => 'approved'
         ]);
 
         $response = $this->postJson('/api/v1/auth/login', [
@@ -110,10 +117,8 @@ class AuthControllerTest extends TestCase
             'password' => 'wrongpassword'
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson([
-                'message' => 'Invalid credentials'
-            ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
     }
 
     public function test_authenticated_user_can_logout()
@@ -125,7 +130,8 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Successfully logged out'
+                'success' => true,
+                'message' => 'Logged out successfully'
             ]);
     }
 
@@ -145,9 +151,12 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email
+                'success' => true,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email
+                ]
             ]);
     }
 

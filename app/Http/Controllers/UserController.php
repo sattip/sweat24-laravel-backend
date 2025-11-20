@@ -11,6 +11,11 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
+        // Only admin can list all users
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         $query = User::query();
         
         if ($request->has('search')) {
@@ -37,6 +42,11 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        // Only admin can create users
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
@@ -54,8 +64,13 @@ class UserController extends Controller
         return response()->json($user, 201);
     }
 
-    public function show(User $user)
+    public function show(Request $request, User $user)
     {
+        // Only admin or the user themselves can view
+        if ($request->user()->role !== 'admin' && $request->user()->id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         $userData = $user->load('packages', 'bookings', 'activityLogs', 'parentConsent')->toArray();
         
         // Ensure medical_history is decoded as JSON object, not string
@@ -68,6 +83,11 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        // Only admin or the user themselves can update
+        if ($request->user()->role !== 'admin' && $request->user()->id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
@@ -109,8 +129,13 @@ class UserController extends Controller
         return response()->json($user->load('packages', 'bookings'));
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
+        // Only admin can delete users
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         $user->delete();
         
         return response()->json(['message' => 'User deleted successfully']);
