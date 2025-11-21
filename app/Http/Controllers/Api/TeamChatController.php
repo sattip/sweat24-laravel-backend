@@ -85,7 +85,6 @@ class TeamChatController extends Controller
         // Consider users online if they were active in the last 5 minutes
         $users = User::whereIn('role', ['admin', 'trainer'])
                      ->where('status', 'active')
-                     ->where('membership_type', 'Admin') // Ensure they can access team chat
                      ->select('id', 'name', 'role', 'last_seen')
                      ->orderBy('last_seen', 'desc')
                      ->get()
@@ -130,7 +129,6 @@ class TeamChatController extends Controller
             'messages_today' => TeamChatMessage::whereDate('created_at', today())->count(),
             'active_users' => User::whereIn('role', ['admin', 'trainer'])
                                   ->where('status', 'active')
-                                  ->where('membership_type', 'Admin')
                                   ->where('last_seen', '>=', now()->subMinutes(5))
                                   ->count(),
             'recent_activity' => TeamChatMessage::where('created_at', '>=', now()->subHours(24))
@@ -145,9 +143,8 @@ class TeamChatController extends Controller
 
     private function canAccessTeamChat(User $user): bool
     {
-        return $user && 
-               ($user->role === 'admin' || $user->role === 'trainer') && 
-               $user->membership_type === 'Admin' &&
+        return $user &&
+               ($user->role === 'admin' || $user->role === 'trainer') &&
                $user->status === 'active';
     }
 

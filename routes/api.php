@@ -234,8 +234,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('users/search/by-phone', [UserController::class, 'searchByPhone']);
     Route::get('users/{id}/referral-info', [UserController::class, 'getUserReferralInfo']);
 
-    // Packages (Admin management)
-    Route::apiResource('packages', PackageController::class)->except(['index', 'show'])->middleware('role:admin');
+    // Packages (Admin and Trainer management)
+    Route::apiResource('packages', PackageController::class)->except(['index', 'show'])->middleware('role:admin,trainer');
 
     // Bookings (authenticated routes)
     // Specific routes must be defined BEFORE apiResource to avoid conflicts
@@ -445,13 +445,19 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         // Hard delete a user package for a specific user (admin only)
         Route::delete('admin/users/{userId}/packages/{userPackageId}', [\App\Http\Controllers\Admin\UserPackageController::class, 'destroy']);
         
-        // Admin Progress Photos Routes
-        Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
+        // Admin Progress Photos Routes (Delete only - admin only)
         Route::delete('admin/progress-photos/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'adminDestroy']);
-        
-        // Admin Body Measurements Routes
+    });
+
+    // Progress Photos and Measurements Routes (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
         Route::get('admin/users/{userId}/measurements', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserMeasurements']);
         Route::get('admin/users/{userId}/measurements/latest', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserLatestMeasurement']);
+    });
+
+    // Continue Admin only routes
+    Route::middleware(['role:admin'])->group(function () {
 
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);
@@ -570,13 +576,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('notifications/{recipient}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     
-    Route::middleware(['role:admin'])->group(function () {
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('notifications', NotificationController::class);
         Route::post('notifications/{notification}/send', [NotificationController::class, 'send']);
         Route::post('notifications/preview-recipients', [NotificationController::class, 'previewRecipients']);
         Route::get('notifications/statistics', [NotificationController::class, 'statistics']);
         Route::get('notifications/types', [NotificationController::class, 'getTypes']);
-        
+
         // Notification filters
         Route::apiResource('notification-filters', NotificationFilterController::class);
         Route::get('notification-filters/{filter}/preview', [NotificationFilterController::class, 'previewRecipients']);

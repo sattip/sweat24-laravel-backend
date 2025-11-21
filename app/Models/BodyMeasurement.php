@@ -73,7 +73,7 @@ class BodyMeasurement extends Model
      */
     public function getFormattedDateAttribute()
     {
-        return $this->measurement_date->format('Y-m-d');
+        return $this->measurement_date ? $this->measurement_date->format('Y-m-d') : null;
     }
 
     /**
