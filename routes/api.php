@@ -361,8 +361,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('classes/{class}/waitlist/status', [WaitlistController::class, 'status']);
     Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin,trainer');
     
-    // Financial Features (Admin only)
-    Route::middleware(['role:admin'])->group(function () {
+    // Financial Features (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('payment-installments', PaymentInstallmentController::class);
         Route::apiResource('cash-register', CashRegisterEntryController::class);
         Route::apiResource('business-expenses', BusinessExpenseController::class);
@@ -395,14 +395,20 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('admin/store/products/{id}', [\App\Http\Controllers\StoreProductController::class, 'destroy']);
         Route::post('admin/store/upload-image', [ImageUploadController::class, 'uploadProductImage']);
 
-        // Admin Class Types Management
+    });
+
+    // Class Types Management (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::get('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'index']);
         Route::post('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'store']);
         Route::get('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'show']);
         Route::post('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'update']);
         Route::delete('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'destroy']);
         Route::post('admin/class-types/reorder', [\App\Http\Controllers\Api\ClassTypesController::class, 'reorder']);
+    });
 
+    // Admin only routes
+    Route::middleware(['role:admin'])->group(function () {
         // Admin Events Management
         Route::get('admin/events', [EventController::class, 'adminIndex']);
         Route::get('admin/event-rsvps', [EventController::class, 'adminGetAllRsvps']);
@@ -741,6 +747,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('team-chat')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('messages', [TeamChatController::class, 'getMessages']);
         Route::post('messages', [TeamChatController::class, 'sendMessage']);
+        Route::post('upload', [TeamChatController::class, 'uploadFile']);
         Route::get('online-users', [TeamChatController::class, 'getOnlineUsers']);
         Route::get('stats', [TeamChatController::class, 'getStats']);
         Route::delete('messages/{message}', [TeamChatController::class, 'deleteMessage']);
