@@ -676,6 +676,32 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
+    // Exercise Muscle Groups Routes
+    Route::prefix('exercise-muscle-groups')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'active']);
+
+        // Admin/Trainer routes for managing muscle groups
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'store']);
+            Route::put('/{muscleGroup}', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'update']);
+            Route::delete('/{muscleGroup}', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'destroy']);
+        });
+    });
+
+    // Exercise Categories Routes
+    Route::prefix('exercise-categories')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'active']);
+
+        // Admin/Trainer routes for managing categories
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'store']);
+            Route::put('/{category}', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'update']);
+            Route::delete('/{category}', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'destroy']);
+        });
+    });
+
     // Training Sessions Routes (Admin & Trainer)
     Route::prefix('training-sessions')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
