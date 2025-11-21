@@ -707,6 +707,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
         Route::get('/user/{userId}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
         Route::get('/user/{userId}/analytics', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'analytics']);
+        Route::get('/user/{userId}/enhanced-analytics', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'enhancedAnalytics']);
+        Route::get('/user/{userId}/alerts', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'alerts']);
         Route::post('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'store']);
         Route::get('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'show']);
         Route::put('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'update']);
