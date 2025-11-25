@@ -324,7 +324,7 @@ class AnalyticsController extends Controller
             ->whereDate('assigned_date', '<=', $endDate);
 
         // Get usage statistics
-        $packages = $query->with('package:id,name,sessions,type')->get();
+        $packages = $query->with('package:id,name,sessions,class_type')->get();
 
         $totalPackages = $packages->count();
         $totalSessions = $packages->sum('total_sessions');
@@ -333,8 +333,8 @@ class AnalyticsController extends Controller
         });
         $avgUsageRate = $totalSessions > 0 ? round(($usedSessions / $totalSessions) * 100, 1) : 0;
 
-        // By package type
-        $byType = $packages->groupBy(fn($pkg) => $pkg->package?->type ?? 'unknown')
+        // By package type (using class_type field)
+        $byType = $packages->groupBy(fn($pkg) => $pkg->package?->class_type ?? 'Γενικό')
             ->map(function ($group, $type) {
                 $total = $group->sum('total_sessions');
                 $used = $group->sum(fn($pkg) => $pkg->total_sessions - $pkg->remaining_sessions);
