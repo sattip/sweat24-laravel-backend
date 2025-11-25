@@ -1183,6 +1183,29 @@ Route::prefix('v1/admin/points')->group(function () {
     Route::apiResource('rewards', \App\Http\Controllers\Api\PointsRewardsController::class);
 });
 
+// ============ PAYROLL AGREEMENTS ROUTES ============
+
+// Admin Payroll Agreements Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/payroll-agreements')->group(function () {
+    // List all agreements
+    Route::get('/', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'index']);
+
+    // Create new agreement
+    Route::post('/', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'store']);
+
+    // Get summary for instructor
+    Route::get('/instructor/{instructorId}/summary', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'summary']);
+
+    // Update agreement
+    Route::put('/{payrollAgreement}', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'update']);
+
+    // Toggle active status
+    Route::post('/{payrollAgreement}/toggle-active', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'toggleActive']);
+
+    // Delete agreement
+    Route::delete('/{payrollAgreement}', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'destroy']);
+});
+
 // ============ CHURN FEEDBACK ROUTES ============
 
 // Mobile App routes (for users to respond to churn surveys)
