@@ -535,22 +535,22 @@ class AnalyticsController extends Controller
             SUM(CASE WHEN would_recommend = 1 THEN 1 ELSE 0 END) as would_recommend_count
         ")->first();
 
-        // By instructor
+        // By instructor (using instructor name from gym_classes)
         $byInstructor = ClassEvaluation::where('is_submitted', true)
             ->whereDate('submitted_at', '>=', $startDate)
             ->whereDate('submitted_at', '<=', $endDate)
-            ->join('gym_classes', 'class_evaluations.gym_class_id', '=', 'gym_classes.id')
-            ->join('instructors', 'gym_classes.instructor_id', '=', 'instructors.id')
-            ->when($instructorId, fn($q) => $q->where('instructors.id', $instructorId))
+            ->join('gym_classes', 'class_evaluations.class_id', '=', 'gym_classes.id')
+            ->whereNotNull('gym_classes.instructor')
+            ->when($instructorId, fn($q) => $q->where('gym_classes.instructor', $instructorId))
             ->selectRaw("
-                instructors.id as instructor_id,
-                instructors.name as instructor_name,
+                gym_classes.instructor as instructor_id,
+                gym_classes.instructor as instructor_name,
                 AVG(class_evaluations.overall_rating) as avg_overall,
                 AVG(class_evaluations.instructor_rating) as avg_instructor,
                 AVG(class_evaluations.facility_rating) as avg_facility,
                 COUNT(*) as total_reviews
             ")
-            ->groupBy('instructors.id', 'instructors.name')
+            ->groupBy('gym_classes.instructor')
             ->orderByDesc('avg_overall')
             ->get();
 
@@ -558,18 +558,18 @@ class AnalyticsController extends Controller
         $byService = ClassEvaluation::where('is_submitted', true)
             ->whereDate('submitted_at', '>=', $startDate)
             ->whereDate('submitted_at', '<=', $endDate)
-            ->join('gym_classes', 'class_evaluations.gym_class_id', '=', 'gym_classes.id')
-            ->join('services', 'gym_classes.service_id', '=', 'services.id')
+            ->join('gym_classes', 'class_evaluations.class_id', '=', 'gym_classes.id')
+            ->leftJoin('services', 'gym_classes.service_id', '=', 'services.id')
             ->when($serviceId, fn($q) => $q->where('services.id', $serviceId))
             ->selectRaw("
-                services.id as service_id,
-                services.name as service_name,
+                COALESCE(services.id, 0) as service_id,
+                COALESCE(services.name, gym_classes.type) as service_name,
                 AVG(class_evaluations.overall_rating) as avg_overall,
                 AVG(class_evaluations.instructor_rating) as avg_instructor,
                 AVG(class_evaluations.facility_rating) as avg_facility,
                 COUNT(*) as total_reviews
             ")
-            ->groupBy('services.id', 'services.name')
+            ->groupBy('services.id', 'services.name', 'gym_classes.type')
             ->orderByDesc('avg_overall')
             ->get();
 
