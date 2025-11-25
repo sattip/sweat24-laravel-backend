@@ -702,6 +702,20 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
+    // Exercise Equipment Routes
+    Route::prefix('exercise-equipment')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'active']);
+
+        // Admin/Trainer routes for managing equipment
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'store']);
+            Route::get('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'show']);
+            Route::put('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'update']);
+            Route::delete('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'destroy']);
+        });
+    });
+
     // Training Sessions Routes (Admin & Trainer)
     Route::prefix('training-sessions')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
