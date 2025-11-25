@@ -207,12 +207,12 @@ class ChurnFeedbackController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Filter by date range
+        // Filter by date range - use whereDate for SQLite compatibility
         if ($request->has('from_date')) {
-            $query->where('expired_at', '>=', $request->from_date);
+            $query->whereDate('expired_at', '>=', $request->from_date);
         }
         if ($request->has('to_date')) {
-            $query->where('expired_at', '<=', $request->to_date);
+            $query->whereDate('expired_at', '<=', $request->to_date);
         }
 
         // Filter by responded
@@ -249,8 +249,9 @@ class ChurnFeedbackController extends Controller
         $fromDate = $request->input('from_date', now()->subMonths(3)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
 
-        // Base query for date range
-        $baseQuery = ChurnFeedback::whereBetween('expired_at', [$fromDate, $toDate]);
+        // Base query for date range - use whereDate for proper SQLite compatibility
+        $baseQuery = ChurnFeedback::whereDate('expired_at', '>=', $fromDate)
+            ->whereDate('expired_at', '<=', $toDate);
 
         // Total counts
         $totalExpired = (clone $baseQuery)->count();
@@ -267,7 +268,8 @@ class ChurnFeedbackController extends Controller
 
         // Return after pause rate
         $pausedThatReturned = ChurnFeedback::where('status', ChurnFeedback::STATUS_PAUSE)
-            ->whereBetween('expired_at', [$fromDate, $toDate])
+            ->whereDate('expired_at', '>=', $fromDate)
+            ->whereDate('expired_at', '<=', $toDate)
             ->whereHas('user', function ($q) {
                 $q->whereHas('userPackages', function ($pq) {
                     $pq->where('status', 'active');
@@ -333,16 +335,16 @@ class ChurnFeedbackController extends Controller
                 return $item;
             });
 
-        // Monthly trends (last 6 months)
+        // Monthly trends (last 6 months) - use strftime for SQLite compatibility
         $monthlyTrends = ChurnFeedback::select(
-            DB::raw("DATE_FORMAT(expired_at, '%Y-%m') as month"),
+            DB::raw("strftime('%Y-%m', expired_at) as month"),
             DB::raw('COUNT(*) as total'),
             DB::raw("SUM(CASE WHEN status = 'churn' THEN 1 ELSE 0 END) as churned"),
             DB::raw("SUM(CASE WHEN status = 'pause' THEN 1 ELSE 0 END) as paused"),
             DB::raw("SUM(CASE WHEN status = 'renewed' THEN 1 ELSE 0 END) as renewed"),
             DB::raw('AVG(return_intent_score) as avg_return_intent')
         )
-            ->where('expired_at', '>=', now()->subMonths(6))
+            ->whereDate('expired_at', '>=', now()->subMonths(6)->toDateString())
             ->groupBy('month')
             ->orderBy('month')
             ->get();
@@ -353,7 +355,8 @@ class ChurnFeedbackController extends Controller
             $reasonField = "reason_{$reason}";
             $avgIntent = ChurnFeedback::where($reasonField, true)
                 ->whereNotNull('future_return_intent')
-                ->whereBetween('expired_at', [$fromDate, $toDate])
+                ->whereDate('expired_at', '>=', $fromDate)
+                ->whereDate('expired_at', '<=', $toDate)
                 ->get();
 
             if ($avgIntent->count() > 0) {

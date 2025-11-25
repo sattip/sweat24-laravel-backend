@@ -1237,3 +1237,42 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/churn-feedba
     // Analytics & Statistics
     Route::get('/analytics/summary', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'analytics']);
 });
+
+// ============ WELLNESS SCORE ROUTES ============
+
+// Mobile App Wellness Routes (for users to submit daily wellness checks)
+Route::prefix('v1/wellness')->group(function () {
+    // Get today's wellness score (supports user_id param or auth token)
+    Route::get('/today', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getToday']);
+
+    // Submit daily wellness score
+    Route::post('/submit', [\App\Http\Controllers\Api\WellnessScoreController::class, 'submit']);
+
+    // Get wellness history
+    Route::get('/history', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getHistory']);
+
+    // Get current threshold settings (for mobile app to show color indicators)
+    Route::get('/thresholds', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getThresholds']);
+});
+
+// Admin Wellness Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/wellness')->group(function () {
+    // List all wellness scores with filters
+    Route::get('/', [\App\Http\Controllers\Api\WellnessScoreController::class, 'adminIndex']);
+
+    // Get users missing today's submission
+    Route::get('/missing', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getMissingSubmissions']);
+
+    // Get users with alerts (orange/red)
+    Route::get('/alerts', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getUsersWithAlerts']);
+
+    // Get single user's wellness detail
+    Route::get('/user/{userId}', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getUserWellness']);
+
+    // Threshold management
+    Route::get('/thresholds', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getThresholdsAdmin']);
+    Route::put('/thresholds/{threshold}', [\App\Http\Controllers\Api\WellnessScoreController::class, 'updateThreshold']);
+
+    // Analytics
+    Route::get('/analytics', [\App\Http\Controllers\Api\WellnessScoreController::class, 'analytics']);
+});
