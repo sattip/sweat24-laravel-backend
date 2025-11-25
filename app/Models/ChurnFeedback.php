@@ -21,6 +21,7 @@ class ChurnFeedback extends Model
         'responded_at',
         'status',
         'survey_type',
+        'trigger_source',
         'reasons',
         'reason_will_continue',
         'reason_price_value',

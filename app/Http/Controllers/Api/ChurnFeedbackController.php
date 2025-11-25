@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ChurnFeedbackSurvey;
 use App\Models\ChurnFeedback;
 use App\Models\UserPackage;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class ChurnFeedbackController extends Controller
 {
@@ -411,5 +413,81 @@ class ChurnFeedbackController extends Controller
         ChurnFeedback::where('user_id', $userId)
             ->whereIn('status', [ChurnFeedback::STATUS_PENDING, ChurnFeedback::STATUS_PAUSE])
             ->update(['status' => ChurnFeedback::STATUS_RENEWED]);
+    }
+
+    /**
+     * Trigger churn feedback for a user manually (admin action).
+     * This is used when admin clicks "Επιθυμεί Διακοπή" button.
+     */
+    public function triggerForUser(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $userId = $validated['user_id'];
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ο χρήστης δεν βρέθηκε'
+            ], 404);
+        }
+
+        // Check if there's already a pending feedback for this user
+        $existingPending = ChurnFeedback::where('user_id', $userId)
+            ->where('status', ChurnFeedback::STATUS_PENDING)
+            ->whereNull('responded_at')
+            ->first();
+
+        if ($existingPending) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Υπάρχει ήδη ενεργό ερωτηματολόγιο αποχώρησης για αυτόν τον χρήστη',
+                'data' => $existingPending
+            ], 400);
+        }
+
+        // Get the user's active or most recent package
+        $userPackage = UserPackage::where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        // Create the churn feedback record
+        $feedback = ChurnFeedback::create([
+            'user_id' => $userId,
+            'user_package_id' => $userPackage?->id,
+            'expired_at' => now(),
+            'sent_at' => now(),
+            'status' => ChurnFeedback::STATUS_PENDING,
+            'comment' => $validated['notes'] ?? null,
+            'trigger_source' => 'admin_manual', // Mark that this was triggered manually
+        ]);
+
+        // Send email notification to user
+        $emailSent = false;
+        if ($user->email) {
+            try {
+                Mail::to($user->email)->send(new ChurnFeedbackSurvey($user, $feedback));
+                $emailSent = true;
+            } catch (\Exception $e) {
+                // Log the error but don't fail the request
+                \Log::error('Failed to send churn feedback email: ' . $e->getMessage(), [
+                    'user_id' => $userId,
+                    'feedback_id' => $feedback->id,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $emailSent
+                ? 'Το ερωτηματολόγιο αποχώρησης στάλθηκε επιτυχώς στον χρήστη (και με email)'
+                : 'Το ερωτηματολόγιο αποχώρησης δημιουργήθηκε (χωρίς email - δεν υπάρχει email χρήστη ή απέτυχε η αποστολή)',
+            'data' => $feedback,
+            'email_sent' => $emailSent
+        ]);
     }
 }

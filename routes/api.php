@@ -1205,6 +1205,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/churn-feedba
     // List all feedback
     Route::get('/', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'index']);
 
+    // Trigger churn feedback for user manually
+    Route::post('/trigger', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'triggerForUser']);
+
     // Get single feedback detail
     Route::get('/{churnFeedback}', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'show']);
 
