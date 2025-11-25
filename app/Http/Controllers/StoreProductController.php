@@ -57,6 +57,7 @@ class StoreProductController extends Controller
             'stock_quantity' => 'nullable|integer|min:0',
             'original_price' => 'nullable|numeric|min:0',
             'display_order' => 'nullable|integer',
+            'is_preorder' => 'boolean',
         ]);
 
         $product = StoreProduct::create($validated);
@@ -78,6 +79,7 @@ class StoreProductController extends Controller
             'original_price' => 'nullable|numeric|min:0',
             'display_order' => 'nullable|integer',
             'is_active' => 'sometimes|boolean',
+            'is_preorder' => 'sometimes|boolean',
         ]);
 
         $storeProduct->update($validated);

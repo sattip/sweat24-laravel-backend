@@ -1182,3 +1182,32 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1/admin/points')->group(function () {
     Route::apiResource('rewards', \App\Http\Controllers\Api\PointsRewardsController::class);
 });
+
+// ============ CHURN FEEDBACK ROUTES ============
+
+// Mobile App routes (for users to respond to churn surveys)
+Route::prefix('v1/churn-feedback')->group(function () {
+    // Get pending survey for user (supports user_id param or auth token)
+    Route::get('/pending', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'getPendingSurvey']);
+
+    // Submit quick response (single reason)
+    Route::post('/quick-response', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitQuickResponse']);
+
+    // Submit full mini survey
+    Route::post('/mini-survey', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitMiniSurvey']);
+
+    // Opt-out from surveys
+    Route::post('/opt-out', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'optOut']);
+});
+
+// Admin Churn Feedback Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/churn-feedback')->group(function () {
+    // List all feedback
+    Route::get('/', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'index']);
+
+    // Get single feedback detail
+    Route::get('/{churnFeedback}', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'show']);
+
+    // Analytics & Statistics
+    Route::get('/analytics/summary', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'analytics']);
+});
