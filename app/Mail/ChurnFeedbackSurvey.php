@@ -15,6 +15,7 @@ class ChurnFeedbackSurvey extends Mailable
     public User $user;
     public ChurnFeedback $feedback;
     public string $surveyUrl;
+    public string $webSurveyUrl;
 
     /**
      * Create a new message instance.
@@ -24,8 +25,9 @@ class ChurnFeedbackSurvey extends Mailable
         $this->user = $user;
         $this->feedback = $feedback;
         // Deep link to open the survey in the mobile app
-        // sweat93://churn-survey/{id} format for app deep linking
         $this->surveyUrl = 'sweat93://churn-survey/' . $feedback->id;
+        // Web URL for browser access
+        $this->webSurveyUrl = config('app.url') . '/survey/churn/' . $feedback->id;
     }
 
     /**

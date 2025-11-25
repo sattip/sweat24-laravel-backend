@@ -187,6 +187,15 @@ Route::prefix('admin')->group(function () {
     });
 });
 
+// ============ CHURN SURVEY WEB ROUTES ============
+// Public routes for churn survey (accessed via email link)
+Route::prefix('survey')->group(function () {
+    Route::get('/churn/{token}', [App\Http\Controllers\ChurnSurveyController::class, 'show'])->name('churn-survey.show');
+    Route::post('/churn/{token}', [App\Http\Controllers\ChurnSurveyController::class, 'submit'])->name('churn-survey.submit');
+    Route::get('/churn/{token}/opt-out', [App\Http\Controllers\ChurnSurveyController::class, 'optOut'])->name('churn-survey.opt-out');
+    Route::get('/thank-you', [App\Http\Controllers\ChurnSurveyController::class, 'thankYou'])->name('churn-survey.thank-you');
+});
+
 // Client/Member Routes
 Route::prefix('client')->middleware(['auth'])->group(function () {
     // Dashboard

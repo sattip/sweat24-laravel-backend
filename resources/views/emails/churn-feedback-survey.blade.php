@@ -17,7 +17,28 @@
         </p>
     </div>
 
-    <h2>Πώς να απαντήσεις:</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+        <tr>
+            <td align="center">
+                <a href="{{ $webSurveyUrl }}"
+                   style="display: inline-block; background-color: #c41e3a; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; mso-padding-alt: 0;">
+                    <!--[if mso]>
+                    <i style="letter-spacing: 40px; mso-font-width: -100%; mso-text-raise: 30pt;">&nbsp;</i>
+                    <![endif]-->
+                    <span style="mso-text-raise: 15pt;">Συμπλήρωσε το Ερωτηματολόγιο</span>
+                    <!--[if mso]>
+                    <i style="letter-spacing: 40px; mso-font-width: -100%;">&nbsp;</i>
+                    <![endif]-->
+                </a>
+            </td>
+        </tr>
+    </table>
+
+    <p style="text-align: center; font-size: 12px; color: #666;">
+        Ή αντέγραψε αυτό το link: <a href="{{ $webSurveyUrl }}" style="color: #c41e3a;">{{ $webSurveyUrl }}</a>
+    </p>
+
+    <h2>Εναλλακτικά:</h2>
 
     <div class="alert alert-success">
         <strong>Μέσω της εφαρμογής Sweat93:</strong><br>
@@ -49,5 +70,9 @@
     <p>
         Με εκτίμηση,<br>
         <strong>Η ομάδα του Sweat93</strong>
+    </p>
+
+    <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">
+        <a href="{{ $webSurveyUrl }}/opt-out" style="color: #999;">Δεν θέλω να λαμβάνω τέτοια μηνύματα</a>
     </p>
 @endsection
