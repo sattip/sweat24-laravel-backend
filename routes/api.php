@@ -1276,3 +1276,41 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/wellness')->
     // Analytics
     Route::get('/analytics', [\App\Http\Controllers\Api\WellnessScoreController::class, 'analytics']);
 });
+
+// ============ COMPREHENSIVE ANALYTICS ROUTES ============
+
+// Admin Analytics Dashboard (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/analytics')->group(function () {
+    // Dashboard overview
+    Route::get('/dashboard', [\App\Http\Controllers\Api\AnalyticsController::class, 'dashboard']);
+
+    // Marketing source analytics (how customers found us)
+    Route::get('/marketing', [\App\Http\Controllers\Api\AnalyticsController::class, 'marketingSource']);
+
+    // Attendance statistics by service/day/week/month
+    Route::get('/attendance', [\App\Http\Controllers\Api\AnalyticsController::class, 'attendanceStats']);
+
+    // Group class capacity analytics (occupancy, cancellation rates)
+    Route::get('/capacity', [\App\Http\Controllers\Api\AnalyticsController::class, 'classCapacity']);
+
+    // Package usage statistics
+    Route::get('/packages', [\App\Http\Controllers\Api\AnalyticsController::class, 'packageUsage']);
+
+    // Demographics analytics (gender, age groups)
+    Route::get('/demographics', [\App\Http\Controllers\Api\AnalyticsController::class, 'demographics']);
+
+    // Service type distribution (EMS, Pilates, Personal, Group, Functional)
+    Route::get('/services', [\App\Http\Controllers\Api\AnalyticsController::class, 'serviceDistribution']);
+
+    // Trainer ratings analytics
+    Route::get('/ratings', [\App\Http\Controllers\Api\AnalyticsController::class, 'trainerRatings']);
+
+    // Churn & retention analytics
+    Route::get('/retention', [\App\Http\Controllers\Api\AnalyticsController::class, 'retentionAnalytics']);
+
+    // Trial conversion analytics
+    Route::get('/trials', [\App\Http\Controllers\Api\AnalyticsController::class, 'trialConversion']);
+
+    // Location-based analytics (per gym)
+    Route::get('/locations', [\App\Http\Controllers\Api\AnalyticsController::class, 'locationAnalytics']);
+});
