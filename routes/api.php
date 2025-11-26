@@ -367,12 +367,30 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::apiResource('cash-register', CashRegisterEntryController::class);
         Route::apiResource('business-expenses', BusinessExpenseController::class);
     });
-    
+
     // Limited financial access for trainers (one week history)
     Route::middleware(['role:admin,trainer'])->group(function () {
         Route::get('cash-register/limited', [CashRegisterEntryController::class, 'limitedIndex']);
     });
-    
+
+    // Cash register session management (open/close)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('cash-register-sessions/status', [CashRegisterEntryController::class, 'sessionStatus']);
+        Route::post('cash-register-sessions/open', [CashRegisterEntryController::class, 'openSession']);
+        Route::post('cash-register-sessions/{session}/close', [CashRegisterEntryController::class, 'closeSession']);
+        Route::get('cash-register-sessions/history', [CashRegisterEntryController::class, 'sessionHistory']);
+    });
+
+    // Shift Checklists (opening/closing)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('shift-checklists', [\App\Http\Controllers\ShiftChecklistController::class, 'index']);
+        Route::post('shift-checklists', [\App\Http\Controllers\ShiftChecklistController::class, 'store']);
+        Route::get('shift-checklists/check-required', [\App\Http\Controllers\ShiftChecklistController::class, 'checkRequired']);
+        Route::get('shift-checklists/statistics', [\App\Http\Controllers\ShiftChecklistController::class, 'statistics']);
+        Route::get('shift-checklists/user', [\App\Http\Controllers\ShiftChecklistController::class, 'userChecklists']);
+        Route::get('shift-checklists/{shiftChecklist}', [\App\Http\Controllers\ShiftChecklistController::class, 'show']);
+    });
+
     // Time Tracking for Trainers
     Route::middleware(['role:trainer,admin'])->group(function () {
         Route::post('time-tracking/start', [TimeTrackingController::class, 'startSession']);

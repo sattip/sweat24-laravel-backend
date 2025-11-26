@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CashRegisterEntry;
+use App\Models\CashRegisterSession;
 use Illuminate\Http\Request;
 
 class CashRegisterEntryController extends Controller
@@ -161,5 +162,137 @@ class CashRegisterEntryController extends Controller
                 'total_expenses' => $unknownEntries->total_expenses
             ] : ['total_entries' => 0, 'total_income' => 0, 'total_expenses' => 0]
         ]);
+    }
+
+    /**
+     * Get current session status for a store
+     */
+    public function sessionStatus(Request $request)
+    {
+        $storeId = $request->input('store_id');
+
+        $query = CashRegisterSession::with(['store', 'openedByUser:id,name', 'closedByUser:id,name'])
+            ->where('status', 'open');
+
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
+        $sessions = $query->get();
+
+        // Calculate expected closing for each open session
+        $sessions->each(function ($session) {
+            $session->expected_closing_amount = $session->calculateExpectedClosing();
+        });
+
+        return response()->json([
+            'success' => true,
+            'sessions' => $sessions
+        ]);
+    }
+
+    /**
+     * Open a new cash register session
+     */
+    public function openSession(Request $request)
+    {
+        $validated = $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'opening_amount' => 'required|numeric|min:0',
+            'opening_notes' => 'nullable|string|max:500',
+        ]);
+
+        // Check if there's already an open session for this store
+        $existingSession = CashRegisterSession::where('store_id', $validated['store_id'])
+            ->where('status', 'open')
+            ->first();
+
+        if ($existingSession) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Υπάρχει ήδη ανοιχτό ταμείο για αυτό το κατάστημα',
+                'session' => $existingSession->load(['store', 'openedByUser:id,name'])
+            ], 422);
+        }
+
+        $session = CashRegisterSession::create([
+            'store_id' => $validated['store_id'],
+            'opened_by' => auth()->id() ?? 1,
+            'opening_amount' => $validated['opening_amount'],
+            'opening_notes' => $validated['opening_notes'] ?? null,
+            'status' => 'open',
+            'opened_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Το ταμείο άνοιξε επιτυχώς',
+            'session' => $session->load(['store', 'openedByUser:id,name'])
+        ], 201);
+    }
+
+    /**
+     * Close an open cash register session
+     */
+    public function closeSession(Request $request, $sessionId)
+    {
+        $validated = $request->validate([
+            'actual_closing_amount' => 'required|numeric|min:0',
+            'closing_notes' => 'nullable|string|max:500',
+        ]);
+
+        $session = CashRegisterSession::where('id', $sessionId)
+            ->where('status', 'open')
+            ->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Δεν βρέθηκε ανοιχτό ταμείο'
+            ], 404);
+        }
+
+        $expectedAmount = $session->calculateExpectedClosing();
+        $discrepancy = $validated['actual_closing_amount'] - $expectedAmount;
+
+        $session->update([
+            'closed_by' => auth()->id() ?? 1,
+            'expected_closing_amount' => $expectedAmount,
+            'actual_closing_amount' => $validated['actual_closing_amount'],
+            'discrepancy' => $discrepancy,
+            'closing_notes' => $validated['closing_notes'] ?? null,
+            'status' => 'closed',
+            'closed_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Το ταμείο έκλεισε επιτυχώς',
+            'session' => $session->load(['store', 'openedByUser:id,name', 'closedByUser:id,name']),
+            'expected_amount' => $expectedAmount,
+            'actual_amount' => $validated['actual_closing_amount'],
+            'discrepancy' => $discrepancy
+        ]);
+    }
+
+    /**
+     * Get session history
+     */
+    public function sessionHistory(Request $request)
+    {
+        $query = CashRegisterSession::with(['store', 'openedByUser:id,name', 'closedByUser:id,name'])
+            ->orderBy('opened_at', 'desc');
+
+        if ($request->has('store_id')) {
+            $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $sessions = $query->paginate($request->get('per_page', 15));
+
+        return response()->json($sessions);
     }
 }
