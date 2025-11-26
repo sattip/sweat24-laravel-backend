@@ -12,7 +12,7 @@ class ShiftChecklist extends Model
     protected $fillable = [
         'user_id',
         'store_id',
-        'time_tracking_id',
+        'work_session_id',
         'type',
         // Cash register
         'cash_counted',
@@ -64,11 +64,11 @@ class ShiftChecklist extends Model
     }
 
     /**
-     * Get the associated time tracking record
+     * Get the associated work session
      */
-    public function timeTracking()
+    public function workSession()
     {
-        return $this->belongsTo(TimeTracking::class);
+        return $this->belongsTo(WorkSession::class);
     }
 
     /**

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ShiftChecklist;
-use App\Models\TimeTracking;
+use App\Models\WorkSession;
 use Illuminate\Http\Request;
 
 class ShiftChecklistController extends Controller
@@ -13,7 +13,7 @@ class ShiftChecklistController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ShiftChecklist::with(['user:id,name,email', 'store', 'timeTracking']);
+        $query = ShiftChecklist::with(['user:id,name,email', 'store', 'workSession']);
 
         if ($request->has('store_id')) {
             $query->where('store_id', $request->store_id);
@@ -48,7 +48,7 @@ class ShiftChecklistController extends Controller
     {
         $validated = $request->validate([
             'store_id' => 'required|exists:stores,id',
-            'time_tracking_id' => 'nullable|exists:time_trackings,id',
+            'work_session_id' => 'nullable|exists:work_sessions,id',
             'type' => 'required|in:opening,closing',
             // Cash register
             'cash_counted' => 'required|in:yes,no,na',
@@ -80,18 +80,8 @@ class ShiftChecklistController extends Controller
 
         $checklist = ShiftChecklist::create($validated);
 
-        // If time_tracking_id is provided, update the time tracking record
-        if ($validated['time_tracking_id']) {
-            $timeTracking = TimeTracking::find($validated['time_tracking_id']);
-            if ($timeTracking) {
-                if ($validated['type'] === 'opening') {
-                    $timeTracking->opening_checklist_id = $checklist->id;
-                } else {
-                    $timeTracking->closing_checklist_id = $checklist->id;
-                }
-                $timeTracking->save();
-            }
-        }
+        // If work_session_id is provided, we can link it (optional enhancement)
+        // Currently we just store the reference in the checklist itself
 
         return response()->json([
             'success' => true,
@@ -109,40 +99,40 @@ class ShiftChecklistController extends Controller
     {
         return response()->json([
             'success' => true,
-            'checklist' => $shiftChecklist->load(['user:id,name,email', 'store', 'timeTracking'])
+            'checklist' => $shiftChecklist->load(['user:id,name,email', 'store', 'workSession'])
         ]);
     }
 
     /**
-     * Check if checklist is needed for a time tracking record
+     * Check if checklist is needed for a work session
      */
     public function checkRequired(Request $request)
     {
         $type = $request->input('type'); // 'opening' or 'closing'
-        $timeTrackingId = $request->input('time_tracking_id');
+        $workSessionId = $request->input('work_session_id');
 
-        if (!$type || !$timeTrackingId) {
+        if (!$type || !$workSessionId) {
             return response()->json([
                 'required' => false
             ]);
         }
 
-        $timeTracking = TimeTracking::find($timeTrackingId);
-        if (!$timeTracking) {
+        $workSession = WorkSession::find($workSessionId);
+        if (!$workSession) {
             return response()->json([
                 'required' => false
             ]);
         }
 
-        // Check if a checklist already exists for this time tracking and type
-        $existingChecklist = ShiftChecklist::where('time_tracking_id', $timeTrackingId)
+        // Check if a checklist already exists for this work session and type
+        $existingChecklist = ShiftChecklist::where('work_session_id', $workSessionId)
             ->where('type', $type)
             ->first();
 
         return response()->json([
             'required' => !$existingChecklist,
             'existing_checklist' => $existingChecklist,
-            'time_tracking' => $timeTracking->load('store')
+            'work_session' => $workSession->load('store')
         ]);
     }
 
@@ -186,7 +176,7 @@ class ShiftChecklistController extends Controller
     {
         $userId = $request->input('user_id', auth()->id() ?? 1);
 
-        $checklists = ShiftChecklist::with(['store', 'timeTracking'])
+        $checklists = ShiftChecklist::with(['store', 'workSession'])
             ->where('user_id', $userId)
             ->orderBy('completed_at', 'desc')
             ->limit(10)

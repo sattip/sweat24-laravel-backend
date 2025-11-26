@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('store_id')->constrained()->onDelete('cascade');
-            $table->foreignId('time_tracking_id')->nullable()->constrained('time_trackings')->onDelete('set null');
+            $table->foreignId('work_session_id')->nullable()->constrained('work_sessions')->onDelete('set null');
             $table->enum('type', ['opening', 'closing']);
 
             // Cash register
