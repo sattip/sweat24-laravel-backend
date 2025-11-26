@@ -36,14 +36,7 @@ class ShiftChecklistController extends Controller
         }
 
         // Filter by issues
-        \Log::info('ShiftChecklist filter params', [
-            'has_issues_raw' => $request->input('has_issues'),
-            'has_issues_filled' => $request->filled('has_issues'),
-            'all_params' => $request->all()
-        ]);
-
         if ($request->filled('has_issues')) {
-            \Log::info('Applying has_issues filter: ' . $request->has_issues);
             if ($request->has_issues === 'yes') {
                 $query->where(function ($q) {
                     $q->where('equipment_checked', 'no')
@@ -51,7 +44,6 @@ class ShiftChecklistController extends Controller
                       ->orWhereNotNull('issues_reported');
                 });
             } elseif ($request->has_issues === 'no') {
-                \Log::info('Filtering for NO issues');
                 $query->where(function ($q) {
                     $q->where(function ($inner) {
                         $inner->where('equipment_checked', '!=', 'no')
