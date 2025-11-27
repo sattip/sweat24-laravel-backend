@@ -55,12 +55,17 @@ class StatisticsService
      */
     public function getMonthlyBookingTrends($months = 12)
     {
-        $results = Booking::selectRaw('
-                DATE_FORMAT(created_at, "%Y-%m") as month,
+        // Use strftime for SQLite compatibility, or DATE_FORMAT for MySQL
+        $dateFormat = DB::getDriverName() === 'sqlite' 
+            ? "strftime('%Y-%m', created_at) as month"
+            : "DATE_FORMAT(created_at, '%Y-%m') as month";
+            
+        $results = Booking::selectRaw("
+                {$dateFormat},
                 booking_type,
                 COUNT(*) as total_bookings,
                 COUNT(CASE WHEN attended = 1 THEN 1 END) as attended_bookings
-            ')
+            ")
             ->where('created_at', '>=', now()->subMonths($months))
             ->groupBy(['month', 'booking_type'])
             ->orderBy('month', 'desc')
@@ -135,10 +140,13 @@ class StatisticsService
             'top_referrers' => \App\Models\User::withCount(['referralsMade as total_referrals' => function($query) {
                                    $query->where('status', 'confirmed');
                                }])
-                               ->having('total_referrals', '>', 0)
                                ->orderBy('total_referrals', 'desc')
                                ->limit(10)
-                               ->get(['id', 'name', 'email']),
+                               ->get(['id', 'name', 'email'])
+                               ->filter(function($user) {
+                                   return $user->total_referrals > 0;
+                               })
+                               ->values(),
         ];
     }
 

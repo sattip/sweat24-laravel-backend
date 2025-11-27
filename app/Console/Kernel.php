@@ -43,6 +43,13 @@ class Kernel extends ConsoleKernel
             ->name('process-expired-waitlist')
             ->withoutOverlapping()
             ->runInBackground();
+
+        // Process churn feedback (send surveys, reminders, and follow-ups)
+        $schedule->command('churn:process')
+            ->dailyAt('10:00')
+            ->name('process-churn-feedback')
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     /**

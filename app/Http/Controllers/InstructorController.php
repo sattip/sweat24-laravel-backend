@@ -11,7 +11,7 @@ class InstructorController extends Controller
 {
     public function index()
     {
-        $instructors = Instructor::with('workTimeEntries', 'payrollAgreements')->get();
+        $instructors = Instructor::with('workTimeEntries', 'payrollAgreements', 'store')->get();
         return response()->json($instructors);
     }
 
@@ -22,6 +22,7 @@ class InstructorController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:instructors|unique:users,email',
                 'phone' => 'nullable|string',
+                'store_id' => 'nullable|exists:stores,id',
                 'specialties' => 'nullable',
                 'certifications' => 'nullable|string',
                 'experience' => 'nullable|string',
@@ -69,6 +70,9 @@ class InstructorController extends Controller
             
             // Create the instructor record
             $instructor = Instructor::create($validated);
+            
+            // Load the store relationship
+            $instructor->load('store');
 
             // Log the created credentials
             \Log::info('Trainer user created', [
@@ -126,7 +130,7 @@ class InstructorController extends Controller
 
     public function show(Instructor $instructor)
     {
-        return response()->json($instructor->load('workTimeEntries', 'payrollAgreements'));
+        return response()->json($instructor->load('workTimeEntries', 'payrollAgreements', 'store'));
     }
 
     public function update(Request $request, Instructor $instructor)
@@ -136,6 +140,7 @@ class InstructorController extends Controller
             'specialties' => 'sometimes|array',
             'email' => 'nullable|email|unique:instructors,email,' . $instructor->id,
             'phone' => 'nullable|string',
+            'store_id' => 'nullable|exists:stores,id',
             'hourly_rate' => 'sometimes|numeric|min:0',
             'monthly_bonus' => 'nullable|numeric|min:0',
             'commission_rate' => 'nullable|numeric|min:0|max:1',
@@ -147,6 +152,7 @@ class InstructorController extends Controller
         ]);
 
         $instructor->update($validated);
+        $instructor->load('store');
         return response()->json($instructor);
     }
 

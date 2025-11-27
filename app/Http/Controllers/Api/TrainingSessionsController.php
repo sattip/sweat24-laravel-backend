@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\TrainingSession;
 use App\Models\TrainingExercise;
 use App\Models\User;
+use App\Models\Booking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class TrainingSessionsController extends Controller
 {
@@ -310,6 +312,347 @@ class TrainingSessionsController extends Controller
         return response()->json([
             'success' => true,
             'data' => $analytics
+        ]);
+    }
+
+    /**
+     * Get enhanced training analytics with adherence, alerts, and MoM.
+     */
+    public function enhancedAnalytics(Request $request, $userId): JsonResponse
+    {
+        $user = User::findOrFail($userId);
+
+        $startDate = $request->get('start_date', now()->subDays(30)->format('Y-m-d'));
+        $endDate = $request->get('end_date', now()->format('Y-m-d'));
+
+        $sessions = TrainingSession::forUser($userId)
+            ->betweenDates($startDate, $endDate)
+            ->with('exercises')
+            ->get();
+
+        // Basic analytics
+        $totalSessions = $sessions->count();
+        $totalVolume = $sessions->sum('total_volume');
+        $avgIntensity = $sessions->avg('intensity');
+
+        // Muscle group frequency
+        $muscleGroupCounts = [];
+        foreach ($sessions as $session) {
+            if (is_array($session->muscle_groups)) {
+                foreach ($session->muscle_groups as $group) {
+                    $muscleGroupCounts[$group] = ($muscleGroupCounts[$group] ?? 0) + 1;
+                }
+            }
+        }
+
+        // Calculate muscle balance percentage
+        $muscleBalance = [];
+        if ($totalSessions > 0) {
+            foreach ($muscleGroupCounts as $group => $count) {
+                $muscleBalance[$group] = round(($count / $totalSessions) * 100, 1);
+            }
+        }
+
+        // Weekly trends with WoW comparison
+        $weeklyData = $this->calculateWeeklyTrends($sessions);
+
+        // Monthly trends with MoM comparison
+        $monthlyData = $this->calculateMonthlyTrends($userId, $startDate, $endDate);
+
+        // Adherence tracking
+        $adherenceData = $this->calculateAdherence($userId, $startDate, $endDate);
+
+        // Load management alerts
+        $alerts = $this->generateAlerts($userId, $sessions, $weeklyData, $adherenceData);
+
+        $analytics = [
+            'period' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+            'totals' => [
+                'sessions' => $totalSessions,
+                'total_volume_kg' => round($totalVolume, 2),
+                'avg_intensity' => round($avgIntensity ?? 0, 1),
+                'avg_duration' => round($sessions->avg('duration_minutes') ?? 0, 0),
+            ],
+            'muscle_groups' => [
+                'frequency' => $muscleGroupCounts,
+                'balance_percentage' => $muscleBalance,
+            ],
+            'weekly_trends' => $weeklyData,
+            'monthly_trends' => $monthlyData,
+            'adherence' => $adherenceData,
+            'alerts' => $alerts,
+            'intensity_distribution' => [
+                'low' => $sessions->filter(fn($s) => $s->intensity <= 3)->count(),
+                'moderate' => $sessions->filter(fn($s) => $s->intensity > 3 && $s->intensity <= 6)->count(),
+                'high' => $sessions->filter(fn($s) => $s->intensity > 6)->count(),
+            ],
+            'session_types' => $sessions->groupBy('session_type')->map->count(),
+            'includes' => [
+                'cardio' => $sessions->where('includes_cardio', true)->count(),
+                'cognitive' => $sessions->where('includes_cognitive', true)->count(),
+                'mobility' => $sessions->where('includes_mobility', true)->count(),
+                'balance' => $sessions->where('includes_balance', true)->count(),
+                'functional' => $sessions->where('includes_functional', true)->count(),
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $analytics
+        ]);
+    }
+
+    /**
+     * Calculate weekly trends with WoW comparison.
+     */
+    private function calculateWeeklyTrends($sessions)
+    {
+        $weeklyVolume = $sessions->groupBy(function ($session) {
+            return $session->session_date->format('Y-W');
+        });
+
+        $weeks = [];
+        $previousVolume = null;
+        $previousSessions = null;
+        $previousIntensity = null;
+
+        foreach ($weeklyVolume as $week => $weekSessions) {
+            $volume = $weekSessions->sum('total_volume');
+            $count = $weekSessions->count();
+            $intensity = $weekSessions->avg('intensity');
+
+            $volumeChange = null;
+            $sessionsChange = null;
+            $intensityChange = null;
+
+            if ($previousVolume !== null && $previousVolume > 0) {
+                $volumeChange = round((($volume - $previousVolume) / $previousVolume) * 100, 1);
+            }
+            if ($previousSessions !== null && $previousSessions > 0) {
+                $sessionsChange = round((($count - $previousSessions) / $previousSessions) * 100, 1);
+            }
+            if ($previousIntensity !== null && $previousIntensity > 0) {
+                $intensityChange = round((($intensity - $previousIntensity) / $previousIntensity) * 100, 1);
+            }
+
+            $weeks[$week] = [
+                'volume' => round($volume, 2),
+                'sessions' => $count,
+                'avg_intensity' => round($intensity ?? 0, 1),
+                'wow_volume_change' => $volumeChange,
+                'wow_sessions_change' => $sessionsChange,
+                'wow_intensity_change' => $intensityChange,
+            ];
+
+            $previousVolume = $volume;
+            $previousSessions = $count;
+            $previousIntensity = $intensity;
+        }
+
+        return $weeks;
+    }
+
+    /**
+     * Calculate monthly trends with MoM comparison.
+     */
+    private function calculateMonthlyTrends($userId, $startDate, $endDate)
+    {
+        // Get sessions for the last 3 months to have comparison data
+        $extendedStartDate = Carbon::parse($startDate)->subMonths(2)->format('Y-m-d');
+
+        $sessions = TrainingSession::forUser($userId)
+            ->betweenDates($extendedStartDate, $endDate)
+            ->get();
+
+        $monthlyData = $sessions->groupBy(function ($session) {
+            return $session->session_date->format('Y-m');
+        });
+
+        $months = [];
+        $previousVolume = null;
+        $previousSessions = null;
+
+        // Calculate muscle group trends per month
+        foreach ($monthlyData as $month => $monthSessions) {
+            $volume = $monthSessions->sum('total_volume');
+            $count = $monthSessions->count();
+            $intensity = $monthSessions->avg('intensity');
+
+            // Muscle group frequency for this month
+            $muscleGroupCounts = [];
+            foreach ($monthSessions as $session) {
+                if (is_array($session->muscle_groups)) {
+                    foreach ($session->muscle_groups as $group) {
+                        $muscleGroupCounts[$group] = ($muscleGroupCounts[$group] ?? 0) + 1;
+                    }
+                }
+            }
+
+            $volumeChange = null;
+            $sessionsChange = null;
+
+            if ($previousVolume !== null && $previousVolume > 0) {
+                $volumeChange = round((($volume - $previousVolume) / $previousVolume) * 100, 1);
+            }
+            if ($previousSessions !== null && $previousSessions > 0) {
+                $sessionsChange = round((($count - $previousSessions) / $previousSessions) * 100, 1);
+            }
+
+            $months[$month] = [
+                'volume' => round($volume, 2),
+                'sessions' => $count,
+                'avg_intensity' => round($intensity ?? 0, 1),
+                'mom_volume_change' => $volumeChange,
+                'mom_sessions_change' => $sessionsChange,
+                'muscle_groups' => $muscleGroupCounts,
+            ];
+
+            $previousVolume = $volume;
+            $previousSessions = $count;
+        }
+
+        return $months;
+    }
+
+    /**
+     * Calculate adherence based on bookings.
+     */
+    private function calculateAdherence($userId, $startDate, $endDate)
+    {
+        // Get all bookings for the user in the period
+        $bookings = Booking::where('user_id', $userId)
+            ->whereBetween('date', [$startDate, $endDate])
+            ->whereIn('booking_type', ['personal', 'semi_personal', 'group'])
+            ->get();
+
+        $totalScheduled = $bookings->count();
+        $attended = $bookings->where('attended', true)->count();
+        $missed = $bookings->where('attended', false)
+            ->whereIn('status', ['absent', 'no_show', 'cancelled_late'])
+            ->count();
+
+        $adherencePercentage = $totalScheduled > 0
+            ? round(($attended / $totalScheduled) * 100, 1)
+            : 0;
+
+        // Get missed session details
+        $missedSessions = $bookings->filter(function ($booking) {
+            return !$booking->attended && in_array($booking->status, ['absent', 'no_show', 'cancelled_late']);
+        })->map(function ($booking) {
+            return [
+                'date' => $booking->date->format('Y-m-d'),
+                'class_name' => $booking->class_name,
+                'reason' => $booking->absence_reason ?? 'Χωρίς αιτιολογία',
+            ];
+        })->values();
+
+        return [
+            'total_scheduled' => $totalScheduled,
+            'attended' => $attended,
+            'missed' => $missed,
+            'adherence_percentage' => $adherencePercentage,
+            'missed_sessions' => $missedSessions,
+        ];
+    }
+
+    /**
+     * Generate load management alerts.
+     */
+    private function generateAlerts($userId, $sessions, $weeklyData, $adherenceData)
+    {
+        $alerts = [];
+
+        // Get the last two weeks' data for comparison
+        $weeks = array_keys($weeklyData);
+        if (count($weeks) >= 2) {
+            $currentWeek = end($weeklyData);
+            $previousWeek = prev($weeklyData);
+
+            // RPE/Intensity Alert: >15% increase
+            if ($currentWeek['wow_intensity_change'] !== null && $currentWeek['wow_intensity_change'] > 15) {
+                $alerts[] = [
+                    'type' => 'high_intensity',
+                    'severity' => 'warning',
+                    'message' => "Υψηλή αύξηση έντασης (+{$currentWeek['wow_intensity_change']}%). Πρότεινε αποφόρτιση.",
+                    'icon' => '⚠️',
+                ];
+            }
+
+            // Volume Alert: >10% increase
+            if ($currentWeek['wow_volume_change'] !== null && $currentWeek['wow_volume_change'] > 10) {
+                $alerts[] = [
+                    'type' => 'high_volume',
+                    'severity' => 'warning',
+                    'message' => "Υψηλή φόρτιση (+{$currentWeek['wow_volume_change']}% όγκος). Πρότεινε recovery day.",
+                    'icon' => '⚠️',
+                ];
+            }
+
+            // Session decrease alert: >30% drop
+            if ($currentWeek['wow_sessions_change'] !== null && $currentWeek['wow_sessions_change'] < -30) {
+                $alerts[] = [
+                    'type' => 'engagement_drop',
+                    'severity' => 'danger',
+                    'message' => "Απότομη πτώση προπονήσεων ({$currentWeek['wow_sessions_change']}%). Πρότεινε follow-up.",
+                    'icon' => '🚨',
+                ];
+            }
+        }
+
+        // Adherence Alert: <70%
+        if ($adherenceData['adherence_percentage'] < 70 && $adherenceData['total_scheduled'] > 0) {
+            $alerts[] = [
+                'type' => 'low_adherence',
+                'severity' => 'danger',
+                'message' => "Χαμηλή συνέπεια ({$adherenceData['adherence_percentage']}%). Επικοινώνησε με τον πελάτη.",
+                'icon' => '🚨',
+            ];
+        }
+
+        // Good performance alerts
+        if (empty($alerts) && $sessions->count() > 0) {
+            $avgIntensity = $sessions->avg('intensity');
+            if ($avgIntensity >= 6 && $avgIntensity <= 8) {
+                $alerts[] = [
+                    'type' => 'good_intensity',
+                    'severity' => 'success',
+                    'message' => "Καλή ένταση προπόνησης ({$avgIntensity}/10).",
+                    'icon' => '✅',
+                ];
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Get load management alerts for a user.
+     */
+    public function alerts(Request $request, $userId): JsonResponse
+    {
+        $user = User::findOrFail($userId);
+
+        $startDate = $request->get('start_date', now()->subDays(30)->format('Y-m-d'));
+        $endDate = $request->get('end_date', now()->format('Y-m-d'));
+
+        $sessions = TrainingSession::forUser($userId)
+            ->betweenDates($startDate, $endDate)
+            ->with('exercises')
+            ->get();
+
+        $weeklyData = $this->calculateWeeklyTrends($sessions);
+        $adherenceData = $this->calculateAdherence($userId, $startDate, $endDate);
+        $alerts = $this->generateAlerts($userId, $sessions, $weeklyData, $adherenceData);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'alerts' => $alerts,
+                'adherence' => $adherenceData,
+            ]
         ]);
     }
 }

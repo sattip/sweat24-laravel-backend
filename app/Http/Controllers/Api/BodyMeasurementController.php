@@ -283,12 +283,13 @@ class BodyMeasurementController extends Controller
     }
 
     /**
-     * Admin: Get measurements for specific user
+     * Admin/Trainer: Get measurements for specific user
      */
     public function getUserMeasurements(Request $request, $userId)
     {
-        // Check if requester is admin
-        if ($request->user()->membership_type !== 'Admin') {
+        // Check if requester is admin or trainer
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'trainer']) || $user->status !== 'active') {
             return response()->json([
                 'message' => 'Unauthorized',
             ], 403);
@@ -305,12 +306,13 @@ class BodyMeasurementController extends Controller
     }
 
     /**
-     * Admin: Get latest measurement for specific user
+     * Admin/Trainer: Get latest measurement for specific user
      */
     public function getUserLatestMeasurement(Request $request, $userId)
     {
-        // Check if requester is admin
-        if ($request->user()->membership_type !== 'Admin') {
+        // Check if requester is admin or trainer
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'trainer']) || $user->status !== 'active') {
             return response()->json([
                 'message' => 'Unauthorized',
             ], 403);

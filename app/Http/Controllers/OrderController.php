@@ -67,12 +67,18 @@ class OrderController extends Controller
             // Calculate totals
             $subtotal = 0;
             $orderItems = [];
+            $hasPreorderProduct = false;
 
             foreach ($validated['items'] as $item) {
                 $product = StoreProduct::find($item['product_id']);
-                
+
                 if (!$product || !$product->is_active) {
                     throw new \Exception("Product {$item['product_id']} is not available");
+                }
+
+                // Check if any product is preorder
+                if ($product->is_preorder) {
+                    $hasPreorderProduct = true;
                 }
 
                 $itemSubtotal = $product->price * $item['quantity'];
@@ -83,11 +89,12 @@ class OrderController extends Controller
                     'product_name' => $product->name,
                     'price' => $product->price,
                     'quantity' => $item['quantity'],
-                    'subtotal' => $itemSubtotal
+                    'subtotal' => $itemSubtotal,
+                    'is_preorder' => $product->is_preorder
                 ];
 
-                // Update stock if tracking is enabled
-                if ($product->stock_quantity !== null) {
+                // Update stock only for non-preorder products
+                if (!$product->is_preorder && $product->stock_quantity !== null) {
                     if ($product->stock_quantity < $item['quantity']) {
                         throw new \Exception("Insufficient stock for {$product->name}");
                     }
@@ -102,6 +109,7 @@ class OrderController extends Controller
             $order = Order::create([
                 'user_id' => $validated['user_id'],
                 'status' => 'pending',
+                'is_preorder' => $hasPreorderProduct,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'total' => $total,
@@ -129,10 +137,14 @@ class OrderController extends Controller
 
             DB::commit();
 
+            $message = $hasPreorderProduct
+                ? 'Το αίτημα προπαραγγελίας σας καταχωρήθηκε επιτυχώς! Θα ενημερωθείτε όταν είναι διαθέσιμο.'
+                : 'Η παραγγελία σας καταχωρήθηκε επιτυχώς!';
+
             return response()->json([
                 'success' => true,
                 'order' => $order->load('items'),
-                'message' => 'Η παραγγελία σας καταχωρήθηκε επιτυχώς!'
+                'message' => $message
             ], 201);
 
         } catch (\Exception $e) {
@@ -201,10 +213,10 @@ class OrderController extends Controller
 
             case 'cancelled':
                 $order->cancel();
-                
-                // Restore stock if cancelled
+
+                // Restore stock if cancelled (only for non-preorder items)
                 foreach ($order->items as $item) {
-                    if ($item->product && $item->product->stock_quantity !== null) {
+                    if (!$item->is_preorder && $item->product && $item->product->stock_quantity !== null) {
                         $item->product->increment('stock_quantity', $item->quantity);
                     }
                 }

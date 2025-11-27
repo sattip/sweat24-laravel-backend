@@ -20,6 +20,7 @@ class Instructor extends Model
         'services',
         'email',
         'phone',
+        'store_id',
         'hourly_rate',
         'monthly_bonus',
         'commission_rate',
@@ -59,5 +60,10 @@ class Instructor extends Model
     public function bookingRequests()
     {
         return $this->hasMany(BookingRequest::class);
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
     }
 }

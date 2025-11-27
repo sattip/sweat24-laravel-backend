@@ -51,13 +51,18 @@ class StoreProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'description' => 'required|string',
+            'description' => 'nullable|string',
             'image_url' => 'nullable|string',
             'category' => 'required|in:supplements,apparel,accessories,equipment',
             'stock_quantity' => 'nullable|integer|min:0',
             'original_price' => 'nullable|numeric|min:0',
             'display_order' => 'nullable|integer',
+            'is_preorder' => 'boolean',
         ]);
+
+        // Set defaults for nullable fields that have NOT NULL constraints in DB
+        $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
+        $validated['description'] = $validated['description'] ?? '';
 
         $product = StoreProduct::create($validated);
         
@@ -78,6 +83,7 @@ class StoreProductController extends Controller
             'original_price' => 'nullable|numeric|min:0',
             'display_order' => 'nullable|integer',
             'is_active' => 'sometimes|boolean',
+            'is_preorder' => 'sometimes|boolean',
         ]);
 
         $storeProduct->update($validated);

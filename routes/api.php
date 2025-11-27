@@ -234,8 +234,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('users/search/by-phone', [UserController::class, 'searchByPhone']);
     Route::get('users/{id}/referral-info', [UserController::class, 'getUserReferralInfo']);
 
-    // Packages (Admin management)
-    Route::apiResource('packages', PackageController::class)->except(['index', 'show'])->middleware('role:admin');
+    // Packages (Admin and Trainer management)
+    Route::apiResource('packages', PackageController::class)->except(['index', 'show'])->middleware('role:admin,trainer');
 
     // Bookings (authenticated routes)
     // Specific routes must be defined BEFORE apiResource to avoid conflicts
@@ -361,18 +361,36 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('classes/{class}/waitlist/status', [WaitlistController::class, 'status']);
     Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin,trainer');
     
-    // Financial Features (Admin only)
-    Route::middleware(['role:admin'])->group(function () {
+    // Financial Features (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('payment-installments', PaymentInstallmentController::class);
         Route::apiResource('cash-register', CashRegisterEntryController::class);
         Route::apiResource('business-expenses', BusinessExpenseController::class);
     });
-    
+
     // Limited financial access for trainers (one week history)
     Route::middleware(['role:admin,trainer'])->group(function () {
         Route::get('cash-register/limited', [CashRegisterEntryController::class, 'limitedIndex']);
     });
-    
+
+    // Cash register session management (open/close)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('cash-register-sessions/status', [CashRegisterEntryController::class, 'sessionStatus']);
+        Route::post('cash-register-sessions/open', [CashRegisterEntryController::class, 'openSession']);
+        Route::post('cash-register-sessions/{session}/close', [CashRegisterEntryController::class, 'closeSession']);
+        Route::get('cash-register-sessions/history', [CashRegisterEntryController::class, 'sessionHistory']);
+    });
+
+    // Shift Checklists (opening/closing)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('shift-checklists', [\App\Http\Controllers\ShiftChecklistController::class, 'index']);
+        Route::post('shift-checklists', [\App\Http\Controllers\ShiftChecklistController::class, 'store']);
+        Route::get('shift-checklists/check-required', [\App\Http\Controllers\ShiftChecklistController::class, 'checkRequired']);
+        Route::get('shift-checklists/statistics', [\App\Http\Controllers\ShiftChecklistController::class, 'statistics']);
+        Route::get('shift-checklists/user', [\App\Http\Controllers\ShiftChecklistController::class, 'userChecklists']);
+        Route::get('shift-checklists/{shiftChecklist}', [\App\Http\Controllers\ShiftChecklistController::class, 'show']);
+    });
+
     // Time Tracking for Trainers
     Route::middleware(['role:trainer,admin'])->group(function () {
         Route::post('time-tracking/start', [TimeTrackingController::class, 'startSession']);
@@ -395,14 +413,20 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('admin/store/products/{id}', [\App\Http\Controllers\StoreProductController::class, 'destroy']);
         Route::post('admin/store/upload-image', [ImageUploadController::class, 'uploadProductImage']);
 
-        // Admin Class Types Management
+    });
+
+    // Class Types Management (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::get('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'index']);
         Route::post('admin/class-types', [\App\Http\Controllers\Api\ClassTypesController::class, 'store']);
         Route::get('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'show']);
         Route::post('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'update']);
         Route::delete('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'destroy']);
         Route::post('admin/class-types/reorder', [\App\Http\Controllers\Api\ClassTypesController::class, 'reorder']);
+    });
 
+    // Admin only routes
+    Route::middleware(['role:admin'])->group(function () {
         // Admin Events Management
         Route::get('admin/events', [EventController::class, 'adminIndex']);
         Route::get('admin/event-rsvps', [EventController::class, 'adminGetAllRsvps']);
@@ -439,13 +463,19 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         // Hard delete a user package for a specific user (admin only)
         Route::delete('admin/users/{userId}/packages/{userPackageId}', [\App\Http\Controllers\Admin\UserPackageController::class, 'destroy']);
         
-        // Admin Progress Photos Routes
-        Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
+        // Admin Progress Photos Routes (Delete only - admin only)
         Route::delete('admin/progress-photos/{id}', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'adminDestroy']);
-        
-        // Admin Body Measurements Routes
+    });
+
+    // Progress Photos and Measurements Routes (Admin and Trainer)
+    Route::middleware(['role:admin,trainer'])->group(function () {
+        Route::get('admin/users/{userId}/progress-photos', [\App\Http\Controllers\Api\ProgressPhotoController::class, 'getUserPhotos']);
         Route::get('admin/users/{userId}/measurements', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserMeasurements']);
         Route::get('admin/users/{userId}/measurements/latest', [\App\Http\Controllers\Api\BodyMeasurementController::class, 'getUserLatestMeasurement']);
+    });
+
+    // Continue Admin only routes
+    Route::middleware(['role:admin'])->group(function () {
 
         // Admin Partner Management
         Route::get('admin/partners', [PartnerController::class, 'adminGetPartners']);
@@ -564,13 +594,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('notifications/{recipient}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     
-    Route::middleware(['role:admin'])->group(function () {
+    Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('notifications', NotificationController::class);
         Route::post('notifications/{notification}/send', [NotificationController::class, 'send']);
         Route::post('notifications/preview-recipients', [NotificationController::class, 'previewRecipients']);
         Route::get('notifications/statistics', [NotificationController::class, 'statistics']);
         Route::get('notifications/types', [NotificationController::class, 'getTypes']);
-        
+
         // Notification filters
         Route::apiResource('notification-filters', NotificationFilterController::class);
         Route::get('notification-filters/{filter}/preview', [NotificationFilterController::class, 'previewRecipients']);
@@ -664,11 +694,53 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
+    // Exercise Muscle Groups Routes
+    Route::prefix('exercise-muscle-groups')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'active']);
+
+        // Admin/Trainer routes for managing muscle groups
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'store']);
+            Route::put('/{muscleGroup}', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'update']);
+            Route::delete('/{muscleGroup}', [\App\Http\Controllers\Api\ExerciseMuscleGroupController::class, 'destroy']);
+        });
+    });
+
+    // Exercise Categories Routes
+    Route::prefix('exercise-categories')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'active']);
+
+        // Admin/Trainer routes for managing categories
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'store']);
+            Route::put('/{category}', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'update']);
+            Route::delete('/{category}', [\App\Http\Controllers\Api\ExerciseCategoryController::class, 'destroy']);
+        });
+    });
+
+    // Exercise Equipment Routes
+    Route::prefix('exercise-equipment')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'index']);
+        Route::get('/active', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'active']);
+
+        // Admin/Trainer routes for managing equipment
+        Route::middleware(['role:admin,trainer'])->group(function () {
+            Route::post('/', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'store']);
+            Route::get('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'show']);
+            Route::put('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'update']);
+            Route::delete('/{equipment}', [\App\Http\Controllers\Api\ExerciseEquipmentController::class, 'destroy']);
+        });
+    });
+
     // Training Sessions Routes (Admin & Trainer)
     Route::prefix('training-sessions')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
         Route::get('/user/{userId}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'index']);
         Route::get('/user/{userId}/analytics', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'analytics']);
+        Route::get('/user/{userId}/enhanced-analytics', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'enhancedAnalytics']);
+        Route::get('/user/{userId}/alerts', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'alerts']);
         Route::post('/', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'store']);
         Route::get('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'show']);
         Route::put('/{id}', [\App\Http\Controllers\Api\TrainingSessionsController::class, 'update']);
@@ -741,6 +813,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('team-chat')->middleware(['role:admin,trainer'])->group(function () {
         Route::get('messages', [TeamChatController::class, 'getMessages']);
         Route::post('messages', [TeamChatController::class, 'sendMessage']);
+        Route::post('upload', [TeamChatController::class, 'uploadFile']);
         Route::get('online-users', [TeamChatController::class, 'getOnlineUsers']);
         Route::get('stats', [TeamChatController::class, 'getStats']);
         Route::delete('messages/{message}', [TeamChatController::class, 'deleteMessage']);
@@ -1078,6 +1151,25 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/statistics')
     // Export functionality
     Route::get('export', [\App\Http\Controllers\Api\StatisticsController::class, 'export']);
 });
+
+// Financial Reports (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/financial-reports')->group(function () {
+    Route::get('dashboard', [\App\Http\Controllers\FinancialReportsController::class, 'dashboard']);
+    Route::get('total-revenue', [\App\Http\Controllers\FinancialReportsController::class, 'totalRevenue']);
+    Route::get('revenue-per-customer', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerCustomer']);
+    Route::get('revenue-per-service', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerService']);
+    Route::get('revenue-per-store', [\App\Http\Controllers\FinancialReportsController::class, 'revenuePerStore']);
+    Route::get('top-customers', [\App\Http\Controllers\FinancialReportsController::class, 'topCustomers']);
+    Route::get('package-statistics', [\App\Http\Controllers\FinancialReportsController::class, 'packageStatistics']);
+    Route::get('product-statistics', [\App\Http\Controllers\FinancialReportsController::class, 'productStatistics']);
+    Route::get('expense-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'expenseAnalysis']);
+    Route::get('revenue-trends', [\App\Http\Controllers\FinancialReportsController::class, 'revenueTrends']);
+    Route::get('payment-methods', [\App\Http\Controllers\FinancialReportsController::class, 'paymentMethods']);
+    Route::get('profitability-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'profitabilityAnalysis']);
+    Route::get('customer-conversion', [\App\Http\Controllers\FinancialReportsController::class, 'customerConversion']);
+    Route::get('customer-ltv', [\App\Http\Controllers\FinancialReportsController::class, 'customerLTV']);
+    Route::get('retention-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'retentionAnalysis']);
+});
 // Debug endpoint to see exactly what the admin panel is sending
 Route::any('/debug/admin-requests', function(Request $request) {
     return response()->json([
@@ -1107,4 +1199,136 @@ Route::prefix('v1')->group(function () {
 // These routes are public to allow admin panel access without Sanctum authentication
 Route::prefix('v1/admin/points')->group(function () {
     Route::apiResource('rewards', \App\Http\Controllers\Api\PointsRewardsController::class);
+});
+
+// ============ PAYROLL AGREEMENTS ROUTES ============
+
+// Admin Payroll Agreements Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/payroll-agreements')->group(function () {
+    // List all agreements
+    Route::get('/', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'index']);
+
+    // Create new agreement
+    Route::post('/', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'store']);
+
+    // Get summary for instructor
+    Route::get('/instructor/{instructorId}/summary', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'summary']);
+
+    // Update agreement
+    Route::put('/{payrollAgreement}', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'update']);
+
+    // Toggle active status
+    Route::post('/{payrollAgreement}/toggle-active', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'toggleActive']);
+
+    // Delete agreement
+    Route::delete('/{payrollAgreement}', [\App\Http\Controllers\Api\PayrollAgreementController::class, 'destroy']);
+});
+
+// ============ CHURN FEEDBACK ROUTES ============
+
+// Mobile App routes (for users to respond to churn surveys)
+Route::prefix('v1/churn-feedback')->group(function () {
+    // Get pending survey for user (supports user_id param or auth token)
+    Route::get('/pending', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'getPendingSurvey']);
+
+    // Submit quick response (single reason)
+    Route::post('/quick-response', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitQuickResponse']);
+
+    // Submit full mini survey
+    Route::post('/mini-survey', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitMiniSurvey']);
+
+    // Opt-out from surveys
+    Route::post('/opt-out', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'optOut']);
+});
+
+// Admin Churn Feedback Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/churn-feedback')->group(function () {
+    // List all feedback
+    Route::get('/', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'index']);
+
+    // Trigger churn feedback for user manually
+    Route::post('/trigger', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'triggerForUser']);
+
+    // Get single feedback detail
+    Route::get('/{churnFeedback}', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'show']);
+
+    // Analytics & Statistics
+    Route::get('/analytics/summary', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'analytics']);
+});
+
+// ============ WELLNESS SCORE ROUTES ============
+
+// Mobile App Wellness Routes (for users to submit daily wellness checks)
+Route::prefix('v1/wellness')->group(function () {
+    // Get today's wellness score (supports user_id param or auth token)
+    Route::get('/today', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getToday']);
+
+    // Submit daily wellness score
+    Route::post('/submit', [\App\Http\Controllers\Api\WellnessScoreController::class, 'submit']);
+
+    // Get wellness history
+    Route::get('/history', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getHistory']);
+
+    // Get current threshold settings (for mobile app to show color indicators)
+    Route::get('/thresholds', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getThresholds']);
+});
+
+// Admin Wellness Management (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/wellness')->group(function () {
+    // List all wellness scores with filters
+    Route::get('/', [\App\Http\Controllers\Api\WellnessScoreController::class, 'adminIndex']);
+
+    // Get users missing today's submission
+    Route::get('/missing', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getMissingSubmissions']);
+
+    // Get users with alerts (orange/red)
+    Route::get('/alerts', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getUsersWithAlerts']);
+
+    // Get single user's wellness detail
+    Route::get('/user/{userId}', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getUserWellness']);
+
+    // Threshold management
+    Route::get('/thresholds', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getThresholdsAdmin']);
+    Route::put('/thresholds/{threshold}', [\App\Http\Controllers\Api\WellnessScoreController::class, 'updateThreshold']);
+
+    // Analytics
+    Route::get('/analytics', [\App\Http\Controllers\Api\WellnessScoreController::class, 'analytics']);
+});
+
+// ============ COMPREHENSIVE ANALYTICS ROUTES ============
+
+// Admin Analytics Dashboard (Protected)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/analytics')->group(function () {
+    // Dashboard overview
+    Route::get('/dashboard', [\App\Http\Controllers\Api\AnalyticsController::class, 'dashboard']);
+
+    // Marketing source analytics (how customers found us)
+    Route::get('/marketing', [\App\Http\Controllers\Api\AnalyticsController::class, 'marketingSource']);
+
+    // Attendance statistics by service/day/week/month
+    Route::get('/attendance', [\App\Http\Controllers\Api\AnalyticsController::class, 'attendanceStats']);
+
+    // Group class capacity analytics (occupancy, cancellation rates)
+    Route::get('/capacity', [\App\Http\Controllers\Api\AnalyticsController::class, 'classCapacity']);
+
+    // Package usage statistics
+    Route::get('/packages', [\App\Http\Controllers\Api\AnalyticsController::class, 'packageUsage']);
+
+    // Demographics analytics (gender, age groups)
+    Route::get('/demographics', [\App\Http\Controllers\Api\AnalyticsController::class, 'demographics']);
+
+    // Service type distribution (EMS, Pilates, Personal, Group, Functional)
+    Route::get('/services', [\App\Http\Controllers\Api\AnalyticsController::class, 'serviceDistribution']);
+
+    // Trainer ratings analytics
+    Route::get('/ratings', [\App\Http\Controllers\Api\AnalyticsController::class, 'trainerRatings']);
+
+    // Churn & retention analytics
+    Route::get('/retention', [\App\Http\Controllers\Api\AnalyticsController::class, 'retentionAnalytics']);
+
+    // Trial conversion analytics
+    Route::get('/trials', [\App\Http\Controllers\Api\AnalyticsController::class, 'trialConversion']);
+
+    // Location-based analytics (per gym)
+    Route::get('/locations', [\App\Http\Controllers\Api\AnalyticsController::class, 'locationAnalytics']);
 });

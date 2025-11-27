@@ -19,6 +19,7 @@ class StoreProduct extends Model
         'category',
         'slug',
         'is_active',
+        'is_preorder',
         'stock_quantity',
         'original_price',
         'display_order',
@@ -30,6 +31,7 @@ class StoreProduct extends Model
             'price' => 'decimal:2',
             'original_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'is_preorder' => 'boolean',
         ];
     }
 

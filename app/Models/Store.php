@@ -47,4 +47,9 @@ class Store extends Model
     {
         return $this->hasMany(BusinessExpense::class);
     }
+
+    public function instructors()
+    {
+        return $this->hasMany(Instructor::class);
+    }
 }
