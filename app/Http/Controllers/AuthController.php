@@ -246,9 +246,18 @@ class AuthController extends Controller
                 ];
             }
 
+            // Get the first error message dynamically
+            $firstErrorMessage = 'Παρακαλώ διορθώστε τα σφάλματα στη φόρμα';
+            if (!empty($errors)) {
+                $firstErrorKey = array_key_first($errors);
+                if (isset($errors[$firstErrorKey][0])) {
+                    $firstErrorMessage = $errors[$firstErrorKey][0];
+                }
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+                'message' => $firstErrorMessage,
                 'errors' => $errors
             ], 422);
         }
@@ -481,29 +490,52 @@ class AuthController extends Controller
             $rules['parentConsent.signature'] = 'required|string';
         }
         
+        // Custom Greek validation messages
+        $messages = [
+            'firstName.required' => 'Το όνομα είναι υποχρεωτικό',
+            'lastName.required' => 'Το επώνυμο είναι υποχρεωτικό',
+            'email.required' => 'Το email είναι υποχρεωτικό',
+            'email.email' => 'Παρακαλώ εισάγετε έγκυρο email',
+            'email.unique' => 'Αυτό το email χρησιμοποιείται ήδη',
+            'password.required' => 'Ο κωδικός είναι υποχρεωτικός',
+            'password.min' => 'Ο κωδικός πρέπει να έχει τουλάχιστον :min χαρακτήρες',
+            'birthDate.required' => 'Η ημερομηνία γέννησης είναι υποχρεωτική',
+            'birthDate.before' => 'Η ημερομηνία γέννησης πρέπει να είναι στο παρελθόν',
+            'signature.required' => 'Η υπογραφή είναι υποχρεωτική',
+            'medicalHistory.liability_declaration_accepted.required' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+            'medicalHistory.liability_declaration_accepted.accepted' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+            'medicalHistory.ems_liability_accepted.accepted' => 'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση EMS για να συνεχίσετε',
+            'parentConsent.required' => 'Απαιτείται συγκατάθεση γονέα για ανηλίκους',
+            'parentConsent.parentFullName.required' => 'Το ονοματεπώνυμο γονέα είναι υποχρεωτικό',
+            'parentConsent.parentIdNumber.required' => 'Ο αριθμός ταυτότητας γονέα είναι υποχρεωτικός',
+            'parentConsent.parentIdNumber.unique' => 'Αυτός ο αριθμός ταυτότητας έχει ήδη χρησιμοποιηθεί',
+            'parentConsent.parentPhone.required' => 'Το τηλέφωνο γονέα είναι υποχρεωτικό',
+            'parentConsent.parentEmail.required' => 'Το email γονέα είναι υποχρεωτικό',
+            'parentConsent.consentAccepted.accepted' => 'Πρέπει να αποδεχθείτε τη συγκατάθεση γονέα',
+            'parentConsent.signature.required' => 'Η υπογραφή γονέα είναι υποχρεωτική',
+        ];
+
         try {
-            $validated = $request->validate($rules);
+            $validated = $request->validate($rules, $messages);
         } catch (ValidationException $e) {
-            // Custom error message for liability declaration
             $errors = $e->errors();
-            if (isset($errors['medicalHistory.liability_declaration_accepted'])) {
-                $errors['medicalHistory.liability_declaration_accepted'] = [
-                    'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική'
-                ];
-            }
-            if (isset($errors['medicalHistory.ems_liability_accepted'])) {
-                $errors['medicalHistory.ems_liability_accepted'] = [
-                    'Πρέπει να αποδεχθείτε την Υπεύθυνη Δήλωση EMS για να συνεχίσετε'
-                ];
+
+            // Get the first error message dynamically
+            $firstErrorMessage = 'Παρακαλώ διορθώστε τα σφάλματα στη φόρμα';
+            if (!empty($errors)) {
+                $firstErrorKey = array_key_first($errors);
+                if (isset($errors[$firstErrorKey][0])) {
+                    $firstErrorMessage = $errors[$firstErrorKey][0];
+                }
             }
 
             return response()->json([
                 'success' => false,
-                'message' => 'Η αποδοχή της Υπεύθυνης Δήλωσης είναι υποχρεωτική',
+                'message' => $firstErrorMessage,
                 'errors' => $errors
             ], 422);
         }
-        
+
         DB::beginTransaction();
         try {
             // Create user
