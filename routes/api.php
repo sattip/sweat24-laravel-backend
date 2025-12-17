@@ -332,6 +332,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('fitness-classes', [\App\Http\Controllers\Api\FitnessClassesController::class, 'store']);
         Route::put('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'update']);
         Route::delete('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'destroy']);
+        Route::get('fitness-classes/{id}/participants', [\App\Http\Controllers\Api\FitnessClassesController::class, 'getParticipants']);
+        Route::post('fitness-classes/{id}/attendance', [\App\Http\Controllers\Api\FitnessClassesController::class, 'markAttendance']);
     });
 
     // Questionnaires (authenticated routes for admin/trainer)

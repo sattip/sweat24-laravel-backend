@@ -355,4 +355,135 @@ class FitnessClassesController extends Controller
             'data' => $types
         ]);
     }
+
+    /**
+     * Get participants for a fitness class
+     */
+    public function getParticipants($id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        // Get bookings for this class that are not cancelled
+        $bookings = \App\Models\Booking::where('class_id', $id)
+            ->whereIn('status', ['confirmed', 'pending', 'completed', 'absent'])
+            ->with('user:id,name,email,phone')
+            ->get();
+
+        $participants = $bookings->map(function ($booking) {
+            // Try to get user package info
+            $userPackage = null;
+            if ($booking->user_id) {
+                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+                    ->where('status', 'active')
+                    ->first();
+            }
+
+            return [
+                'id' => $booking->id,
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
+                'user_name' => $booking->customer_name ?? $booking->user?->name ?? 'Άγνωστος',
+                'user_email' => $booking->customer_email ?? $booking->user?->email ?? '',
+                'user_phone' => $booking->user?->phone ?? null,
+                'status' => $booking->status,
+                'checked_in' => $booking->status === 'completed' || $booking->attended,
+                'package_name' => $userPackage?->package?->name ?? null,
+                'remaining_sessions' => $userPackage?->remaining_sessions ?? null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'participants' => $participants
+        ]);
+    }
+
+    /**
+     * Mark attendance for a participant in a fitness class
+     */
+    public function markAttendance(Request $request, $id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        $validated = $request->validate([
+            'booking_id' => 'required|integer|exists:bookings,id',
+            'status' => 'required|in:present,absent',
+            'with_charge' => 'boolean',
+        ]);
+
+        $booking = \App\Models\Booking::findOrFail($validated['booking_id']);
+
+        // Verify booking belongs to this class
+        if ($booking->class_id != $id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Η κράτηση δεν ανήκει σε αυτό το μάθημα'
+            ], 422);
+        }
+
+        if ($validated['status'] === 'present') {
+            // Mark as present (completed)
+            $booking->update([
+                'status' => 'completed',
+                'attended' => true,
+            ]);
+
+            // Deduct session from user package if applicable
+            if ($booking->user_id) {
+                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+                    ->where('status', 'active')
+                    ->where('remaining_sessions', '>', 0)
+                    ->first();
+
+                if ($userPackage) {
+                    $userPackage->decrement('remaining_sessions');
+
+                    // Check if package is now empty
+                    if ($userPackage->remaining_sessions <= 0) {
+                        $userPackage->update(['status' => 'completed']);
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Η παρουσία καταχωρήθηκε επιτυχώς'
+            ]);
+        } else {
+            // Mark as absent
+            $withCharge = $validated['with_charge'] ?? true;
+
+            $booking->update([
+                'status' => 'absent',
+                'attended' => false,
+                'absence_reason' => 'Απουσία από ομαδικό μάθημα',
+                'absence_with_charge' => $withCharge,
+                'absence_marked_at' => now(),
+                'absence_marked_by' => auth()->id(),
+            ]);
+
+            // If charging for absence, deduct from package
+            if ($withCharge && $booking->user_id) {
+                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+                    ->where('status', 'active')
+                    ->where('remaining_sessions', '>', 0)
+                    ->first();
+
+                if ($userPackage) {
+                    $userPackage->decrement('remaining_sessions');
+
+                    if ($userPackage->remaining_sessions <= 0) {
+                        $userPackage->update(['status' => 'completed']);
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $withCharge
+                    ? 'Η απουσία καταχωρήθηκε με χρέωση'
+                    : 'Η απουσία καταχωρήθηκε χωρίς χρέωση'
+            ]);
+        }
+    }
 }
