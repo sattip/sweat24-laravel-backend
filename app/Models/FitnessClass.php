@@ -79,7 +79,7 @@ class FitnessClass extends Model
      */
     public function scopeByDate($query, $date)
     {
-        return $query->where('date', $date);
+        return $query->whereDate('date', $date);
     }
 
     /**

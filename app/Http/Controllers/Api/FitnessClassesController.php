@@ -26,10 +26,10 @@ class FitnessClassesController extends Controller
         // Filter by date range
         if ($request->has('date_from') || $request->has('date_to')) {
             if ($request->date_from) {
-                $query->where('date', '>=', $request->date_from);
+                $query->whereDate('date', '>=', $request->date_from);
             }
             if ($request->date_to) {
-                $query->where('date', '<=', $request->date_to);
+                $query->whereDate('date', '<=', $request->date_to);
             }
         }
 
@@ -58,10 +58,19 @@ class FitnessClassesController extends Controller
                          ->orderBy('time', 'asc')
                          ->get();
 
+        // Get all instructors for name lookup
+        $instructors = \App\Models\Instructor::pluck('name', 'id')->toArray();
+
         // Transform data to include frontend-expected fields
-        $transformedClasses = $classes->map(function ($class) {
+        $transformedClasses = $classes->map(function ($class) use ($instructors) {
             $startTime = Carbon::parse($class->time);
             $endTime = $startTime->copy()->addMinutes($class->duration);
+
+            // Get trainer ID and name - instructor field may be numeric ID or name string
+            $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+            $trainerName = $trainerId && isset($instructors[$trainerId])
+                ? $instructors[$trainerId]
+                : $class->instructor; // Fall back to raw value if name not found
 
             return [
                 'id' => $class->id,
@@ -69,8 +78,8 @@ class FitnessClassesController extends Controller
                 'type' => $class->type,
                 'class_type' => $class->name, // Alias for frontend
                 'instructor' => $class->instructor,
-                'trainer_name' => $class->instructor, // Alias for frontend
-                'trainer_id' => null, // Not using numeric IDs yet
+                'trainer_name' => $trainerName,
+                'trainer_id' => $trainerId,
                 'date' => $class->date ? $class->date->format('Y-m-d') : null,
                 'time' => $startTime->format('H:i'),
                 'start_time' => $startTime->format('H:i'),
