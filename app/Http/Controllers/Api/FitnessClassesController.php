@@ -181,14 +181,24 @@ class FitnessClassesController extends Controller
         $startTime = Carbon::parse($class->time);
         $endTime = $startTime->copy()->addMinutes($class->duration);
 
+        // Get trainer info
+        $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+        $trainerName = $class->instructor;
+        if ($trainerId) {
+            $instructor = \App\Models\Instructor::find($trainerId);
+            if ($instructor) {
+                $trainerName = $instructor->name;
+            }
+        }
+
         $transformedClass = [
             'id' => $class->id,
             'name' => $class->name,
             'type' => $class->type,
             'class_type' => $class->name,
             'instructor' => $class->instructor,
-            'trainer_name' => $class->instructor,
-            'trainer_id' => null,
+            'trainer_name' => $trainerName,
+            'trainer_id' => $trainerId,
             'date' => $class->date ? $class->date->format('Y-m-d') : null,
             'time' => $startTime->format('H:i'),
             'start_time' => $startTime->format('H:i'),
@@ -222,18 +232,25 @@ class FitnessClassesController extends Controller
     {
         $class = FitnessClass::findOrFail($id);
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|string|max:255',
-            'instructor' => 'required|string|max:255',
-            'date' => 'required|date',
-            'time' => 'required|date_format:H:i',
-            'duration' => 'required|integer|min:15|max:480',
-            'max_participants' => 'required|integer|min:1|max:100',
+            'name' => 'sometimes|string|max:255',
+            'type' => 'sometimes|string|max:255',
+            'instructor' => 'sometimes|string|max:255',
+            'date' => 'sometimes|date',
+            'time' => 'sometimes|date_format:H:i',
+            'start_time' => 'sometimes|date_format:H:i', // Accept start_time as alias for time
+            'duration' => 'sometimes|integer|min:15|max:480',
+            'max_participants' => 'sometimes|integer|min:1|max:100',
             'store_id' => 'nullable|exists:stores,id',
             'location' => 'nullable|string|max:500',
             'description' => 'nullable|string|max:1000',
-            'status' => 'in:active,cancelled,completed'
+            'status' => 'sometimes|in:active,cancelled,completed'
         ]);
+
+        // Map start_time to time if provided
+        if (isset($validated['start_time']) && !isset($validated['time'])) {
+            $validated['time'] = $validated['start_time'];
+            unset($validated['start_time']);
+        }
 
         $class->update($validated);
         $class->load('store:id,name,color');
