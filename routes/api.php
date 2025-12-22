@@ -267,6 +267,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Mobile App - Get authenticated user's partial payment summary
     Route::get('/my-partial-payments', [UserPackageController::class, 'myPartialPayments']);
 
+    // Mobile App - Get authenticated user's package history (expired, cancelled, completed)
+    Route::get('/my-packages/history', [UserPackageController::class, 'myPackagesHistory']);
+
+    // Mobile App - Get authenticated user's active packages
+    Route::get('/my-active-packages', [UserPackageController::class, 'myActivePackages']);
+
     // Custom Packages route alias (points to user-packages endpoint)
     Route::get('custom-packages/user/{userId}', [UserPackageController::class, 'userPackages']);
     

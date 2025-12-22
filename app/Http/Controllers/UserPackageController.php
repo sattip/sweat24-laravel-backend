@@ -529,107 +529,350 @@ class UserPackageController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Get all packages with partial or pending payments
+        return $this->getPartialPaymentsForUser($user->id);
+    }
+
+    /**
+     * Get authenticated user's package history (expired, cancelled, completed)
+     * For mobile app - shows non-active packages
+     */
+    public function myPackagesHistory()
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Get packages that are not active (expired, cancelled, completed, or no remaining sessions)
         $packages = UserPackage::where('user_id', $user->id)
+            ->where(function ($query) {
+                $query->where('status', UserPackage::STATUS_EXPIRED)
+                    ->orWhere('status', 'cancelled')
+                    ->orWhere('status', 'completed')
+                    ->orWhere(function ($q) {
+                        // Packages with no remaining sessions (completed)
+                        $q->where('remaining_sessions', 0)
+                          ->where('total_sessions', '>', 0);
+                    })
+                    ->orWhere(function ($q) {
+                        // Packages past expiry date
+                        $q->whereNotNull('expiry_date')
+                          ->where('expiry_date', '<', now());
+                    });
+            })
+            ->with(['package'])
+            ->orderBy('expiry_date', 'desc')
+            ->get();
+
+        $result = $packages->map(function ($pkg) {
+            // Determine the actual status
+            $status = $pkg->status;
+            if ($status === UserPackage::STATUS_ACTIVE && $pkg->remaining_sessions === 0) {
+                $status = 'completed';
+            } elseif ($pkg->expiry_date && $pkg->expiry_date->isPast()) {
+                $status = 'expired';
+            }
+
+            // Calculate sessions used
+            $sessionsUsed = ($pkg->total_sessions ?? 0) - ($pkg->remaining_sessions ?? 0);
+
+            return [
+                'id' => $pkg->id,
+                'name' => $pkg->name,
+                'package_name' => $pkg->name, // Alternative field
+                'status' => $status,
+                'assigned_date' => $pkg->assigned_date?->format('Y-m-d'),
+                'start_date' => $pkg->assigned_date?->format('Y-m-d'), // Alternative field
+                'expires_at' => $pkg->expiry_date?->format('Y-m-d'),
+                'expiry_date' => $pkg->expiry_date?->format('Y-m-d'), // Alternative field
+                'end_date' => $pkg->expiry_date?->format('Y-m-d'), // Alternative field
+                'total_sessions' => $pkg->total_sessions,
+                'sessions_used' => $sessionsUsed,
+                'remaining_sessions' => $pkg->remaining_sessions,
+            ];
+        });
+
+        return response()->json([
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Get authenticated user's active packages
+     * For mobile app - shows currently active packages
+     */
+    public function myActivePackages()
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Get active packages (not expired, not cancelled, has remaining sessions or is unlimited)
+        $packages = UserPackage::where('user_id', $user->id)
+            ->where('status', UserPackage::STATUS_ACTIVE)
+            ->where(function ($query) {
+                $query->where('remaining_sessions', '>', 0)
+                    ->orWhereNull('total_sessions'); // Unlimited packages
+            })
+            ->where(function ($query) {
+                $query->whereNull('expiry_date')
+                    ->orWhere('expiry_date', '>=', now());
+            })
+            ->with(['package'])
+            ->orderBy('expiry_date', 'asc')
+            ->get();
+
+        $result = $packages->map(function ($pkg) {
+            $sessionsUsed = ($pkg->total_sessions ?? 0) - ($pkg->remaining_sessions ?? 0);
+            $daysRemaining = $pkg->expiry_date ? now()->diffInDays($pkg->expiry_date, false) : null;
+
+            return [
+                'id' => $pkg->id,
+                'name' => $pkg->name,
+                'package_name' => $pkg->name,
+                'status' => $pkg->status,
+                'assigned_date' => $pkg->assigned_date?->format('Y-m-d'),
+                'expires_at' => $pkg->expiry_date?->format('Y-m-d'),
+                'expiry_date' => $pkg->expiry_date?->format('Y-m-d'),
+                'total_sessions' => $pkg->total_sessions,
+                'remaining_sessions' => $pkg->remaining_sessions,
+                'sessions_used' => $sessionsUsed,
+                'days_remaining' => $daysRemaining,
+                'is_expiring_soon' => $daysRemaining !== null && $daysRemaining <= 7 && $daysRemaining > 0,
+                'is_frozen' => $pkg->is_frozen ?? false,
+                'auto_renew' => $pkg->auto_renew ?? false,
+            ];
+        });
+
+        return response()->json([
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Core logic for getting partial payments for a user
+     * Used by both myPartialPayments (auth user) and userPartialPayments (admin)
+     */
+    protected function getPartialPaymentsForUser($userId)
+    {
+        // Get all packages with partial payments OR installment plans
+        $packages = UserPackage::where('user_id', $userId)
             ->where(function ($query) {
                 $query->where('payment_status', UserPackage::PAYMENT_STATUS_PARTIAL)
                     ->orWhere('payment_status', UserPackage::PAYMENT_STATUS_PENDING)
-                    ->orWhere('amount_remaining', '>', 0);
+                    ->orWhere('amount_remaining', '>', 0)
+                    ->orWhere('installments', '>', 1); // Include packages with installment plans
             })
             ->with(['package'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Get all pending installments for the user
-        $pendingInstallments = PaymentInstallment::where('customer_id', $user->id)
-            ->whereIn('status', ['pending', 'overdue'])
+        // Get existing installment records from payment_installments table
+        $existingInstallments = PaymentInstallment::where('customer_id', $userId)
             ->orderBy('due_date', 'asc')
             ->get();
 
         $result = [
-            'has_pending_payments' => $packages->count() > 0 || $pendingInstallments->count() > 0,
+            'has_pending_payments' => false,
             'total_amount_remaining' => 0,
-            'total_pending_installments' => $pendingInstallments->count(),
             'next_installment_due' => null,
+            'next_installment_amount' => null,
             'packages' => [],
             'upcoming_installments' => [],
         ];
 
-        // Process packages with partial payments
+        // Process each package
         foreach ($packages as $package) {
             $totalAmount = $package->getEffectivePrice();
             $amountPaid = $package->amount_paid ?? 0;
             $amountRemaining = $package->amount_remaining ?? ($totalAmount - $amountPaid);
+            $totalInstallments = $package->installments ?? 1;
+            $installmentsPaid = $package->installments_paid ?? 0;
+
+            // Skip fully paid packages
+            if ($amountRemaining <= 0 && $package->payment_status === UserPackage::PAYMENT_STATUS_PAID) {
+                continue;
+            }
 
             $result['total_amount_remaining'] += $amountRemaining;
+            $result['has_pending_payments'] = true;
 
-            // Get installments for this package
-            $packageInstallments = $pendingInstallments->where('package_id', $package->package_id);
-            $paidInstallments = PaymentInstallment::where('customer_id', $user->id)
-                ->where('package_id', $package->package_id)
-                ->where('status', 'paid')
-                ->count();
-            $totalInstallments = $package->installments ?? ($paidInstallments + $packageInstallments->count());
+            // Get existing installment records for this package
+            $packageExistingInstallments = $existingInstallments->where('package_id', $package->package_id);
+
+            // Generate installment schedule
+            $installmentsArray = $this->generateInstallmentSchedule(
+                $package,
+                $totalAmount,
+                $amountPaid,
+                $totalInstallments,
+                $installmentsPaid,
+                $packageExistingInstallments
+            );
+
+            $pendingInstallmentsCount = collect($installmentsArray)->where('status', 'pending')->count();
+            $overdueInstallmentsCount = collect($installmentsArray)->where('status', 'overdue')->count();
 
             $result['packages'][] = [
+                'id' => $package->id,
                 'user_package_id' => $package->id,
-                'package_name' => $package->name,
                 'package_id' => $package->package_id,
-                'total_amount' => $totalAmount,
-                'amount_paid' => $amountPaid,
-                'amount_remaining' => $amountRemaining,
+                'package_name' => $package->name,
+                'total_amount' => (float) $totalAmount,
+                'amount_paid' => (float) $amountPaid,
+                'amount_remaining' => (float) $amountRemaining,
                 'payment_status' => $package->payment_status,
                 'payment_method' => $package->payment_method,
-                'is_custom_package' => $package->is_custom_package,
+                'is_custom_package' => $package->is_custom_package ?? false,
                 'assigned_date' => $package->assigned_date?->format('Y-m-d'),
                 'expiry_date' => $package->expiry_date?->format('Y-m-d'),
-                'installments' => [
-                    'total' => $totalInstallments,
-                    'paid' => $paidInstallments,
-                    'remaining' => $packageInstallments->count(),
-                ],
                 'remaining_sessions' => $package->remaining_sessions,
                 'status' => $package->status,
-            ];
-        }
-
-        // Process upcoming installments
-        foreach ($pendingInstallments as $installment) {
-            $isOverdue = $installment->due_date && $installment->due_date->isPast();
-
-            $result['upcoming_installments'][] = [
-                'id' => $installment->id,
-                'package_id' => $installment->package_id,
-                'package_name' => $installment->package_name,
-                'installment_number' => $installment->installment_number,
-                'total_installments' => $installment->total_installments,
-                'amount' => $installment->amount,
-                'due_date' => $installment->due_date?->format('Y-m-d'),
-                'status' => $installment->status,
-                'is_overdue' => $isOverdue,
-                'days_until_due' => $installment->due_date ? now()->diffInDays($installment->due_date, false) : null,
+                'installments' => $installmentsArray,
+                'installments_summary' => [
+                    'total' => $totalInstallments,
+                    'paid' => $installmentsPaid,
+                    'pending' => $pendingInstallmentsCount,
+                    'overdue' => $overdueInstallmentsCount,
+                ],
             ];
 
-            // Set next installment due
-            if (!$result['next_installment_due'] && !$isOverdue && $installment->due_date) {
-                $result['next_installment_due'] = [
-                    'date' => $installment->due_date->format('Y-m-d'),
-                    'amount' => $installment->amount,
-                    'package_name' => $installment->package_name,
-                    'installment_number' => $installment->installment_number,
-                    'total_installments' => $installment->total_installments,
-                ];
+            // Add pending/overdue installments to upcoming_installments
+            foreach ($installmentsArray as $inst) {
+                if ($inst['status'] !== 'paid') {
+                    $result['upcoming_installments'][] = array_merge($inst, [
+                        'package_name' => $package->name,
+                        'user_package_id' => $package->id,
+                    ]);
+                }
             }
         }
 
         // Sort upcoming installments: overdue first, then by due date
         usort($result['upcoming_installments'], function ($a, $b) {
-            if ($a['is_overdue'] && !$b['is_overdue']) return -1;
-            if (!$a['is_overdue'] && $b['is_overdue']) return 1;
+            if (($a['is_overdue'] ?? false) && !($b['is_overdue'] ?? false)) return -1;
+            if (!($a['is_overdue'] ?? false) && ($b['is_overdue'] ?? false)) return 1;
             return strcmp($a['due_date'] ?? '', $b['due_date'] ?? '');
         });
 
+        // Set next installment due from first non-overdue pending installment
+        foreach ($result['upcoming_installments'] as $inst) {
+            if (!($inst['is_overdue'] ?? false) && $inst['status'] === 'pending') {
+                $result['next_installment_due'] = $inst['due_date'];
+                $result['next_installment_amount'] = $inst['amount'];
+                break;
+            }
+        }
+
         return response()->json($result);
+    }
+
+    /**
+     * Generate installment schedule for a package
+     * Uses existing payment_installments records if available, otherwise calculates from package data
+     */
+    protected function generateInstallmentSchedule($package, $totalAmount, $amountPaid, $totalInstallments, $installmentsPaid, $existingInstallments)
+    {
+        $installments = [];
+
+        // If we have existing installment records, use them
+        if ($existingInstallments->count() > 0) {
+            foreach ($existingInstallments as $inst) {
+                $isOverdue = $inst->status === 'overdue' ||
+                    ($inst->status === 'pending' && $inst->due_date && $inst->due_date->isPast());
+
+                $installments[] = [
+                    'id' => $inst->id,
+                    'installment_number' => $inst->installment_number,
+                    'total_installments' => $inst->total_installments,
+                    'amount' => (float) $inst->amount,
+                    'due_date' => $inst->due_date?->format('Y-m-d'),
+                    'paid_date' => $inst->paid_date?->format('Y-m-d'),
+                    'status' => $isOverdue ? 'overdue' : $inst->status,
+                    'is_overdue' => $isOverdue,
+                    'days_until_due' => $inst->due_date ? (int) now()->diffInDays($inst->due_date, false) : null,
+                ];
+            }
+            return $installments;
+        }
+
+        // No existing records - generate schedule from package data
+        if ($totalInstallments <= 1) {
+            // Single payment package
+            $status = $amountPaid >= $totalAmount ? 'paid' : 'pending';
+            $installments[] = [
+                'id' => null,
+                'installment_number' => 1,
+                'total_installments' => 1,
+                'amount' => (float) $totalAmount,
+                'due_date' => $package->assigned_date?->format('Y-m-d'),
+                'paid_date' => $status === 'paid' ? now()->format('Y-m-d') : null,
+                'status' => $status,
+                'is_overdue' => false,
+                'days_until_due' => null,
+            ];
+            return $installments;
+        }
+
+        // Multiple installments - calculate schedule
+        $installmentAmount = round($totalAmount / $totalInstallments, 2);
+        $frequency = $package->installment_frequency ?? 'monthly'; // Default to monthly
+        $startDate = $package->assigned_date ?? now();
+
+        for ($i = 1; $i <= $totalInstallments; $i++) {
+            // Calculate due date based on frequency
+            $dueDate = $this->calculateInstallmentDueDate($startDate, $i, $frequency);
+
+            // Determine status
+            if ($i <= $installmentsPaid) {
+                $status = 'paid';
+                $isOverdue = false;
+            } else {
+                // Check if overdue
+                $isOverdue = $dueDate->isPast();
+                $status = $isOverdue ? 'overdue' : 'pending';
+            }
+
+            // Adjust last installment amount to account for rounding
+            $amount = $i === $totalInstallments
+                ? $totalAmount - ($installmentAmount * ($totalInstallments - 1))
+                : $installmentAmount;
+
+            $installments[] = [
+                'id' => null, // Generated, not from DB
+                'installment_number' => $i,
+                'total_installments' => $totalInstallments,
+                'amount' => (float) $amount,
+                'due_date' => $dueDate->format('Y-m-d'),
+                'paid_date' => $status === 'paid' ? $dueDate->format('Y-m-d') : null,
+                'status' => $status,
+                'is_overdue' => $isOverdue,
+                'days_until_due' => $status !== 'paid' ? (int) now()->diffInDays($dueDate, false) : null,
+            ];
+        }
+
+        return $installments;
+    }
+
+    /**
+     * Calculate due date for an installment based on frequency
+     */
+    protected function calculateInstallmentDueDate($startDate, $installmentNumber, $frequency)
+    {
+        $date = \Carbon\Carbon::parse($startDate);
+
+        switch ($frequency) {
+            case 'weekly':
+                return $date->copy()->addWeeks($installmentNumber - 1);
+            case 'biweekly':
+                return $date->copy()->addWeeks(($installmentNumber - 1) * 2);
+            case 'monthly':
+            default:
+                return $date->copy()->addMonths($installmentNumber - 1);
+        }
     }
 
     /**
@@ -639,74 +882,14 @@ class UserPackageController extends Controller
     {
         $user = User::findOrFail($userId);
 
-        // Get all packages with partial or pending payments
-        $packages = UserPackage::where('user_id', $userId)
-            ->where(function ($query) {
-                $query->where('payment_status', UserPackage::PAYMENT_STATUS_PARTIAL)
-                    ->orWhere('payment_status', UserPackage::PAYMENT_STATUS_PENDING)
-                    ->orWhere('amount_remaining', '>', 0);
-            })
-            ->with(['package'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Use the shared core logic
+        $response = $this->getPartialPaymentsForUser($userId);
 
-        // Get all pending installments for the user
-        $pendingInstallments = PaymentInstallment::where('customer_id', $userId)
-            ->whereIn('status', ['pending', 'overdue'])
-            ->orderBy('due_date', 'asc')
-            ->get();
+        // Get the JSON data and add user info
+        $data = json_decode($response->getContent(), true);
+        $data['user_id'] = (int) $userId;
+        $data['user_name'] = $user->name;
 
-        $result = [
-            'user_id' => (int) $userId,
-            'user_name' => $user->name,
-            'has_pending_payments' => $packages->count() > 0 || $pendingInstallments->count() > 0,
-            'total_amount_remaining' => 0,
-            'total_pending_installments' => $pendingInstallments->count(),
-            'packages' => [],
-            'upcoming_installments' => [],
-        ];
-
-        // Process packages
-        foreach ($packages as $package) {
-            $totalAmount = $package->getEffectivePrice();
-            $amountPaid = $package->amount_paid ?? 0;
-            $amountRemaining = $package->amount_remaining ?? ($totalAmount - $amountPaid);
-
-            $result['total_amount_remaining'] += $amountRemaining;
-
-            $packageInstallments = $pendingInstallments->where('package_id', $package->package_id);
-            $paidInstallments = PaymentInstallment::where('customer_id', $userId)
-                ->where('package_id', $package->package_id)
-                ->where('status', 'paid')
-                ->count();
-
-            $result['packages'][] = [
-                'user_package_id' => $package->id,
-                'package_name' => $package->name,
-                'total_amount' => $totalAmount,
-                'amount_paid' => $amountPaid,
-                'amount_remaining' => $amountRemaining,
-                'payment_status' => $package->payment_status,
-                'installments_paid' => $paidInstallments,
-                'installments_remaining' => $packageInstallments->count(),
-                'assigned_date' => $package->assigned_date?->format('Y-m-d'),
-            ];
-        }
-
-        // Process installments
-        foreach ($pendingInstallments as $installment) {
-            $result['upcoming_installments'][] = [
-                'id' => $installment->id,
-                'package_name' => $installment->package_name,
-                'installment_number' => $installment->installment_number,
-                'total_installments' => $installment->total_installments,
-                'amount' => $installment->amount,
-                'due_date' => $installment->due_date?->format('Y-m-d'),
-                'status' => $installment->status,
-                'is_overdue' => $installment->due_date && $installment->due_date->isPast(),
-            ];
-        }
-
-        return response()->json($result);
+        return response()->json($data);
     }
 }
