@@ -49,6 +49,13 @@ class AuthController extends Controller
             ]);
         }
 
+        // Only allow admins and trainers to login to the panel
+        if (!in_array($user->role, ['admin', 'trainer'])) {
+            throw ValidationException::withMessages([
+                'email' => ['Δεν έχετε πρόσβαση. Μόνο διαχειριστές και γυμναστές μπορούν να συνδεθούν σε αυτό το panel.'],
+            ]);
+        }
+
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
