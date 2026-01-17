@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\GymClass;
-use App\Models\Instructor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class GymClassFactory extends Factory
@@ -15,9 +14,7 @@ class GymClassFactory extends Factory
         return [
             'name' => fake()->randomElement(['Morning Yoga', 'Evening Pilates', 'HIIT Training', 'CrossFit', 'Zumba']),
             'type' => fake()->randomElement(['Yoga', 'Pilates', 'HIIT', 'CrossFit', 'Zumba', 'Boxing']),
-            'instructor' => function () {
-                return Instructor::factory()->create()->id;
-            },
+            'instructor' => fake()->name(),
             'date' => fake()->dateTimeBetween('now', '+30 days'),
             'time' => fake()->time('H:i:s'),
             'duration' => fake()->randomElement([30, 45, 60, 90]),

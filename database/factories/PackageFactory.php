@@ -11,16 +11,13 @@ class PackageFactory extends Factory
 
     public function definition(): array
     {
-        $type = fake()->randomElement(['sessions', 'unlimited', 'time_based']);
-        
         return [
             'name' => fake()->randomElement(['Basic', 'Premium', 'Gold', 'Platinum']) . ' Package',
-            'type' => $type,
             'duration' => fake()->randomElement([7, 14, 30, 60, 90]),
             'description' => fake()->sentence(),
             'price' => fake()->randomFloat(2, 50, 500),
-            'credits' => $type === 'sessions' ? fake()->numberBetween(5, 50) : 0,
-            'active' => true,
+            'sessions' => fake()->numberBetween(5, 50),
+            'status' => 'active',
         ];
     }
 }

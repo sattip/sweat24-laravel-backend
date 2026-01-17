@@ -16,9 +16,16 @@ class BookingFactory extends Factory
         return [
             'user_id' => User::factory(),
             'class_id' => GymClass::factory(),
-            'booking_date' => fake()->dateTimeBetween('now', '+30 days'),
-            'status' => fake()->randomElement(['confirmed', 'cancelled', 'completed']),
-            'notes' => fake()->optional()->sentence(),
+            'customer_name' => fake()->name(),
+            'customer_email' => fake()->safeEmail(),
+            'class_name' => fake()->randomElement(['Yoga', 'Pilates', 'HIIT', 'Zumba']),
+            'instructor' => fake()->name(),
+            'date' => fake()->dateTimeBetween('now', '+30 days'),
+            'time' => fake()->time('H:i'),
+            'status' => fake()->randomElement(['confirmed', 'cancelled', 'completed', 'pending']),
+            'type' => fake()->randomElement(['group', 'personal']),
+            'booking_time' => fake()->dateTimeBetween('-7 days', 'now'),
+            'location' => fake()->randomElement(['Studio A', 'Studio B', 'Main Hall']),
         ];
     }
 }
