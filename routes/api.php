@@ -67,6 +67,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/admin/login', [AuthController::class, 'adminLogin']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
     Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);

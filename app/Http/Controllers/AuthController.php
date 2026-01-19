@@ -98,15 +98,103 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Handle admin/trainer login for admin panel
+     */
+    public function adminLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
+            ]);
+        }
+
+        // Check if user is still pending approval
+        if ($user->status === 'pending_approval') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
+            ]);
+        }
+
+        // Check if user is inactive
+        if ($user->status === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
+            ]);
+        }
+
+        // Only allow admins and trainers to login to the admin panel
+        if (!in_array($user->role, ['admin', 'trainer'])) {
+            throw ValidationException::withMessages([
+                'email' => ['Δεν έχετε πρόσβαση. Μόνο διαχειριστές και γυμναστές μπορούν να συνδεθούν σε αυτό το panel.'],
+            ]);
+        }
+
+        // Create token
+        $token = $user->createToken('admin-token')->plainTextToken;
+
+        // Log the login activity
+        ActivityLogger::logLogin($user);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'address' => $user->address,
+                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
+                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
+                'gender' => $user->gender,
+                'weight' => $user->weight,
+                'height' => $user->height,
+                'emergency_contact' => $user->emergency_contact,
+                'emergency_phone' => $user->emergency_phone,
+                'membership_type' => $user->membership_type,
+                'role' => $user->role,
+                'status' => $user->status,
+                'registration_status' => $user->registration_status,
+                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
+                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
+                'is_minor' => $user->is_minor,
+                'age_at_registration' => $user->age_at_registration,
+                'remaining_sessions' => $user->remaining_sessions,
+                'total_sessions' => $user->total_sessions,
+                'join_date' => $user->join_date,
+                'last_visit' => $user->last_visit,
+                'medical_history' => $user->medical_history,
+                'notes' => $user->notes,
+                'has_signed_terms' => $user->approved_at ?
+                    $user->signatures()
+                        ->where('document_type', 'terms_and_conditions')
+                        ->where('signed_at', '>', $user->approved_at)
+                        ->exists() : false,
+                'terms_accepted_at' => $user->terms_accepted_at,
+                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
+                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
+            ],
+            'token' => $token,
+        ]);
+    }
+
     public function logout(Request $request)
     {
         $user = $request->user();
-        
+
         // Log the logout activity
         if ($user) {
             ActivityLogger::logLogout($user);
         }
-        
+
         // Check if it's an API request
         if ($request->expectsJson()) {
             $request->user()->currentAccessToken()->delete();
@@ -116,46 +204,15 @@ class AuthController extends Controller
                 'message' => 'Logged out successfully',
             ]);
         }
-        
+
         // Web logout
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        
+
         return redirect('/admin/login')->with('success', 'Logged out successfully');
     }
     
-    public function adminLogin(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-
-        $credentials = $request->only('email', 'password');
-        
-        if (Auth::attempt($credentials, $request->filled('remember'))) {
-            $user = Auth::user();
-            
-            // Check if user is admin
-            if ($user->membership_type !== 'Admin') {
-                Auth::logout();
-                return redirect()->back()->with('error', 'Unauthorized. Admin access only.');
-            }
-            
-            $request->session()->regenerate();
-            
-            // Log the admin login activity
-            ActivityLogger::logLogin($user);
-            
-            return redirect()->intended(route('admin.dashboard'));
-        }
-
-        return redirect()->back()
-            ->withInput($request->only('email'))
-            ->with('error', 'Invalid credentials.');
-    }
-
     public function me(Request $request)
     {
         $user = $request->user();
