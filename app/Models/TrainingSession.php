@@ -138,7 +138,8 @@ class TrainingSession extends Model
      */
     public function scopeBetweenDates($query, $startDate, $endDate)
     {
-        return $query->whereBetween('session_date', [$startDate, $endDate]);
+        return $query->whereDate('session_date', '>=', $startDate)
+                     ->whereDate('session_date', '<=', $endDate);
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PriorityBookingSettings extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'default_priority_seats',
         'priority_advance_hours',

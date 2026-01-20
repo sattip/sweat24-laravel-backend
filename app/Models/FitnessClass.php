@@ -32,7 +32,6 @@ class FitnessClass extends Model
 
     protected $casts = [
         'date' => 'date',
-        'time' => 'datetime:H:i',
         'duration' => 'integer',
         'max_participants' => 'integer',
         'current_participants' => 'integer',
