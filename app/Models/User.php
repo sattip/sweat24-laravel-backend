@@ -138,11 +138,6 @@ class User extends Authenticatable
         return $value;
     }
 
-    public function packages()
-    {
-        return $this->hasMany(UserPackage::class);
-    }
-
     public function bookings()
     {
         return $this->hasMany(Booking::class);
@@ -279,7 +274,7 @@ class User extends Authenticatable
      */
     public function progressPhotos()
     {
-        return $this->hasMany(\App\Models\ProgressPhoto::class);
+        return $this->hasMany(ProgressPhoto::class);
     }
     
     /**
@@ -287,7 +282,7 @@ class User extends Authenticatable
      */
     public function bodyMeasurements()
     {
-        return $this->hasMany(\App\Models\BodyMeasurement::class);
+        return $this->hasMany(BodyMeasurement::class);
     }
 
     /**
@@ -295,7 +290,7 @@ class User extends Authenticatable
      */
     public function fitnessLevels()
     {
-        return $this->hasMany(\App\Models\FitnessLevel::class);
+        return $this->hasMany(FitnessLevel::class);
     }
 
     /**
@@ -303,7 +298,7 @@ class User extends Authenticatable
      */
     public function currentFitnessLevel()
     {
-        return $this->hasOne(\App\Models\FitnessLevel::class)->latestOfMany('assessment_date');
+        return $this->hasOne(FitnessLevel::class)->latestOfMany('assessment_date');
     }
 
     /**
@@ -311,7 +306,7 @@ class User extends Authenticatable
      */
     public function performanceTests()
     {
-        return $this->hasMany(\App\Models\PerformanceTest::class);
+        return $this->hasMany(PerformanceTest::class);
     }
 
     /**
@@ -319,7 +314,7 @@ class User extends Authenticatable
      */
     public function trainingSessions()
     {
-        return $this->hasMany(\App\Models\TrainingSession::class);
+        return $this->hasMany(TrainingSession::class);
     }
 
     /**
@@ -327,7 +322,7 @@ class User extends Authenticatable
      */
     public function trainingSessionsAsTrainer()
     {
-        return $this->hasMany(\App\Models\TrainingSession::class, 'trainer_id');
+        return $this->hasMany(TrainingSession::class, 'trainer_id');
     }
     
     /**

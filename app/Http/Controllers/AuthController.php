@@ -18,10 +18,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email',
@@ -56,7 +58,7 @@ class AuthController extends Controller
     /**
      * Handle admin/trainer login for admin panel
      */
-    public function adminLogin(Request $request)
+    public function adminLogin(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email',
@@ -158,7 +160,7 @@ class AuthController extends Controller
         return array_merge($response, $additionalFields);
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -184,8 +186,8 @@ class AuthController extends Controller
 
         return redirect('/admin/login')->with('success', 'Logged out successfully');
     }
-    
-    public function me(Request $request)
+
+    public function me(Request $request): JsonResponse
     {
         $user = $request->user();
 
@@ -202,7 +204,7 @@ class AuthController extends Controller
      * @deprecated Use registerWithConsent() instead to ensure proper age verification
      * This endpoint is maintained for backward compatibility but should not be used for new registrations
      */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         // Log deprecation warning
         Log::warning('Deprecated registration endpoint used', [
@@ -388,7 +390,7 @@ class AuthController extends Controller
      * Check if a user is a minor based on birth date
      * CRITICAL: Age calculation must be done on server for legal validity
      */
-    public function checkAge(Request $request)
+    public function checkAge(Request $request): JsonResponse
     {
         $request->validate([
             'birth_date' => 'required|date|before:today'
@@ -426,7 +428,7 @@ class AuthController extends Controller
     /**
      * Enhanced registration with parent consent support
      */
-    public function registerWithConsent(Request $request)
+    public function registerWithConsent(Request $request): JsonResponse
     {
         // Basic validation
         $rules = [

@@ -342,20 +342,24 @@ class RoleBasedAccessTest extends TestCase
     public function test_member_can_create_booking(): void
     {
         $member = User::factory()->member()->create();
+        Sanctum::actingAs($member);
 
-                $gymClass = GymClass::factory()->create([
-            'max_participants' => 10,
-            'date' => now()->addDays(1)->format('Y-m-d'),
-            'time' => '10:00:00',
-        ]);
+        $store = \App\Models\Store::factory()->create();
+        $instructor = \App\Models\Instructor::factory()->create();
 
-        // Public booking endpoint doesn't require auth
+        // Booking endpoint requires authentication
         $response = $this->postJson('/api/v1/bookings', [
-            'class_id' => $gymClass->id,
+            'store_id' => $store->id,
             'user_id' => $member->id,
+            'class_name' => 'Yoga Class',
+            'instructor' => $instructor->name,
+            'date' => now()->addDays(1)->format('Y-m-d'),
+            'time' => '10:00',
+            'type' => 'group',
+            'location' => 'Studio A',
         ]);
 
-        // Booking creation should work (may need specific data)
+        // Booking creation should work (not 401 or 403)
         $this->assertNotEquals(401, $response->status());
         $this->assertNotEquals(403, $response->status());
     }

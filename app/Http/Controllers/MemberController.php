@@ -11,7 +11,7 @@ class MemberController extends Controller
     {
         $query = User::where('membership_type', '!=', 'Admin')
                     ->orWhereNull('membership_type')
-                    ->with(['packages' => function($q) {
+                    ->with(['userPackages' => function($q) {
                         $q->where('status', 'active');
                     }, 'parentConsent']);
         

@@ -32,7 +32,7 @@ class UserController extends Controller
 
         // Check if no_pagination is requested (for frontend dropdown lists, etc)
         if ($request->has('no_pagination') && $request->get('no_pagination') === 'true') {
-            $users = $query->with('packages', 'activityLogs')
+            $users = $query->with('userPackages', 'activityLogs')
                 ->addSelect([
                     'users.*',
                     'doctor_certificate_path',
@@ -48,7 +48,7 @@ class UserController extends Controller
             return response()->json($users);
         }
 
-        $users = $query->with('packages', 'activityLogs')
+        $users = $query->with('userPackages', 'activityLogs')
             ->select([
                 'users.*',
                 'doctor_certificate_path',
@@ -114,7 +114,7 @@ class UserController extends Controller
     public function show(User $user)
     {
         $userData = $user->load([
-            'packages' => function ($query) {
+            'userPackages' => function ($query) {
                 $query->with(['package:id,name,price,sessions,duration,service_id']);
             },
             'bookings',
@@ -128,8 +128,8 @@ class UserController extends Controller
         }
 
         // Add original package price to each user package
-        if (isset($userData['packages'])) {
-            foreach ($userData['packages'] as &$userPackage) {
+        if (isset($userData['user_packages'])) {
+            foreach ($userData['user_packages'] as &$userPackage) {
                 if (isset($userPackage['package'])) {
                     $userPackage['original_package_price'] = $userPackage['package']['price'];
                     $userPackage['original_package_sessions'] = $userPackage['package']['sessions'];
@@ -191,7 +191,7 @@ class UserController extends Controller
             ['changes' => $validated]
         );
         
-        return response()->json($user->load('packages', 'bookings'));
+        return response()->json($user->load('userPackages', 'bookings'));
     }
 
     public function destroy(User $user)

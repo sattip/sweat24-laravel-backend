@@ -18,23 +18,23 @@ use App\Notifications\Bookings\BookingConfirmationNotification;
 use App\Notifications\Bookings\BookingCancelledNotification;
 use Illuminate\Support\Facades\Notification;
 use App\Services\BookingCompletionService;
+use Illuminate\Http\JsonResponse;
 
 class BookingController extends Controller
 {
     use ApiResponseTrait;
 
-    protected $bookingCompletionService;
+    protected BookingCompletionService $bookingCompletionService;
 
     public function __construct(BookingCompletionService $bookingCompletionService)
     {
         $this->bookingCompletionService = $bookingCompletionService;
     }
-    
-    // Remove middleware for testing
+
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Booking::with('user', 'store', 'service', 'gymClass', 'fitnessClass');
 
@@ -94,7 +94,7 @@ class BookingController extends Controller
     /**
      * Get user's past bookings for workout history
      */
-    public function history(Request $request)
+    public function history(Request $request): JsonResponse
     {
         // Get authenticated user
         $authUser = $request->user();
@@ -164,7 +164,7 @@ class BookingController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
         $validated = $request->validate([
@@ -378,7 +378,7 @@ class BookingController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Booking $booking)
+    public function show(Booking $booking): JsonResponse
     {
         return response()->json($booking->load('user', 'store', 'service'));
     }
@@ -386,7 +386,7 @@ class BookingController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Booking $booking)
+    public function update(Request $request, Booking $booking): JsonResponse
     {
         $validated = $request->validate([
             'store_id' => 'sometimes|exists:stores,id',
@@ -413,7 +413,7 @@ class BookingController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Booking $booking)
+    public function destroy(Booking $booking): JsonResponse
     {
         $booking->delete();
         return response()->json(['message' => 'Booking deleted successfully']);
@@ -422,7 +422,7 @@ class BookingController extends Controller
     /**
      * Complete a booking (mark as attended and deduct session from package)
      */
-    public function complete(Request $request, $bookingId)
+    public function complete(Request $request, $bookingId): JsonResponse
     {
         try {
             // Validate request
@@ -490,7 +490,7 @@ class BookingController extends Controller
     /**
      * Cancel a booking
      */
-    public function cancel(Request $request, Booking $booking)
+    public function cancel(Request $request, Booking $booking): JsonResponse
     {
         // Check if user owns this booking
         $userId = null;
@@ -614,7 +614,7 @@ class BookingController extends Controller
     /**
      * Mark booking as no-show/absent
      */
-    public function markAbsent(Request $request, Booking $booking)
+    public function markAbsent(Request $request, Booking $booking): JsonResponse
     {
         // Validate request
         $validated = $request->validate([
@@ -677,13 +677,18 @@ class BookingController extends Controller
             }
 
             // Log activity
-            ActivityLogger::log('booking_marked_absent', [
-                'booking_id' => $booking->id,
-                'user_id' => $booking->user_id,
-                'with_charge' => $withCharge,
-                'reason' => $reason,
-                'marked_by' => $request->user() ? $request->user()->name : 'System',
-            ]);
+            ActivityLogger::log(
+                'booking_marked_absent',
+                "Booking marked as absent: {$booking->user->name}",
+                $booking,
+                [
+                    'booking_id' => $booking->id,
+                    'user_id' => $booking->user_id,
+                    'with_charge' => $withCharge,
+                    'reason' => $reason,
+                    'marked_by' => $request->user() ? $request->user()->name : 'System',
+                ]
+            );
 
             // If "without charge", notify admins
             if (!$withCharge) {

@@ -43,11 +43,11 @@ class UserTest extends TestCase
         $this->assertInstanceOf(\Illuminate\Database\Eloquent\Relations\HasMany::class, $user->bookings());
     }
 
-    public function test_user_has_packages_relationship(): void
+    public function test_user_has_user_packages_relationship(): void
     {
         $user = User::factory()->create();
 
-        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Relations\HasMany::class, $user->packages());
+        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Relations\HasMany::class, $user->userPackages());
     }
 
     public function test_user_email_must_be_unique(): void
