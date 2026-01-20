@@ -25,16 +25,11 @@ class BookingControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create(['role' => 'member']);
         $this->admin = User::factory()->create(['role' => 'admin']);
-        
-        $instructor = Instructor::create([
-            'name' => 'Test Instructor',
-            'email' => 'instructor@test.com',
-            'phone' => '1234567890',
-            'specialization' => 'Yoga'
-        ]);
+
+        $instructor = Instructor::factory()->create();
 
         $this->gymClass = GymClass::factory()->create([
             'instructor' => $instructor->id,
@@ -45,22 +40,16 @@ class BookingControllerTest extends TestCase
             'status' => 'active'
         ]);
 
-        $this->package = Package::create([
+        $this->package = Package::factory()->create([
             'name' => 'Test Package',
-            'type' => 'sessions',
-            'duration' => 30,
-            'description' => 'Test package',
-            'price' => 100,
-            'credits' => 10,
-            'active' => true
         ]);
 
-        $this->userPackage = UserPackage::create([
+        $this->userPackage = UserPackage::factory()->create([
             'user_id' => $this->user->id,
             'package_id' => $this->package->id,
-            'sessions_remaining' => 10,
-            'active' => true,
-            'expires_at' => now()->addDays(30)
+            'remaining_sessions' => 10,
+            'status' => 'active',
+            'expiry_date' => now()->addDays(30)
         ]);
     }
 
@@ -91,12 +80,12 @@ class BookingControllerTest extends TestCase
 
         // Check that session was deducted
         $this->userPackage->refresh();
-        $this->assertEquals(9, $this->userPackage->sessions_remaining);
+        $this->assertEquals(9, $this->userPackage->remaining_sessions);
     }
 
     public function test_user_cannot_book_class_without_sessions()
     {
-        $this->userPackage->update(['sessions_remaining' => 0]);
+        $this->userPackage->update(['remaining_sessions' => 0]);
         Sanctum::actingAs($this->user);
 
         $response = $this->postJson('/api/v1/bookings', [
@@ -131,12 +120,12 @@ class BookingControllerTest extends TestCase
     public function test_user_cannot_double_book_same_class()
     {
         Sanctum::actingAs($this->user);
-        
-        // First booking
-        Booking::create([
+
+        // First booking using factory
+        Booking::factory()->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->addDays(1),
+            'date' => now()->addDays(1),
             'status' => 'confirmed'
         ]);
 
@@ -156,7 +145,7 @@ class BookingControllerTest extends TestCase
     public function test_user_can_view_own_bookings()
     {
         Sanctum::actingAs($this->user);
-        
+
         Booking::factory()->count(3)->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id
@@ -171,7 +160,7 @@ class BookingControllerTest extends TestCase
                     'id',
                     'user_id',
                     'class_id',
-                    'booking_date',
+                    'date',
                     'status'
                 ]
             ]);
@@ -180,7 +169,7 @@ class BookingControllerTest extends TestCase
     public function test_admin_can_view_all_bookings()
     {
         Sanctum::actingAs($this->admin);
-        
+
         Booking::factory()->count(5)->create([
             'class_id' => $this->gymClass->id
         ]);
@@ -194,18 +183,18 @@ class BookingControllerTest extends TestCase
     public function test_user_can_cancel_own_booking()
     {
         Sanctum::actingAs($this->user);
-        
-        $booking = Booking::create([
+
+        $booking = Booking::factory()->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->addDays(2),
+            'date' => now()->addDays(2),
             'status' => 'confirmed'
         ]);
 
         // Deduct session first
-        $this->userPackage->decrement('sessions_remaining');
+        $this->userPackage->decrement('remaining_sessions');
 
-        $response = $this->putJson("/api/bookings/{$booking->id}", [
+        $response = $this->putJson("/api/v1/bookings/{$booking->id}", [
             'status' => 'cancelled'
         ]);
 
@@ -216,21 +205,21 @@ class BookingControllerTest extends TestCase
 
         // Check that session was refunded
         $this->userPackage->refresh();
-        $this->assertEquals(10, $this->userPackage->sessions_remaining);
+        $this->assertEquals(10, $this->userPackage->remaining_sessions);
     }
 
     public function test_user_cannot_cancel_past_booking()
     {
         Sanctum::actingAs($this->user);
-        
-        $booking = Booking::create([
+
+        $booking = Booking::factory()->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->subDays(1),
+            'date' => now()->subDays(1),
             'status' => 'confirmed'
         ]);
 
-        $response = $this->putJson("/api/bookings/{$booking->id}", [
+        $response = $this->putJson("/api/v1/bookings/{$booking->id}", [
             'status' => 'cancelled'
         ]);
 
@@ -244,15 +233,15 @@ class BookingControllerTest extends TestCase
     {
         Sanctum::actingAs($this->user);
         $otherUser = User::factory()->create();
-        
-        $booking = Booking::create([
+
+        $booking = Booking::factory()->create([
             'user_id' => $otherUser->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->addDays(2),
+            'date' => now()->addDays(2),
             'status' => 'confirmed'
         ]);
 
-        $response = $this->putJson("/api/bookings/{$booking->id}", [
+        $response = $this->putJson("/api/v1/bookings/{$booking->id}", [
             'status' => 'cancelled'
         ]);
 
@@ -262,15 +251,15 @@ class BookingControllerTest extends TestCase
     public function test_admin_can_delete_booking()
     {
         Sanctum::actingAs($this->admin);
-        
-        $booking = Booking::create([
+
+        $booking = Booking::factory()->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->addDays(2),
+            'date' => now()->addDays(2),
             'status' => 'confirmed'
         ]);
 
-        $response = $this->deleteJson("/api/bookings/{$booking->id}");
+        $response = $this->deleteJson("/api/v1/bookings/{$booking->id}");
 
         $response->assertStatus(204);
         $this->assertDatabaseMissing('bookings', [
@@ -281,15 +270,15 @@ class BookingControllerTest extends TestCase
     public function test_regular_user_cannot_delete_booking()
     {
         Sanctum::actingAs($this->user);
-        
-        $booking = Booking::create([
+
+        $booking = Booking::factory()->create([
             'user_id' => $this->user->id,
             'class_id' => $this->gymClass->id,
-            'booking_date' => now()->addDays(2),
+            'date' => now()->addDays(2),
             'status' => 'confirmed'
         ]);
 
-        $response = $this->deleteJson("/api/bookings/{$booking->id}");
+        $response = $this->deleteJson("/api/v1/bookings/{$booking->id}");
 
         $response->assertStatus(403);
     }

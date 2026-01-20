@@ -23,12 +23,7 @@ class GymClassControllerTest extends TestCase
         
         $this->user = User::factory()->create(['role' => 'member']);
         $this->admin = User::factory()->create(['role' => 'admin']);
-        $this->instructor = Instructor::create([
-            'name' => 'Test Instructor',
-            'email' => 'instructor@test.com',
-            'phone' => '1234567890',
-            'specialization' => 'Yoga'
-        ]);
+        $this->instructor = Instructor::factory()->create();
     }
 
     public function test_anyone_can_view_all_classes()
@@ -231,12 +226,7 @@ class GymClassControllerTest extends TestCase
 
     public function test_can_filter_classes_by_instructor()
     {
-        $instructor2 = Instructor::create([
-            'name' => 'Second Instructor',
-            'email' => 'instructor2@test.com',
-            'phone' => '9876543210',
-            'specialization' => 'Pilates'
-        ]);
+        $instructor2 = Instructor::factory()->create();
 
         GymClass::factory()->create(['instructor' => $this->instructor->id]);
         GymClass::factory()->create(['instructor' => $instructor2->id]);

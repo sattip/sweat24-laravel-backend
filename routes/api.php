@@ -144,6 +144,10 @@ Route::prefix('v1')->group(function () {
     // Public trainer routes
     Route::get('trainers', [\App\Http\Controllers\TrainerController::class, 'apiIndex']);
     Route::get('trainers/{id}', [\App\Http\Controllers\TrainerController::class, 'apiShow']);
+
+    // Public instructor routes
+    Route::get('instructors', [InstructorController::class, 'index']);
+    Route::get('instructors/{instructor}', [InstructorController::class, 'show']);
     
     // Public package routes
     Route::get('packages', [PackageController::class, 'index']);
@@ -291,8 +295,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('bookings/{booking}/policy-check', [CancellationPolicyController::class, 'testPolicy']);
     Route::post('bookings/{booking}/reschedule', [CancellationPolicyController::class, 'requestReschedule']);
     
-    // Instructors/Trainers
-    Route::apiResource('instructors', InstructorController::class);
+    // Instructors/Trainers (admin-only create/update/delete - public index/show defined above)
+    Route::middleware('role:admin')->group(function () {
+        Route::post('instructors', [InstructorController::class, 'store']);
+        Route::put('instructors/{instructor}', [InstructorController::class, 'update']);
+        Route::patch('instructors/{instructor}', [InstructorController::class, 'update']);
+        Route::delete('instructors/{instructor}', [InstructorController::class, 'destroy']);
+    });
 
     // Services Management (Admin/Trainer)
     Route::apiResource('services', ServiceController::class)->except(['show', 'index']);

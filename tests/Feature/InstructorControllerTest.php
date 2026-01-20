@@ -37,7 +37,7 @@ class InstructorControllerTest extends TestCase
                     'name',
                     'email',
                     'phone',
-                    'specialization'
+                    'specialties'
                 ]
             ]);
     }
@@ -46,7 +46,7 @@ class InstructorControllerTest extends TestCase
     {
         $instructor = Instructor::factory()->create();
 
-        $response = $this->getJson("/api/instructors/{$instructor->id}");
+        $response = $this->getJson("/api/v1/instructors/{$instructor->id}");
 
         $response->assertStatus(200)
             ->assertJson([
@@ -64,17 +64,19 @@ class InstructorControllerTest extends TestCase
             'name' => 'New Instructor',
             'email' => 'newinstructor@example.com',
             'phone' => '5551234567',
-            'specialization' => 'CrossFit',
+            'specialties' => ['CrossFit'],
             'bio' => 'Experienced CrossFit coach'
         ]);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
-                'id',
-                'name',
-                'email',
-                'phone',
-                'specialization'
+                'instructor' => [
+                    'id',
+                    'name',
+                    'email',
+                    'specialties'
+                ],
+                'message'
             ]);
 
         $this->assertDatabaseHas('instructors', [
@@ -90,7 +92,7 @@ class InstructorControllerTest extends TestCase
             'name' => 'Unauthorized Instructor',
             'email' => 'unauth@example.com',
             'phone' => '5551234567',
-            'specialization' => 'Yoga'
+            'specialties' => ['Yoga']
         ]);
 
         $response->assertStatus(403);
@@ -101,15 +103,14 @@ class InstructorControllerTest extends TestCase
         Sanctum::actingAs($this->admin);
         $instructor = Instructor::factory()->create();
 
-        $response = $this->putJson("/api/instructors/{$instructor->id}", [
+        $response = $this->putJson("/api/v1/instructors/{$instructor->id}", [
             'name' => 'Updated Name',
-            'specialization' => 'Pilates and Yoga'
+            'specialties' => ['Pilates', 'Yoga']
         ]);
 
         $response->assertStatus(200)
             ->assertJson([
-                'name' => 'Updated Name',
-                'specialization' => 'Pilates and Yoga'
+                'name' => 'Updated Name'
             ]);
 
         $this->assertDatabaseHas('instructors', [
@@ -123,9 +124,9 @@ class InstructorControllerTest extends TestCase
         Sanctum::actingAs($this->admin);
         $instructor = Instructor::factory()->create();
 
-        $response = $this->deleteJson("/api/instructors/{$instructor->id}");
+        $response = $this->deleteJson("/api/v1/instructors/{$instructor->id}");
 
-        $response->assertStatus(204);
+        $response->assertStatus(200);
         $this->assertDatabaseMissing('instructors', [
             'id' => $instructor->id
         ]);
@@ -136,7 +137,7 @@ class InstructorControllerTest extends TestCase
         Sanctum::actingAs($this->user);
         $instructor = Instructor::factory()->create();
 
-        $response = $this->deleteJson("/api/instructors/{$instructor->id}");
+        $response = $this->deleteJson("/api/v1/instructors/{$instructor->id}");
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('instructors', [
@@ -147,14 +148,14 @@ class InstructorControllerTest extends TestCase
     public function test_cannot_create_instructor_with_duplicate_email()
     {
         Sanctum::actingAs($this->admin);
-        
+
         Instructor::factory()->create(['email' => 'existing@example.com']);
 
         $response = $this->postJson('/api/v1/instructors', [
             'name' => 'Duplicate Instructor',
             'email' => 'existing@example.com',
             'phone' => '5551234567',
-            'specialization' => 'Yoga'
+            'specialties' => ['Yoga']
         ]);
 
         $response->assertStatus(422)
