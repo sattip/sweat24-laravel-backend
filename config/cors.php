@@ -17,19 +17,21 @@ return [
 
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'broadcasting/auth'],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
-    'allowed_origins' => [
-       '*',
+    'allowed_origins' => explode(',', env('CORS_ALLOWED_ORIGINS', 'https://sweat24.gr,https://admin.sweat24.gr,https://app.sweat24.gr')),
+
+    'allowed_origins_patterns' => [
+        // Allow localhost for development
+        '#^https?://localhost(:\d+)?$#',
+        '#^https?://127\.0\.0\.1(:\d+)?$#',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['Content-Type', 'X-Requested-With', 'Authorization', 'Accept', 'Origin', 'X-CSRF-TOKEN'],
 
-    'allowed_headers' => ['*'],
+    'exposed_headers' => ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
 
-    'exposed_headers' => [],
-
-    'max_age' => 0,
+    'max_age' => 86400, // 24 hours
 
     'supports_credentials' => true,
 
