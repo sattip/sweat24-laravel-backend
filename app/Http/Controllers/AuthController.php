@@ -9,6 +9,7 @@ use App\Services\ActivityLogger;
 use App\Services\ReferralService;
 use App\Notifications\Auth\RegistrationConfirmationNotification;
 use App\Notifications\Admin\NewRegistrationNotification;
+use App\Auth\TokenAbilities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -49,8 +50,9 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create token
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // Create token with role-based abilities
+        $abilities = TokenAbilities::forRole($user->role);
+        $token = $user->createToken('auth-token', $abilities)->plainTextToken;
 
         // Log the login activity
         ActivityLogger::logLogin($user);
@@ -137,8 +139,9 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create token
-        $token = $user->createToken('admin-token')->plainTextToken;
+        // Create token with role-based abilities for admin panel
+        $abilities = TokenAbilities::forRole($user->role);
+        $token = $user->createToken('admin-token', $abilities)->plainTextToken;
 
         // Log the login activity
         ActivityLogger::logLogin($user);

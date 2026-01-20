@@ -23,8 +23,8 @@ class AdminMiddleware
             ], 401);
         }
 
-        // Check if user is admin
-        if ($request->user()->membership_type !== 'Admin') {
+        // Check if user is admin (using role field, not membership_type)
+        if ($request->user()->role !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Admin access required.'
