@@ -9,7 +9,7 @@ use App\Models\BookingRequest;
 use App\Models\CashRegisterEntry;
 use App\Models\GymClass;
 use App\Models\Instructor;
-use App\Models\Message;
+use App\Models\ChatMessage;
 use App\Models\PaymentInstallment;
 use App\Models\Task;
 use App\Models\User;
@@ -101,11 +101,14 @@ class DashboardController extends Controller
                 : 0;
 
             $stats['today_tasks'] = Task::where('assigned_to', $user->id)
-                ->whereDate('due_date', today())
+                ->whereDate('deadline', today())
                 ->where('status', '!=', 'completed')
                 ->count();
 
-            $stats['unread_messages'] = Message::where('recipient_id', $user->id)
+            $stats['unread_messages'] = ChatMessage::whereHas('conversation', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                })
+                ->where('sender_id', '!=', $user->id)
                 ->whereNull('read_at')
                 ->count();
         } else {
