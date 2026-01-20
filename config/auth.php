@@ -116,4 +116,20 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define which users have super admin privileges. Super admins can perform
+    | dangerous operations like force-deleting users or impersonating accounts.
+    | Configure via SUPER_ADMIN_EMAILS environment variable (comma-separated).
+    |
+    */
+
+    'super_admins' => array_filter(array_map(
+        'trim',
+        explode(',', env('SUPER_ADMIN_EMAILS', ''))
+    )),
+
 ];

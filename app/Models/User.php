@@ -203,6 +203,17 @@ class User extends Authenticatable
     {
         return $this->role === 'member';
     }
+
+    public function isSuperAdmin(): bool
+    {
+        if (!$this->isAdmin()) {
+            return false;
+        }
+
+        $superAdminEmails = config('auth.super_admins', []);
+
+        return in_array($this->email, $superAdminEmails);
+    }
     
     public function canAccessFinancials(): bool
     {

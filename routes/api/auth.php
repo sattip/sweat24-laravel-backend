@@ -15,25 +15,7 @@ Route::prefix('v1/auth')->group(function () {
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/admin/login', [AuthController::class, 'adminLogin']);
-        Route::post('/login-simple', function(\Illuminate\Http\Request $request) {
-            $credentials = $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
-
-            if (auth()->attempt($credentials, true)) {
-                return response()->json([
-                    'success' => true,
-                    'authenticated' => true,
-                    'user' => auth()->user()
-                ]);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid credentials'
-            ], 401);
-        });
+        Route::post('/login-simple', [AuthController::class, 'loginSimple']);
     });
 
     // Registration routes - rate limited
@@ -55,17 +37,5 @@ Route::prefix('v1/auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 
     // Web session authentication endpoint
-    Route::get('/session', function () {
-        if (auth()->check()) {
-            return response()->json([
-                'authenticated' => true,
-                'user' => auth()->user()
-            ]);
-        } else {
-            return response()->json([
-                'authenticated' => false,
-                'user' => null
-            ]);
-        }
-    })->middleware('web');
+    Route::get('/session', [AuthController::class, 'session'])->middleware('web');
 });

@@ -201,6 +201,48 @@ class AuthController extends Controller
     }
 
     /**
+     * Simple login with session-based authentication.
+     */
+    public function loginSimple(Request $request): JsonResponse
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        if (Auth::attempt($credentials, true)) {
+            return response()->json([
+                'success' => true,
+                'authenticated' => true,
+                'user' => Auth::user()
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid credentials'
+        ], 401);
+    }
+
+    /**
+     * Check web session authentication status.
+     */
+    public function session(): JsonResponse
+    {
+        if (Auth::check()) {
+            return response()->json([
+                'authenticated' => true,
+                'user' => Auth::user()
+            ]);
+        }
+
+        return response()->json([
+            'authenticated' => false,
+            'user' => null
+        ]);
+    }
+
+    /**
      * @deprecated Use registerWithConsent() instead to ensure proper age verification
      * This endpoint is maintained for backward compatibility but should not be used for new registrations
      */

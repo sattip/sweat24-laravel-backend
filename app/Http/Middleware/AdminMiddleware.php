@@ -6,8 +6,16 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Middleware to restrict access to admin users only.
+ * This is a convenience wrapper around CheckRole middleware for admin-only routes.
+ */
 class AdminMiddleware
 {
+    public function __construct(
+        protected CheckRole $checkRole
+    ) {}
+
     /**
      * Handle an incoming request.
      *
@@ -15,22 +23,6 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Check if user is authenticated
-        if (!$request->user()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.'
-            ], 401);
-        }
-
-        // Check if user is admin (using role field, not membership_type)
-        if ($request->user()->role !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Admin access required.'
-            ], 403);
-        }
-
-        return $next($request);
+        return $this->checkRole->handle($request, $next, 'admin');
     }
 }

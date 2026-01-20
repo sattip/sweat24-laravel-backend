@@ -109,7 +109,7 @@ class AuthServiceProvider extends ServiceProvider
 
         // Super admin gate (for dangerous operations)
         Gate::define('super-admin', function (User $user) {
-            return $user->isAdmin() && $user->id === 1; // Only first admin
+            return $user->isSuperAdmin();
         });
     }
 }

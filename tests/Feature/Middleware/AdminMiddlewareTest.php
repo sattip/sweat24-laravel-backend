@@ -49,8 +49,7 @@ class AdminMiddlewareTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Admin access required.',
+                'message' => 'Forbidden. You do not have permission to access this resource.',
             ]);
     }
 
@@ -68,8 +67,7 @@ class AdminMiddlewareTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Admin access required.',
+                'message' => 'Forbidden. You do not have permission to access this resource.',
             ]);
     }
 
