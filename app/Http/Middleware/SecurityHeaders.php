@@ -28,16 +28,20 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
         // Permissions Policy (replaces Feature-Policy)
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+        $response->headers->set('Permissions-Policy', $this->buildPermissionsPolicy());
 
-        // Content Security Policy - adjust as needed for your frontend
-        if (config('app.env') === 'production') {
-            $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none';");
+        // Content Security Policy - configurable via config/security.php
+        if (config('app.env') === 'production' && config('security.csp.enabled', true)) {
+            $cspHeader = config('security.csp.report_only', false)
+                ? 'Content-Security-Policy-Report-Only'
+                : 'Content-Security-Policy';
+
+            $response->headers->set($cspHeader, $this->buildContentSecurityPolicy());
         }
 
         // HSTS - only in production with HTTPS
-        if (config('app.env') === 'production' && $request->secure()) {
-            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        if (config('app.env') === 'production' && $request->secure() && config('security.hsts.enabled', true)) {
+            $response->headers->set('Strict-Transport-Security', $this->buildHstsHeader());
         }
 
         // Remove server identification headers
@@ -45,5 +49,71 @@ class SecurityHeaders
         $response->headers->remove('Server');
 
         return $response;
+    }
+
+    /**
+     * Build the Content Security Policy header value from config.
+     */
+    protected function buildContentSecurityPolicy(): string
+    {
+        $directives = config('security.csp.directives', []);
+        $parts = [];
+
+        foreach ($directives as $directive => $sources) {
+            if (!empty($sources)) {
+                $parts[] = $directive . ' ' . implode(' ', $sources);
+            }
+        }
+
+        // Add report-uri if configured
+        if ($reportUri = config('security.csp.report_uri')) {
+            $parts[] = 'report-uri ' . $reportUri;
+        }
+
+        return implode('; ', $parts);
+    }
+
+    /**
+     * Build the HSTS header value from config.
+     */
+    protected function buildHstsHeader(): string
+    {
+        $maxAge = config('security.hsts.max_age', 31536000);
+        $header = "max-age={$maxAge}";
+
+        if (config('security.hsts.include_subdomains', true)) {
+            $header .= '; includeSubDomains';
+        }
+
+        if (config('security.hsts.preload', false)) {
+            $header .= '; preload';
+        }
+
+        return $header;
+    }
+
+    /**
+     * Build the Permissions Policy header value from config.
+     */
+    protected function buildPermissionsPolicy(): string
+    {
+        $policies = config('security.permissions_policy', [
+            'camera' => [],
+            'microphone' => [],
+            'geolocation' => [],
+            'payment' => [],
+        ]);
+
+        $parts = [];
+        foreach ($policies as $feature => $allowlist) {
+            if (empty($allowlist)) {
+                $parts[] = "{$feature}=()";
+            } else {
+                $quoted = array_map(fn($origin) => "\"{$origin}\"", $allowlist);
+                $parts[] = "{$feature}=(" . implode(' ', $quoted) . ')';
+            }
+        }
+
+        return implode(', ', $parts);
     }
 }

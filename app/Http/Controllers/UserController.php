@@ -3,23 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Services\ActivityLogger;
 
 class UserController extends Controller
 {
+    use SearchableTrait;
     public function index(Request $request)
     {
         $query = User::query();
         
         if ($request->has('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'email', 'phone'], $search);
         }
         
         if ($request->has('status')) {
@@ -255,12 +253,7 @@ class UserController extends Controller
             // Add search functionality
             if ($request->has('search')) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%")
-                      ->orWhere('referral_phone', 'like', "%{$search}%");
-                });
+                $this->addSafeMultiColumnSearch($query, ['name', 'email', 'phone', 'referral_phone'], $search);
             }
 
             $users = $query->orderBy('created_at', 'desc')->paginate(20);

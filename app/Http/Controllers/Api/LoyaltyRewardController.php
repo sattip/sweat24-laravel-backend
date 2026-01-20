@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LoyaltyReward;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class LoyaltyRewardController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display a listing of loyalty rewards.
      */
@@ -27,11 +29,7 @@ class LoyaltyRewardController extends Controller
 
         // Αναζήτηση
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'description'], $request->search);
         }
 
         // Ταξινόμηση

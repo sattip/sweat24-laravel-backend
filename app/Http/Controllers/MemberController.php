@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 
 class MemberController extends Controller
 {
+    use SearchableTrait;
     public function index(Request $request)
     {
         $query = User::where('membership_type', '!=', 'Admin')
@@ -16,12 +18,7 @@ class MemberController extends Controller
                     }, 'parentConsent']);
         
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'email', 'phone'], $request->search);
         }
         
         if ($request->has('status') && $request->status) {

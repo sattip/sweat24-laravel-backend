@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 
 class BookingManagementController extends Controller
 {
+    use SearchableTrait;
     public function index(Request $request)
     {
         $query = Booking::with('user');
@@ -23,7 +25,7 @@ class BookingManagementController extends Controller
         }
         
         if ($request->has('instructor') && $request->instructor) {
-            $query->where('instructor', 'LIKE', '%' . $request->instructor . '%');
+            $this->addSafeLikeWhere($query, 'instructor', $request->instructor);
         }
         
         $bookings = $query->orderBy('date')->orderBy('time')->paginate(20);

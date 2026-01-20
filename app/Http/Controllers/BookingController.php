@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use App\Events\BookingCreated;
 use App\Events\BookingCancelled;
 use App\Traits\ApiResponseTrait;
+use App\Traits\SearchableTrait;
 use App\Notifications\Bookings\BookingConfirmationNotification;
 use App\Notifications\Bookings\BookingCancelledNotification;
 use Illuminate\Support\Facades\Notification;
@@ -22,7 +23,7 @@ use Illuminate\Http\JsonResponse;
 
 class BookingController extends Controller
 {
-    use ApiResponseTrait;
+    use ApiResponseTrait, SearchableTrait;
 
     protected BookingCompletionService $bookingCompletionService;
 
@@ -78,7 +79,7 @@ class BookingController extends Controller
         }
 
         if ($request->has('instructor')) {
-            $query->where('instructor', 'LIKE', '%' . $request->instructor . '%');
+            $this->addSafeLikeWhere($query, 'instructor', $request->instructor);
         }
 
         // Filter by store if provided, otherwise show all stores
