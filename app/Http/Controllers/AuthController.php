@@ -36,19 +36,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if user is still pending approval
-        if ($user->status === 'pending_approval') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
-            ]);
-        }
-
-        // Check if user is inactive
-        if ($user->status === 'inactive') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
-            ]);
-        }
+        $this->validateUserStatus($user);
 
         // Create token with role-based abilities
         $abilities = TokenAbilities::forRole($user->role);
@@ -60,42 +48,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ? 
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            'user' => $this->buildUserResponse($user),
             'token' => $token,
         ]);
     }
@@ -118,19 +71,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if user is still pending approval
-        if ($user->status === 'pending_approval') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
-            ]);
-        }
-
-        // Check if user is inactive
-        if ($user->status === 'inactive') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
-            ]);
-        }
+        $this->validateUserStatus($user);
 
         // Only allow admins and trainers to login to the admin panel
         if (!in_array($user->role, ['admin', 'trainer'])) {
@@ -149,44 +90,72 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ?
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            'user' => $this->buildUserResponse($user),
             'token' => $token,
         ]);
+    }
+
+    /**
+     * Validate user account status
+     */
+    private function validateUserStatus(User $user): void
+    {
+        if ($user->status === 'pending_approval') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
+            ]);
+        }
+
+        if ($user->status === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
+            ]);
+        }
+    }
+
+    /**
+     * Build standardized user response array
+     */
+    private function buildUserResponse(User $user, array $additionalFields = []): array
+    {
+        $response = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'address' => $user->address,
+            'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
+            'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
+            'gender' => $user->gender,
+            'weight' => $user->weight,
+            'height' => $user->height,
+            'emergency_contact' => $user->emergency_contact,
+            'emergency_phone' => $user->emergency_phone,
+            'membership_type' => $user->membership_type,
+            'role' => $user->role,
+            'status' => $user->status,
+            'registration_status' => $user->registration_status,
+            'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
+            'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
+            'is_minor' => $user->is_minor,
+            'age_at_registration' => $user->age_at_registration,
+            'remaining_sessions' => $user->remaining_sessions,
+            'total_sessions' => $user->total_sessions,
+            'join_date' => $user->join_date,
+            'last_visit' => $user->last_visit,
+            'medical_history' => $user->medical_history,
+            'notes' => $user->notes,
+            'has_signed_terms' => $user->approved_at ?
+                $user->signatures()
+                    ->where('document_type', 'terms_and_conditions')
+                    ->where('signed_at', '>', $user->approved_at)
+                    ->exists() : false,
+            'terms_accepted_at' => $user->terms_accepted_at,
+            'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
+            'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
+        ];
+
+        return array_merge($response, $additionalFields);
     }
 
     public function logout(Request $request)
@@ -219,48 +188,13 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        
+
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ?
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                // Priority Booking fields
+            'user' => $this->buildUserResponse($user, [
                 'has_priority_booking' => $user->has_priority_booking,
                 'priority_booking_expires_at' => $user->priority_booking_expires_at ? $user->priority_booking_expires_at->format('Y-m-d') : null,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            ]),
         ]);
     }
 
