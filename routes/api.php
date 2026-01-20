@@ -69,6 +69,7 @@ Route::prefix('v1/auth')->group(function () {
     // Login routes - strict rate limiting to prevent brute force
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/admin/login', [AuthController::class, 'adminLogin']);
         Route::post('/login-simple', function(\Illuminate\Http\Request $request) {
             $credentials = $request->validate([
                 'email' => 'required|email',
@@ -275,6 +276,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Mobile App - Get authenticated user's partial payment summary
     Route::get('/my-partial-payments', [UserPackageController::class, 'myPartialPayments']);
 
+    // Mobile App - Get authenticated user's package history (expired, cancelled, completed)
+    Route::get('/my-packages/history', [UserPackageController::class, 'myPackagesHistory']);
+
+    // Mobile App - Get authenticated user's active packages
+    Route::get('/my-active-packages', [UserPackageController::class, 'myActivePackages']);
+
     // Custom Packages route alias (points to user-packages endpoint)
     Route::get('custom-packages/user/{userId}', [UserPackageController::class, 'userPackages']);
     
@@ -340,6 +347,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('fitness-classes', [\App\Http\Controllers\Api\FitnessClassesController::class, 'store']);
         Route::put('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'update']);
         Route::delete('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'destroy']);
+        Route::get('fitness-classes/{id}/participants', [\App\Http\Controllers\Api\FitnessClassesController::class, 'getParticipants']);
+        Route::post('fitness-classes/{id}/attendance', [\App\Http\Controllers\Api\FitnessClassesController::class, 'markAttendance']);
     });
 
     // Questionnaires (authenticated routes for admin/trainer)
@@ -535,18 +544,78 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('orders/{order}/status', [\App\Http\Controllers\OrderController::class, 'updateStatus']);
     });
     
-    // Dashboard stats
+    // Dashboard stats (role-based)
     Route::get('dashboard/stats', function () {
-        return response()->json([
+        $user = auth()->user();
+        $isTrainer = $user && $user->role === 'trainer';
+
+        // Base stats (for all users)
+        $stats = [
             'total_members' => \App\Models\User::count(),
             'active_members' => \App\Models\User::where('status', 'active')->count(),
-            'total_revenue' => \App\Models\CashRegisterEntry::where('type', 'income')->sum('amount'),
             'monthly_revenue' => \App\Models\CashRegisterEntry::where('type', 'income')
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount'),
             'pending_payments' => \App\Models\PaymentInstallment::where('status', 'pending')->count(),
             'overdue_payments' => \App\Models\PaymentInstallment::where('status', 'overdue')->count(),
-        ]);
+        ];
+
+        if ($isTrainer) {
+            // Find the instructor record for this trainer
+            $instructor = \App\Models\Instructor::where('email', $user->email)->first();
+            $trainerId = $instructor ? $instructor->id : null;
+
+            // Trainer-specific stats
+            $stats['my_booking_requests'] = $trainerId
+                ? \App\Models\BookingRequest::where('trainer_id', $trainerId)
+                    ->where('status', 'pending')
+                    ->count()
+                : 0;
+
+            // Customers to renew - customers who have class today and need to pay
+            $stats['customers_to_renew'] = $trainerId
+                ? \App\Models\User::whereHas('userPackages', function($q) {
+                    $q->where('payment_status', '!=', 'fully_paid')
+                        ->where('status', 'active');
+                })->whereHas('bookings', function($q) use ($trainerId) {
+                    $q->whereDate('date', today())
+                        ->where('instructor_id', $trainerId);
+                })->count()
+                : 0;
+
+            // Today's tasks for this trainer
+            $stats['today_tasks'] = \App\Models\Task::where('assigned_to', $user->id)
+                ->whereDate('due_date', today())
+                ->where('status', '!=', 'completed')
+                ->count();
+
+            // Unread messages
+            $stats['unread_messages'] = \App\Models\Message::where('recipient_id', $user->id)
+                ->whereNull('read_at')
+                ->count();
+        } else {
+            // Admin-specific stats
+            // Dormant members - members who haven't attended in 30+ days
+            $stats['dormant_members'] = \App\Models\User::where('status', 'active')
+                ->whereHas('userPackages', function($q) {
+                    $q->where('status', 'active');
+                })
+                ->where(function($q) {
+                    $q->whereDoesntHave('bookings', function($bq) {
+                        $bq->where('date', '>=', now()->subDays(30));
+                    });
+                })
+                ->count();
+
+            // Inactive customers - customers without active package
+            $stats['inactive_customers'] = \App\Models\User::where('role', 'user')
+                ->whereDoesntHave('userPackages', function($q) {
+                    $q->where('status', 'active');
+                })
+                ->count();
+        }
+
+        return response()->json($stats);
     });
     
     // Evaluation routes (authenticated)
