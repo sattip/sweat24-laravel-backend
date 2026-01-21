@@ -129,7 +129,13 @@ class ClassTypesController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'boolean',
             'sort_order' => 'integer|min:0',
+            'locations' => 'nullable|string',
         ]);
+
+        // Parse locations JSON
+        if (isset($validated['locations'])) {
+            $validated['locations'] = json_decode($validated['locations'], true) ?? [];
+        }
 
         // Handle image upload
         if ($request->hasFile('image')) {
@@ -182,7 +188,13 @@ class ClassTypesController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'boolean',
             'sort_order' => 'integer|min:0',
+            'locations' => 'nullable|string',
         ]);
+
+        // Parse locations JSON
+        if (isset($validated['locations'])) {
+            $validated['locations'] = json_decode($validated['locations'], true) ?? [];
+        }
 
         // Handle image upload
         if ($request->hasFile('image')) {

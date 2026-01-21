@@ -54,6 +54,9 @@ Route::prefix('v1/registration')->group(function () {
 Route::prefix('v1/admin')->middleware(['auth:sanctum'])->group(function () {
     Route::post('/users/{id}/approve', [RegistrationController::class, 'approveUser']);
     Route::post('/users/{id}/reject', [RegistrationController::class, 'rejectUser']);
+
+    // User package payment update
+    Route::patch('/users/{userId}/packages/{userPackageId}/payment', [\App\Http\Controllers\Admin\UserPackageController::class, 'updatePayment']);
 });
 
 // Admin Panel specific routes (simplified path as requested)
