@@ -435,6 +435,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'update']);
         Route::delete('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'destroy']);
         Route::post('admin/class-types/reorder', [\App\Http\Controllers\Api\ClassTypesController::class, 'reorder']);
+
+        // Locations Management
+        Route::get('admin/locations', [\App\Http\Controllers\Api\LocationsController::class, 'index']);
+        Route::post('admin/locations', [\App\Http\Controllers\Api\LocationsController::class, 'store']);
+        Route::get('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'show']);
+        Route::post('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'update']);
+        Route::delete('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'destroy']);
     });
 
     // Admin only routes
