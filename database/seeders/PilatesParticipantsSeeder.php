@@ -5,8 +5,9 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Booking;
 use App\Models\User;
-use App\Models\GymClass;
+use App\Models\FitnessClass;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class PilatesParticipantsSeeder extends Seeder
 {
@@ -16,14 +17,13 @@ class PilatesParticipantsSeeder extends Seeder
     public function run(): void
     {
         // Find or create the Pilates class for 2026-01-23 at 13:00
-        $class = GymClass::where('date', '2026-01-23')
+        $class = FitnessClass::where('date', '2026-01-23')
             ->where('time', '13:00:00')
-            ->whereIn('name', ['Pilates Core', 'πιλάτες', 'Pilates'])
             ->first();
 
         if (!$class) {
-            // Create the class if it doesn't exist
-            $class = GymClass::create([
+            // Create the class if it doesn't exist using DB facade to avoid model casts
+            $classId = \DB::table('fitness_classes')->insertGetId([
                 'name' => 'πιλάτες',
                 'type' => 'group',
                 'instructor' => 'Εμιλι Τσεν',
@@ -35,8 +35,11 @@ class PilatesParticipantsSeeder extends Seeder
                 'location' => 'Studio B',
                 'description' => 'Ενδυνάμωση κορμού με pilates τεχνικές',
                 'status' => 'active',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ]);
 
+            $class = FitnessClass::find($classId);
             $this->command->info('Created new Pilates class for 2026-01-23 at 13:00');
         }
 
