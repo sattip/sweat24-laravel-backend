@@ -512,4 +512,92 @@ class FitnessClassesController extends Controller
             ]);
         }
     }
+
+    /**
+     * Cancel a fitness class and notify all participants and instructor
+     */
+    public function cancel($id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        if ($class->status === "cancelled") {
+            return response()->json([
+                "success" => false,
+                "message" => "Το μάθημα είναι ήδη ακυρωμένο"
+            ], 422);
+        }
+
+        // Update class status
+        $class->update(["status" => "cancelled"]);
+
+        // Find all confirmed/pending bookings for this class
+        $bookings = \App\Models\Booking::where("class_id", $id)
+            ->whereIn("status", ["confirmed", "pending"])
+            ->get();
+
+        $notifiedUsers = 0;
+
+        foreach ($bookings as $booking) {
+            // Cancel the booking
+            $booking->update([
+                "status" => "cancelled",
+                "cancellation_reason" => "Ακύρωση μαθήματος",
+            ]);
+
+            // Notify the user if they exist
+            if ($booking->user_id) {
+                $user = \App\Models\User::find($booking->user_id);
+                if ($user) {
+                    try {
+                        $user->notify(new \App\Notifications\Bookings\BookingCancelledNotification(
+                            $booking,
+                            "Ακύρωση μαθήματος από τη διοίκηση",
+                            "admin"
+                        ));
+                        $notifiedUsers++;
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify user about class cancellation", [
+                            "user_id" => $user->id,
+                            "booking_id" => $booking->id,
+                            "error" => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // Notify the instructor/trainer via email
+        $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+        if ($trainerId) {
+            $instructor = \App\Models\Instructor::find($trainerId);
+            if ($instructor && $instructor->email) {
+                try {
+                    \Illuminate\Support\Facades\Mail::send("emails.class-cancelled-trainer", [
+                        "instructor" => $instructor,
+                        "class" => $class,
+                        "bookingsCount" => $bookings->count(),
+                    ], function ($message) use ($instructor, $class) {
+                        $message->to($instructor->email, $instructor->name)
+                                 ->subject("Ακύρωση Μαθήματος: " . $class->name . " - " . $class->date->format("d/m/Y"));
+                    });
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify instructor about class cancellation", [
+                        "instructor_id" => $instructor->id,
+                        "class_id" => $class->id,
+                        "error" => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            "success" => true,
+            "message" => "Το μάθημα ακυρώθηκε επιτυχώς. Ειδοποιήθηκαν {$notifiedUsers} χρήστες.",
+            "data" => [
+                "class_id" => $class->id,
+                "cancelled_bookings" => $bookings->count(),
+                "notified_users" => $notifiedUsers,
+            ]
+        ]);
+    }
 }
