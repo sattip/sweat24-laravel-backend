@@ -372,6 +372,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('classes/{class}/waitlist/decline', [WaitlistController::class, 'decline']);
     Route::get('classes/{class}/waitlist/status', [WaitlistController::class, 'status']);
     Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin,trainer');
+    Route::get("waitlists/summary", [WaitlistController::class, "summary"])->middleware("role:admin,trainer");
     
     // Financial Features (Admin and Trainer)
     Route::middleware(['role:admin,trainer'])->group(function () {
