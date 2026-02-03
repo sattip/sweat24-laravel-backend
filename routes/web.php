@@ -187,6 +187,15 @@ Route::prefix('admin')->group(function () {
     });
 });
 
+// ============ REFERRAL INVITE DEEP LINK ============
+Route::get('/invite/{code}', function ($code) {
+    $appScheme = "com.sweat93.app://signup?ref={$code}";
+    $playStoreUrl = "https://play.google.com/store/apps/details?id=com.sweat93.app";
+    $appStoreUrl = "https://apps.apple.com/app/sweat93/idYOUR_APP_ID";
+
+    return view('invite-redirect', compact('code', 'appScheme', 'playStoreUrl', 'appStoreUrl'));
+});
+
 // ============ CHURN SURVEY WEB ROUTES ============
 // Public routes for churn survey (accessed via email link)
 Route::prefix('survey')->group(function () {
