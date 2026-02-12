@@ -266,6 +266,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/{userPackage}/unfreeze', [UserPackageController::class, 'unfreeze']);
         Route::post('/{userPackage}/renew', [UserPackageController::class, 'renew']);
         Route::post('/{userPackage}/send-notification', [UserPackageController::class, 'sendExpiryNotification']);
+        Route::post("/{userPackage}/toggle-pause", [UserPackageController::class, "togglePause"]);
     });
 
     // Mobile App - Get authenticated user's partial payment summary
@@ -378,6 +379,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Financial Features (Admin and Trainer)
     Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('payment-installments', PaymentInstallmentController::class);
+        Route::post("payment-installments/{paymentInstallment}/pay", [PaymentInstallmentController::class, "markAsPaid"]);
         Route::apiResource('cash-register', CashRegisterEntryController::class);
         Route::apiResource('business-expenses', BusinessExpenseController::class);
     });
