@@ -1199,7 +1199,7 @@ Route::prefix('v1/referrals')->group(function () {
             'data' => [
                 'user_name' => $user->name,
                 'referral_code' => $referralCode->code,
-                'referral_link' => "https://sweat24.obs.com.gr/invite/" . $referralCode->code,
+                'referral_link' => "https://api.sweat93.gr/invite/" . $referralCode->code,
                 'total_referrals' => $totalReferrals,
                 'next_tier' => $nextTier ? [
                     'name' => $nextTier->name,
