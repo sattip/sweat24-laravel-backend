@@ -596,7 +596,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
                 ->count();
 
             // Unread messages
-            $stats['unread_messages'] = \App\Models\Message::where('recipient_id', $user->id)
+            $stats['unread_messages'] = \App\Models\ChatMessage::whereHas('conversation', fn($q) => $q->where('user_id', $user->id))->where('sender_type', 'user')
                 ->whereNull('read_at')
                 ->count();
         } else {
