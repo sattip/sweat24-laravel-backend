@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Traits\SearchableTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ActivityController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display the activity dashboard.
      */
@@ -44,11 +46,12 @@ class ActivityController extends Controller
         }
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('action', 'like', "%{$search}%")
-                    ->orWhereHas('user', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
+            $escaped = $this->escapeLikePattern($search);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('action', 'like', '%' . $escaped . '%')
+                    ->orWhereHas('user', function ($q) use ($escaped) {
+                        $q->where('name', 'like', '%' . $escaped . '%')
+                            ->orWhere('email', 'like', '%' . $escaped . '%');
                     });
             });
         }

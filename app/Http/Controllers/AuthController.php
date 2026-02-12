@@ -9,6 +9,7 @@ use App\Services\ActivityLogger;
 use App\Services\ReferralService;
 use App\Notifications\Auth\RegistrationConfirmationNotification;
 use App\Notifications\Admin\NewRegistrationNotification;
+use App\Auth\TokenAbilities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -17,10 +18,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email',
@@ -35,22 +38,11 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if user is still pending approval
-        if ($user->status === 'pending_approval') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
-            ]);
-        }
+        $this->validateUserStatus($user);
 
-        // Check if user is inactive
-        if ($user->status === 'inactive') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
-            ]);
-        }
-
-        // Create token
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // Create token with role-based abilities
+        $abilities = TokenAbilities::forRole($user->role);
+        $token = $user->createToken('auth-token', $abilities)->plainTextToken;
 
         // Log the login activity
         ActivityLogger::logLogin($user);
@@ -58,42 +50,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ? 
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            'user' => $this->buildUserResponse($user),
             'token' => $token,
         ]);
     }
@@ -101,7 +58,7 @@ class AuthController extends Controller
     /**
      * Handle admin/trainer login for admin panel
      */
-    public function adminLogin(Request $request)
+    public function adminLogin(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email',
@@ -116,19 +73,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if user is still pending approval
-        if ($user->status === 'pending_approval') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
-            ]);
-        }
-
-        // Check if user is inactive
-        if ($user->status === 'inactive') {
-            throw ValidationException::withMessages([
-                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
-            ]);
-        }
+        $this->validateUserStatus($user);
 
         // Only allow admins and trainers to login to the admin panel
         if (!in_array($user->role, ['admin', 'trainer'])) {
@@ -137,8 +82,9 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create token
-        $token = $user->createToken('admin-token')->plainTextToken;
+        // Create token with role-based abilities for admin panel
+        $abilities = TokenAbilities::forRole($user->role);
+        $token = $user->createToken('admin-token', $abilities)->plainTextToken;
 
         // Log the login activity
         ActivityLogger::logLogin($user);
@@ -146,47 +92,75 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ?
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            'user' => $this->buildUserResponse($user),
             'token' => $token,
         ]);
     }
 
-    public function logout(Request $request)
+    /**
+     * Validate user account status
+     */
+    private function validateUserStatus(User $user): void
+    {
+        if ($user->status === 'pending_approval') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας περιμένει έγκριση από τον διαχειριστή.'],
+            ]);
+        }
+
+        if ($user->status === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => ['Ο λογαριασμός σας είναι ανενεργός. Επικοινωνήστε με τον διαχειριστή.'],
+            ]);
+        }
+    }
+
+    /**
+     * Build standardized user response array
+     */
+    private function buildUserResponse(User $user, array $additionalFields = []): array
+    {
+        $response = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'address' => $user->address,
+            'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
+            'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
+            'gender' => $user->gender,
+            'weight' => $user->weight,
+            'height' => $user->height,
+            'emergency_contact' => $user->emergency_contact,
+            'emergency_phone' => $user->emergency_phone,
+            'membership_type' => $user->membership_type,
+            'role' => $user->role,
+            'status' => $user->status,
+            'registration_status' => $user->registration_status,
+            'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
+            'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
+            'is_minor' => $user->is_minor,
+            'age_at_registration' => $user->age_at_registration,
+            'remaining_sessions' => $user->remaining_sessions,
+            'total_sessions' => $user->total_sessions,
+            'join_date' => $user->join_date,
+            'last_visit' => $user->last_visit,
+            'medical_history' => $user->medical_history,
+            'notes' => $user->notes,
+            'has_signed_terms' => $user->approved_at ?
+                $user->signatures()
+                    ->where('document_type', 'terms_and_conditions')
+                    ->where('signed_at', '>', $user->approved_at)
+                    ->exists() : false,
+            'terms_accepted_at' => $user->terms_accepted_at,
+            'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
+            'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
+        ];
+
+        return array_merge($response, $additionalFields);
+    }
+
+    public function logout(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -212,52 +186,59 @@ class AuthController extends Controller
 
         return redirect('/admin/login')->with('success', 'Logged out successfully');
     }
-    
-    public function me(Request $request)
+
+    public function me(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'avatar' => $user->avatar ? url('storage/' . $user->avatar) : null,
-                'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
-                'gender' => $user->gender,
-                'weight' => $user->weight,
-                'height' => $user->height,
-                'emergency_contact' => $user->emergency_contact,
-                'emergency_phone' => $user->emergency_phone,
-                'membership_type' => $user->membership_type,
-                'role' => $user->role,
-                'status' => $user->status,
-                'registration_status' => $user->registration_status,
-                'approved_at' => $user->approved_at ? $user->approved_at->toISOString() : null,
-                'profile_last_updated' => $user->profile_last_updated ? $user->profile_last_updated->toISOString() : null,
-                'is_minor' => $user->is_minor,
-                'age_at_registration' => $user->age_at_registration,
-                'remaining_sessions' => $user->remaining_sessions,
-                'total_sessions' => $user->total_sessions,
-                'join_date' => $user->join_date,
-                'last_visit' => $user->last_visit,
-                'medical_history' => $user->medical_history,
-                'notes' => $user->notes,
-                'has_signed_terms' => $user->approved_at ?
-                    $user->signatures()
-                        ->where('document_type', 'terms_and_conditions')
-                        ->where('signed_at', '>', $user->approved_at)
-                        ->exists() : false,
-                'terms_accepted_at' => $user->terms_accepted_at,
-                // Priority Booking fields
+            'user' => $this->buildUserResponse($user, [
                 'has_priority_booking' => $user->has_priority_booking,
                 'priority_booking_expires_at' => $user->priority_booking_expires_at ? $user->priority_booking_expires_at->format('Y-m-d') : null,
-                'created_at' => $user->created_at ? $user->created_at->toISOString() : null,
-                'updated_at' => $user->updated_at ? $user->updated_at->toISOString() : null,
-            ],
+            ]),
+        ]);
+    }
+
+    /**
+     * Simple login with session-based authentication.
+     */
+    public function loginSimple(Request $request): JsonResponse
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        if (Auth::attempt($credentials, true)) {
+            return response()->json([
+                'success' => true,
+                'authenticated' => true,
+                'user' => Auth::user()
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid credentials'
+        ], 401);
+    }
+
+    /**
+     * Check web session authentication status.
+     */
+    public function session(): JsonResponse
+    {
+        if (Auth::check()) {
+            return response()->json([
+                'authenticated' => true,
+                'user' => Auth::user()
+            ]);
+        }
+
+        return response()->json([
+            'authenticated' => false,
+            'user' => null
         ]);
     }
 
@@ -265,7 +246,7 @@ class AuthController extends Controller
      * @deprecated Use registerWithConsent() instead to ensure proper age verification
      * This endpoint is maintained for backward compatibility but should not be used for new registrations
      */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         // Log deprecation warning
         Log::warning('Deprecated registration endpoint used', [
@@ -451,7 +432,7 @@ class AuthController extends Controller
      * Check if a user is a minor based on birth date
      * CRITICAL: Age calculation must be done on server for legal validity
      */
-    public function checkAge(Request $request)
+    public function checkAge(Request $request): JsonResponse
     {
         $request->validate([
             'birth_date' => 'required|date|before:today'
@@ -489,7 +470,7 @@ class AuthController extends Controller
     /**
      * Enhanced registration with parent consent support
      */
-    public function registerWithConsent(Request $request)
+    public function registerWithConsent(Request $request): JsonResponse
     {
         // Basic validation
         $rules = [

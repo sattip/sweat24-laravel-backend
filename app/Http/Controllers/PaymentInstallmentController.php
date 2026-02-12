@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentInstallment;
 use App\Notifications\Payments\PaymentInstallmentReceivedNotification;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 
 class PaymentInstallmentController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display a listing of the resource.
      */
@@ -20,7 +22,7 @@ class PaymentInstallmentController extends Controller
         }
         
         if ($request->has('customer')) {
-            $query->where('customer_name', 'LIKE', '%' . $request->customer . '%');
+            $this->addSafeLikeWhere($query, 'customer_name', $request->customer);
         }
         
         $installments = $query->orderBy('due_date')->get();

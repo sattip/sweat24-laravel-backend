@@ -2,28 +2,34 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class WorkTimeEntry extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'instructor_id',
         'date',
         'start_time',
         'end_time',
-        'duration',
-        'notes',
-        'status'
+        'hours_worked',
+        'description',
+        'approved',
+        'approved_by',
+        'approved_at',
     ];
-    
+
     protected $casts = [
         'date' => 'date',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime'
+        'hours_worked' => 'decimal:2',
+        'approved' => 'boolean',
+        'approved_at' => 'datetime',
     ];
-    
+
     public function instructor()
     {
-        return $this->belongsTo(User::class, 'instructor_id');
+        return $this->belongsTo(Instructor::class);
     }
 }

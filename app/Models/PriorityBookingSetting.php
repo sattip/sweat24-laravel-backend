@@ -2,22 +2,25 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PriorityBookingSetting extends Model
 {
+    use HasFactory;
     protected $fillable = [
-        'priority_booking_window_days',
-        'regular_booking_window_days',
-        'priority_seats_release_hours',
         'default_priority_seats',
+        'priority_advance_hours',
+        'priority_release_hours',
         'priority_system_enabled',
         'auto_release_enabled',
+        'priority_packages',
     ];
 
     protected $casts = [
         'priority_system_enabled' => 'boolean',
         'auto_release_enabled' => 'boolean',
+        'priority_packages' => 'array',
     ];
 
     /**
@@ -26,10 +29,9 @@ class PriorityBookingSetting extends Model
     public static function getSettings()
     {
         return self::first() ?? self::create([
-            'priority_booking_window_days' => 30,
-            'regular_booking_window_days' => 14,
-            'priority_seats_release_hours' => 48,
             'default_priority_seats' => 5,
+            'priority_advance_hours' => 48,
+            'priority_release_hours' => 24,
             'priority_system_enabled' => true,
             'auto_release_enabled' => true,
         ]);

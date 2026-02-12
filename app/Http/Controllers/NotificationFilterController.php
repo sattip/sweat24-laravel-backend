@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\NotificationFilter;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class NotificationFilterController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display a listing of notification filters.
      */
@@ -22,11 +24,7 @@ class NotificationFilterController extends Controller
 
         // Search
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'description'], $request->search);
         }
 
         $filters = $query->orderBy('name')->get();

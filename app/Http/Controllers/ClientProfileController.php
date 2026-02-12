@@ -17,7 +17,7 @@ class ClientProfileController extends Controller
     public function show(Request $request)
     {
         $user = $request->user()->load([
-            'packages' => function($query) {
+            'userPackages' => function($query) {
                 $query->where('status', 'active')->latest();
             },
             'bookings' => function($query) {
@@ -33,7 +33,7 @@ class ClientProfileController extends Controller
                 'total_bookings' => $user->bookings()->count(),
                 'upcoming_bookings' => $user->bookings()->whereDate('scheduled_at', '>=', now())->count(),
                 'completed_sessions' => $user->bookings()->where('status', 'completed')->count(),
-                'active_packages' => $user->packages()->where('status', 'active')->count(),
+                'active_packages' => $user->userPackages()->where('status', 'active')->count(),
             ]
         ]);
     }

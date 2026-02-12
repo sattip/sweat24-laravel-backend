@@ -63,6 +63,21 @@ class ClassEvaluation extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    /**
+     * Get the user through the booking relationship.
+     */
+    public function user()
+    {
+        return $this->hasOneThrough(
+            User::class,
+            Booking::class,
+            'id', // Foreign key on bookings table
+            'id', // Foreign key on users table
+            'booking_id', // Local key on class_evaluations table
+            'user_id' // Local key on bookings table
+        );
+    }
+
     public function scopePending($query)
     {
         return $query->where('is_submitted', false)

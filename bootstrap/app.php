@@ -13,23 +13,32 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Apply security headers to all requests
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         // Enable CORS for API requests
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
-        
+
+        // Apply rate limiting to API routes
+        $middleware->api(append: [
+            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+        ]);
+
         // Use custom CSRF middleware that excludes API routes
         $middleware->web(replace: [
             \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class => \App\Http\Middleware\VerifyCsrfToken::class,
         ]);
-        
-        // Register admin middleware alias
+
+        // Register middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'role' => \App\Http\Middleware\CheckRole::class,
             'debug' => \App\Http\Middleware\DebugMiddleware::class,
+            'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
         ]);
-        
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

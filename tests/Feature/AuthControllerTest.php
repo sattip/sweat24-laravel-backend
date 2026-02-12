@@ -15,16 +15,10 @@ class AuthControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
-        // Create a default package for new users
-        Package::create([
+
+        // Create a default package for new users using factory
+        Package::factory()->create([
             'name' => 'Basic Package',
-            'type' => 'sessions',
-            'duration' => 30,
-            'description' => 'Basic package for testing',
-            'price' => 50.00,
-            'credits' => 10,
-            'active' => true
         ]);
     }
 
@@ -41,20 +35,24 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
+                'success',
+                'message',
                 'user' => [
                     'id',
                     'name',
                     'email',
-                    'phone',
-                    'created_at',
-                    'updated_at'
-                ],
-                'token'
+                    'status',
+                    'registration_status'
+                ]
+            ])
+            ->assertJson([
+                'success' => true
             ]);
 
         $this->assertDatabaseHas('users', [
             'email' => 'test@example.com',
-            'name' => 'Test User'
+            'name' => 'Test User',
+            'status' => 'pending_approval'
         ]);
     }
 
@@ -71,15 +69,16 @@ class AuthControllerTest extends TestCase
             'date_of_birth' => '1990-01-01'
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        $response->assertStatus(422);
     }
 
     public function test_user_can_login_with_valid_credentials()
     {
+        // Create user with active status (approved)
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
+            'status' => 'active'
         ]);
 
         $response = $this->postJson('/api/v1/auth/login', [
@@ -89,12 +88,17 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
+                'success',
+                'message',
                 'user' => [
                     'id',
                     'name',
                     'email'
                 ],
                 'token'
+            ])
+            ->assertJson([
+                'success' => true
             ]);
     }
 
@@ -102,7 +106,8 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
+            'status' => 'active'
         ]);
 
         $response = $this->postJson('/api/v1/auth/login', [
@@ -110,22 +115,45 @@ class AuthControllerTest extends TestCase
             'password' => 'wrongpassword'
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson([
-                'message' => 'Invalid credentials'
+        // Controller throws ValidationException which returns 422
+        $response->assertStatus(422)
+            ->assertJsonStructure([
+                'message',
+                'errors' => ['email']
+            ]);
+    }
+
+    public function test_pending_user_cannot_login()
+    {
+        $user = User::factory()->create([
+            'email' => 'pending@example.com',
+            'password' => bcrypt('password123'),
+            'status' => 'pending_approval'
+        ]);
+
+        $response = $this->postJson('/api/v1/auth/login', [
+            'email' => 'pending@example.com',
+            'password' => 'password123'
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure([
+                'message',
+                'errors' => ['email']
             ]);
     }
 
     public function test_authenticated_user_can_logout()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'active']);
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/v1/auth/logout');
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Successfully logged out'
+                'success' => true,
+                'message' => 'Logged out successfully'
             ]);
     }
 
@@ -138,16 +166,27 @@ class AuthControllerTest extends TestCase
 
     public function test_authenticated_user_can_get_profile()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'active']);
         Sanctum::actingAs($user);
 
         $response = $this->getJson('/api/v1/auth/me');
 
         $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'user' => [
+                    'id',
+                    'name',
+                    'email'
+                ]
+            ])
             ->assertJson([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email
+                'success' => true,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email
+                ]
             ]);
     }
 

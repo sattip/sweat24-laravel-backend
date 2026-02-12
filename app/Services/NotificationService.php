@@ -86,14 +86,21 @@ class NotificationService
             // Get recipients based on filters
             $recipients = $this->getRecipients($notification->filters);
 
-            // Create recipient records
-            foreach ($recipients as $user) {
-                NotificationRecipient::create([
+            // Create recipient records using bulk insert to avoid N+1 queries
+            $recipientData = $recipients->map(function ($user) use ($notification) {
+                return [
                     'notification_id' => $notification->id,
                     'user_id' => $user->id,
-                    'delivery_channels' => $notification->channels,
+                    'delivery_channels' => json_encode($notification->channels),
                     'delivery_status' => 'pending',
-                ]);
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            })->toArray();
+
+            // Batch insert in chunks to handle large recipient lists
+            foreach (array_chunk($recipientData, 500) as $chunk) {
+                NotificationRecipient::insert($chunk);
             }
 
             // Update notification stats
