@@ -33,13 +33,7 @@ class LoyaltyController extends Controller
         $totalEarnedPoints = $user->loyaltyPoints()->where('type', 'earned')->sum('amount') ?? 0;
         $redeemedRewardsCount = $user->loyaltyRedemptions()->count();
 
-        // Define tier thresholds
-        $tiers = [
-            ['name' => 'Bronze', 'min_points' => 0, 'benefits' => ['5% έκπτωση σε πακέτα']],
-            ['name' => 'Silver', 'min_points' => 500, 'benefits' => ['10% έκπτωση σε πακέτα', 'Δωρεάν πετσέτα']],
-            ['name' => 'Gold', 'min_points' => 1000, 'benefits' => ['15% έκπτωση σε πακέτα', 'Δωρεάν πετσέτα', 'Priority booking']],
-            ['name' => 'Platinum', 'min_points' => 2500, 'benefits' => ['20% έκπτωση σε πακέτα', 'Δωρεάν πετσέτα', 'Priority booking', 'Δωρεάν guest pass']],
-        ];
+        $tiers = config('loyalty.tiers');
 
         // Determine current and next tier based on total earned points
         $currentTier = $tiers[0];

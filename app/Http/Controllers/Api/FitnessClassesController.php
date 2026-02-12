@@ -395,14 +395,16 @@ class FitnessClassesController extends Controller
             ->with('user:id,name,email,phone')
             ->get();
 
-        $participants = $bookings->map(function ($booking) {
-            // Try to get user package info
-            $userPackage = null;
-            if ($booking->user_id) {
-                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
-                    ->where('status', 'active')
-                    ->first();
-            }
+        // Eager-load user packages to avoid N+1 queries
+        $userIds = $bookings->pluck('user_id')->filter()->unique();
+        $userPackages = \App\Models\UserPackage::whereIn('user_id', $userIds)
+            ->where('status', 'active')
+            ->with('package:id,name')
+            ->get()
+            ->keyBy('user_id');
+
+        $participants = $bookings->map(function ($booking) use ($userPackages) {
+            $userPackage = $booking->user_id ? $userPackages->get($booking->user_id) : null;
 
             return [
                 'id' => $booking->id,
@@ -448,35 +450,18 @@ class FitnessClassesController extends Controller
         }
 
         if ($validated['status'] === 'present') {
-            // Mark as present (completed)
             $booking->update([
                 'status' => 'completed',
                 'attended' => true,
             ]);
 
-            // Deduct session from user package if applicable
-            if ($booking->user_id) {
-                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
-                    ->where('status', 'active')
-                    ->where('remaining_sessions', '>', 0)
-                    ->first();
-
-                if ($userPackage) {
-                    $userPackage->decrement('remaining_sessions');
-
-                    // Check if package is now empty
-                    if ($userPackage->remaining_sessions <= 0) {
-                        $userPackage->update(['status' => 'completed']);
-                    }
-                }
-            }
+            $this->deductSessionFromPackage($booking);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Η παρουσία καταχωρήθηκε επιτυχώς'
             ]);
         } else {
-            // Mark as absent
             $withCharge = $validated['with_charge'] ?? true;
 
             $booking->update([
@@ -488,20 +473,8 @@ class FitnessClassesController extends Controller
                 'absence_marked_by' => auth()->id(),
             ]);
 
-            // If charging for absence, deduct from package
-            if ($withCharge && $booking->user_id) {
-                $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
-                    ->where('status', 'active')
-                    ->where('remaining_sessions', '>', 0)
-                    ->first();
-
-                if ($userPackage) {
-                    $userPackage->decrement('remaining_sessions');
-
-                    if ($userPackage->remaining_sessions <= 0) {
-                        $userPackage->update(['status' => 'completed']);
-                    }
-                }
+            if ($withCharge) {
+                $this->deductSessionFromPackage($booking);
             }
 
             return response()->json([
@@ -510,6 +483,29 @@ class FitnessClassesController extends Controller
                     ? 'Η απουσία καταχωρήθηκε με χρέωση'
                     : 'Η απουσία καταχωρήθηκε χωρίς χρέωση'
             ]);
+        }
+    }
+
+    /**
+     * Deduct a session from the user's active package.
+     */
+    private function deductSessionFromPackage(\App\Models\Booking $booking): void
+    {
+        if (!$booking->user_id) {
+            return;
+        }
+
+        $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+            ->where('status', 'active')
+            ->where('remaining_sessions', '>', 0)
+            ->first();
+
+        if ($userPackage) {
+            $userPackage->decrement('remaining_sessions');
+
+            if ($userPackage->remaining_sessions <= 0) {
+                $userPackage->update(['status' => 'completed']);
+            }
         }
     }
 
