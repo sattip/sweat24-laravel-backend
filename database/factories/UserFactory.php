@@ -44,4 +44,72 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'admin',
+            'membership_type' => 'Admin',
+            'status' => 'active',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a trainer.
+     */
+    public function trainer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'trainer',
+            'membership_type' => 'Trainer',
+            'status' => 'active',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a member.
+     */
+    public function member(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'member',
+            'membership_type' => 'Basic',
+            'status' => 'active',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is pending approval.
+     */
+    public function pendingApproval(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'pending_approval',
+            'registration_status' => 'pending_approval',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is inactive.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'inactive',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is active.
+     */
+    public function active(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'active',
+            'registration_status' => 'completed',
+        ]);
+    }
 }

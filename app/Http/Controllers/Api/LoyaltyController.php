@@ -28,12 +28,46 @@ class LoyaltyController extends Controller
     public function dashboard()
     {
         $user = Auth::user();
-        
+
+        $currentPoints = $user->loyalty_points_balance ?? 0;
+        $totalEarnedPoints = $user->loyaltyPoints()->where('type', 'earned')->sum('amount') ?? 0;
+        $redeemedRewardsCount = $user->loyaltyRedemptions()->count();
+
+        $tiers = config('loyalty.tiers');
+
+        // Determine current and next tier based on total earned points
+        $currentTier = $tiers[0];
+        $nextTier = null;
+
+        foreach ($tiers as $index => $tier) {
+            if ($totalEarnedPoints >= $tier['min_points']) {
+                $currentTier = $tier;
+                if (isset($tiers[$index + 1])) {
+                    $nextTier = $tiers[$index + 1];
+                }
+            }
+        }
+
         $dashboard = [
-            'current_balance' => $user->loyalty_points_balance,
-            'expiring_points' => $user->expiring_points,
-            'lifetime_earned' => $user->loyaltyPoints()->where('type', 'earned')->sum('amount'),
-            'lifetime_redeemed' => abs($user->loyaltyPoints()->where('type', 'redeemed')->sum('amount')),
+            // Fields expected by frontend
+            'current_points' => (int) $currentPoints,
+            'total_earned_points' => (int) $totalEarnedPoints,
+            'redeemed_rewards_count' => $redeemedRewardsCount,
+            'current_tier' => [
+                'name' => $currentTier['name'],
+                'benefits' => $currentTier['benefits'],
+            ],
+            'next_tier' => $nextTier ? [
+                'name' => $nextTier['name'],
+                'points_required' => $nextTier['min_points'],
+                'points_needed' => max(0, $nextTier['min_points'] - $totalEarnedPoints),
+            ] : null,
+
+            // Additional fields for backwards compatibility
+            'current_balance' => (int) $currentPoints,
+            'expiring_points' => $user->expiring_points ?? 0,
+            'lifetime_earned' => (int) $totalEarnedPoints,
+            'lifetime_redeemed' => abs($user->loyaltyPoints()->where('type', 'redeemed')->sum('amount') ?? 0),
             'pending_redemptions' => $user->loyaltyRedemptions()
                                          ->whereIn('status', ['pending', 'approved'])
                                          ->count(),
@@ -57,6 +91,7 @@ class LoyaltyController extends Controller
     public function availableRewards(Request $request)
     {
         $user = Auth::user();
+        $userBalance = $user->loyalty_points_balance ?? 0;
         $rewards = $this->loyaltyService->getAvailableRewardsForUser($user);
 
         // Φιλτράρισμα ανά τύπο
@@ -72,14 +107,35 @@ class LoyaltyController extends Controller
         // Ταξινόμηση
         $sortBy = $request->get('sort_by', 'points_cost');
         $sortDirection = $request->get('sort_direction', 'asc');
-        
+
         $rewards = $rewards->sortBy($sortBy, SORT_REGULAR, $sortDirection === 'desc');
+
+        // Transform rewards to match expected format
+        $transformedRewards = $rewards->values()->map(function ($reward) use ($userBalance) {
+            return [
+                'id' => $reward->id,
+                'name' => $reward->name,
+                'description' => $reward->description,
+                'image_url' => $reward->image_url,
+                'points_required' => (int) ($reward->points_cost ?? 0), // Frontend expects points_required
+                'points_cost' => (int) ($reward->points_cost ?? 0), // Keep for backwards compatibility
+                'category' => $reward->type ?? 'general', // Map type to category
+                'type' => $reward->type,
+                'is_affordable' => $userBalance >= ($reward->points_cost ?? 0),
+                'is_limited_time' => $reward->valid_until !== null,
+                'is_available' => $reward->is_available ?? true,
+                'valid_from' => $reward->valid_from?->format('Y-m-d'),
+                'valid_until' => $reward->valid_until?->format('Y-m-d'),
+                'redemptions_remaining' => $reward->redemptions_remaining,
+                'terms_conditions' => $reward->terms_conditions,
+            ];
+        });
 
         return response()->json([
             'success' => true,
             'data' => [
-                'user_balance' => $user->loyalty_points_balance,
-                'rewards' => $rewards->values(),
+                'user_balance' => $userBalance,
+                'rewards' => $transformedRewards,
             ],
         ]);
     }

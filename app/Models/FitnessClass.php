@@ -32,7 +32,6 @@ class FitnessClass extends Model
 
     protected $casts = [
         'date' => 'date',
-        'time' => 'datetime:H:i',
         'duration' => 'integer',
         'max_participants' => 'integer',
         'current_participants' => 'integer',
@@ -79,7 +78,7 @@ class FitnessClass extends Model
      */
     public function scopeByDate($query, $date)
     {
-        return $query->where('date', $date);
+        return $query->whereDate('date', $date);
     }
 
     /**

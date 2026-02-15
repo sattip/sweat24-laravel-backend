@@ -12,31 +12,28 @@ class BodyMeasurement extends Model
 
     protected $fillable = [
         'user_id',
-        'measurement_date',
+        'date',
         'weight',
-        'body_fat_percentage',
-        'muscle_mass',
-        'chest',
+        'height',
         'waist',
         'hips',
-        'thighs',
-        'arms',
-        'calves',
+        'chest',
+        'arm',
+        'thigh',
+        'body_fat',
         'notes',
-        'measured_by',
     ];
 
     protected $casts = [
-        'measurement_date' => 'date',
-        'weight' => 'decimal:1',
-        'body_fat_percentage' => 'decimal:1',
-        'muscle_mass' => 'decimal:1',
-        'chest' => 'decimal:1',
-        'waist' => 'decimal:1',
-        'hips' => 'decimal:1',
-        'thighs' => 'decimal:1',
-        'arms' => 'decimal:1',
-        'calves' => 'decimal:1',
+        'date' => 'date',
+        'weight' => 'decimal:2',
+        'height' => 'decimal:2',
+        'waist' => 'decimal:2',
+        'hips' => 'decimal:2',
+        'chest' => 'decimal:2',
+        'arm' => 'decimal:2',
+        'thigh' => 'decimal:2',
+        'body_fat' => 'decimal:2',
     ];
 
     /**
@@ -73,7 +70,7 @@ class BodyMeasurement extends Model
      */
     public function getFormattedDateAttribute()
     {
-        return $this->measurement_date ? $this->measurement_date->format('Y-m-d') : null;
+        return $this->date ? $this->date->format('Y-m-d') : null;
     }
 
     /**
@@ -81,7 +78,7 @@ class BodyMeasurement extends Model
      */
     public function scopeLatest($query)
     {
-        return $query->orderBy('measurement_date', 'desc');
+        return $query->orderBy('date', 'desc');
     }
 
     /**
@@ -89,7 +86,7 @@ class BodyMeasurement extends Model
      */
     public function scopeBetweenDates($query, $startDate, $endDate)
     {
-        return $query->whereBetween('measurement_date', [$startDate, $endDate]);
+        return $query->whereBetween('date', [$startDate, $endDate]);
     }
 
     /**
@@ -127,8 +124,8 @@ class BodyMeasurement extends Model
     public function getPreviousMeasurement()
     {
         return self::where('user_id', $this->user_id)
-            ->where('measurement_date', '<', $this->measurement_date)
-            ->orderBy('measurement_date', 'desc')
+            ->where('date', '<', $this->date)
+            ->orderBy('date', 'desc')
             ->first();
     }
 
@@ -144,7 +141,7 @@ class BodyMeasurement extends Model
         }
 
         $changes = [];
-        $fields = ['weight', 'body_fat_percentage', 'muscle_mass', 'chest', 'waist', 'hips', 'thighs', 'arms', 'calves'];
+        $fields = ['weight', 'body_fat', 'chest', 'waist', 'hips', 'thigh', 'arm'];
 
         foreach ($fields as $field) {
             if ($this->$field && $previous->$field) {
@@ -169,7 +166,7 @@ class BodyMeasurement extends Model
     public static function getLatestForUser($userId)
     {
         return self::where('user_id', $userId)
-            ->orderBy('measurement_date', 'desc')
+            ->orderBy('date', 'desc')
             ->first();
     }
 }

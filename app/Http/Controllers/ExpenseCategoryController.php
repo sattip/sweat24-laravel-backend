@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExpenseCategory;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ExpenseCategoryController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display a listing of expense categories.
      */
@@ -32,7 +34,7 @@ class ExpenseCategoryController extends Controller
 
         // Search by name
         if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $this->addSafeLikeWhere($query, 'name', $request->search);
         }
 
         $categories = $query->orderBy('sort_order')

@@ -14,43 +14,44 @@ use Carbon\Carbon;
 use App\Events\BookingCreated;
 use App\Events\BookingCancelled;
 use App\Traits\ApiResponseTrait;
+use App\Traits\SearchableTrait;
 use App\Notifications\Bookings\BookingConfirmationNotification;
 use App\Notifications\Bookings\BookingCancelledNotification;
 use Illuminate\Support\Facades\Notification;
 use App\Services\BookingCompletionService;
+use Illuminate\Http\JsonResponse;
 
 class BookingController extends Controller
 {
-    use ApiResponseTrait;
+    use ApiResponseTrait, SearchableTrait;
 
-    protected $bookingCompletionService;
+    protected BookingCompletionService $bookingCompletionService;
 
     public function __construct(BookingCompletionService $bookingCompletionService)
     {
         $this->bookingCompletionService = $bookingCompletionService;
     }
-    
-    // Remove middleware for testing
+
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Booking::with('user', 'store', 'service', 'gymClass', 'fitnessClass');
 
-        // Authenticate via Sanctum token
+        // Get authenticated user from Sanctum token
         $authUser = $request->user('sanctum');
         $isAdmin = $authUser && in_array($authUser->role, ['admin', 'trainer']);
 
+        // For non-admin users, filter by their own user_id
         if (!$isAdmin) {
-            // For non-admin: require authenticated user or user_id param
-            $userId = $authUser ? $authUser->id : $request->get('user_id');
-
-            if (!$userId) {
+            if (!$authUser) {
+                // No authenticated user - return empty array
                 return response()->json([]);
             }
 
-            $query->where('user_id', $userId);
+            // Regular user can only see their own bookings
+            $query->where('user_id', $authUser->id);
             // Only show active bookings for regular users
             $query->where('status', '!=', 'cancelled');
             // Only show future bookings for regular users
@@ -64,6 +65,12 @@ class BookingController extends Controller
             });
         }
 
+        // Admin requests can filter by user_id if provided
+        if ($isAdmin && $request->has('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+
         if ($request->has('date')) {
             $query->whereDate('date', $request->date);
         }
@@ -73,7 +80,7 @@ class BookingController extends Controller
         }
 
         if ($request->has('instructor')) {
-            $query->where('instructor', 'LIKE', '%' . $request->instructor . '%');
+            $this->addSafeLikeWhere($query, 'instructor', $request->instructor);
         }
 
         if ($request->has('store_id') && $request->store_id) {
@@ -88,110 +95,77 @@ class BookingController extends Controller
     /**
      * Get user's past bookings for workout history
      */
-    public function history(Request $request)
+    public function history(Request $request): JsonResponse
     {
-        $query = Booking::with('user', 'store', 'service', 'gymClass', 'fitnessClass', 'muscleGroups');
-        
-        // Get user ID from parameter
-        $userId = $request->get('user_id');
-        if (!$userId) {
-            return response()->json([]);
-        }
-        
-        // Filter by user and show only past bookings
-        $now = now();
-        $query->where('user_id', $userId)
-              ->where(function($q) use ($now) {
-                  $q->where('date', '<', $now->toDateString())
-                    ->orWhere(function($subQuery) use ($now) {
-                        $subQuery->where('date', '=', $now->toDateString())
-                                 ->whereRaw("CONCAT(date, ' ', time) <= ?", [$now->toDateTimeString()]);
-                    });
-              })
-              ->where('status', '!=', 'cancelled');
-        
-        $bookings = $query->orderBy('date', 'desc')->orderBy('time', 'desc')->get();
-        
-        \Log::info('BookingController::history - Returning ' . $bookings->count() . ' past bookings for user ' . $userId);
-        
-        return response()->json($bookings);
-    }
+        // Get authenticated user
+        $authUser = $request->user();
+        $isAdminOrTrainer = $authUser && in_array($authUser->role, ['admin', 'trainer']);
 
-    /**
-     * History endpoint (bypass auth for testing)
-     */
-    public function testHistory(Request $request)
-    {
-        // Direct history call without auth
-        $userId = $request->get('user_id');
+        // Determine which user's history to show
+        $userId = null;
+        if ($isAdminOrTrainer && $request->has('user_id')) {
+            // Admin/trainer can view any user's history
+            $userId = $request->get('user_id');
+        } elseif ($authUser) {
+            // Regular user sees their own history
+            $userId = $authUser->id;
+        }
+
         if (!$userId) {
             return response()->json([]);
         }
 
-        $query = Booking::query();
         $now = now();
-        $bookings = $query->where('user_id', $userId)
-              ->where(function($q) use ($now) {
-                  $q->where('date', '<', $now->toDateString())
-                    ->orWhere(function($subQuery) use ($now) {
-                        $subQuery->where('date', '=', $now->toDateString())
-                                 ->whereRaw("CONCAT(date, ' ', time) <= ?", [$now->toDateTimeString()]);
-                    });
-              })
-              ->where('status', '!=', 'cancelled')
-              ->with(['user', 'store', 'service', 'gymClass', 'fitnessClass', 'muscleGroups']) // Load all relationships
-              ->orderBy('date', 'desc')
-              ->orderBy('time', 'desc')
-              ->get()
-              ->map(function ($booking) {
-                  $bookingData = $booking->toArray();
+        $bookings = Booking::with(['user', 'store', 'service', 'gymClass', 'fitnessClass', 'muscleGroups'])
+            ->where('user_id', $userId)
+            ->where(function($q) use ($now) {
+                $q->where('date', '<', $now->toDateString())
+                  ->orWhere(function($subQuery) use ($now) {
+                      $subQuery->where('date', '=', $now->toDateString())
+                               ->whereRaw("CONCAT(date, ' ', time) <= ?", [$now->toDateTimeString()]);
+                  });
+            })
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('date', 'desc')
+            ->orderBy('time', 'desc')
+            ->get()
+            ->map(function ($booking) {
+                $bookingData = $booking->toArray();
 
-                  // Add muscle groups data
-                  $bookingData['muscle_groups'] = $booking->muscleGroups ? $booking->muscleGroups->muscle_groups : null;
-                  $bookingData['muscle_groups_recorded'] = $booking->muscleGroups !== null;
+                // Add muscle groups data
+                $bookingData['muscle_groups'] = $booking->muscleGroups ? $booking->muscleGroups->muscle_groups : null;
+                $bookingData['muscle_groups_recorded'] = $booking->muscleGroups !== null;
 
-                  // Add class details from either gymClass or fitnessClass
-                  if ($booking->fitnessClass) {
-                      $bookingData['class_type'] = $booking->fitnessClass->type;
-                      $bookingData['class_details'] = [
-                          'id' => $booking->fitnessClass->id,
-                          'name' => $booking->fitnessClass->name,
-                          'type' => $booking->fitnessClass->type,
-                          'instructor' => $booking->fitnessClass->instructor,
-                          'location' => $booking->fitnessClass->location,
-                          'description' => $booking->fitnessClass->description,
-                      ];
-                  } elseif ($booking->gymClass) {
-                      $bookingData['class_type'] = $booking->gymClass->class_type ?? null;
-                      $bookingData['class_details'] = [
-                          'id' => $booking->gymClass->id,
-                          'class_type' => $booking->gymClass->class_type,
-                          'trainer_name' => $booking->gymClass->trainer_name,
-                      ];
-                  }
+                // Add class details from either gymClass or fitnessClass
+                if ($booking->fitnessClass) {
+                    $bookingData['class_type'] = $booking->fitnessClass->type;
+                    $bookingData['class_details'] = [
+                        'id' => $booking->fitnessClass->id,
+                        'name' => $booking->fitnessClass->name,
+                        'type' => $booking->fitnessClass->type,
+                        'instructor' => $booking->fitnessClass->instructor,
+                        'location' => $booking->fitnessClass->location,
+                        'description' => $booking->fitnessClass->description,
+                    ];
+                } elseif ($booking->gymClass) {
+                    $bookingData['class_type'] = $booking->gymClass->class_type ?? null;
+                    $bookingData['class_details'] = [
+                        'id' => $booking->gymClass->id,
+                        'class_type' => $booking->gymClass->class_type,
+                        'trainer_name' => $booking->gymClass->trainer_name,
+                    ];
+                }
 
-                  return $bookingData;
-              });
+                return $bookingData;
+            });
 
         return response()->json($bookings);
-    }
-
-    /**
-     * Test endpoint without any middleware
-     */
-    public function test(Request $request)
-    {
-        return response()->json([
-            'success' => true,
-            'message' => 'Booking API is working!',
-            'data' => $request->all()
-        ]);
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
         $validated = $request->validate([
@@ -216,45 +190,28 @@ class BookingController extends Controller
             return $this->validationErrorResponse($e->errors(), 'Validation failed');
         }
         
-        // Try to detect the authenticated user using multiple methods
-        $user = null;
-        $userId = null;
-        
-        // Check if user_id is passed as parameter (for API calls)
-        if ($request->has('user_id')) {
-            $userId = $request->get('user_id');
-        }
-        // Check session-based authentication via custom header
-        elseif ($request->hasHeader('X-User-ID')) {
-            $userId = $request->header('X-User-ID');
-        }
-        
-        // Set the user_id to the detected user if not provided
-        if (empty($validated['user_id'])) {
-            $validated['user_id'] = $userId ?? 1; // Default to Admin User for now
-        }
-        
-        // Find the customer user if we have a user_id
-        if ($validated['user_id']) {
-            $user = \App\Models\User::find($validated['user_id']);
-        }
-
-        // Get the authenticated user making this request (could be admin/trainer)
+        // Get authenticated user from Sanctum token
         $authUser = $request->user();
 
-        // Fallback: Try to get auth user from X-User-ID header if not authenticated via token
-        if (!$authUser && $request->hasHeader('X-User-ID')) {
-            $authUserId = $request->header('X-User-ID');
-            $authUser = \App\Models\User::find($authUserId);
+        if (!$authUser) {
+            return $this->unauthorizedResponse('Πρέπει να είστε συνδεδεμένος για να κάνετε κράτηση.');
         }
 
-        \Log::info('Booking creation - User roles', [
-            'customer_user_id' => $user ? $user->id : null,
-            'customer_role' => $user ? $user->role : null,
-            'auth_user_id' => $authUser ? $authUser->id : null,
-            'auth_user_role' => $authUser ? $authUser->role : null,
-            'has_x_user_id_header' => $request->hasHeader('X-User-ID'),
-        ]);
+        // Determine the customer user for this booking
+        $user = null;
+        $isAdminOrTrainer = in_array($authUser->role, ['admin', 'trainer']);
+
+        if ($isAdminOrTrainer && !empty($validated['user_id'])) {
+            // Admin/trainer creating booking for another user
+            $user = \App\Models\User::find($validated['user_id']);
+            if (!$user) {
+                return $this->notFoundResponse('Ο χρήστης δεν βρέθηκε.');
+            }
+        } else {
+            // Regular user creating booking for themselves
+            $user = $authUser;
+            $validated['user_id'] = $authUser->id;
+        }
 
         // Check for duplicate booking - PREVENT DOUBLE BOOKINGS
         if ($user && !empty($validated['class_id'])) {
@@ -279,11 +236,8 @@ class BookingController extends Controller
         }
         
         // Check if customer has available sessions for the selected service
-        // Skip validation if the authenticated user is admin or trainer (they're creating bookings for customers)
-        // Only validate packages if the authenticated user is the customer themselves (or no auth user)
-        $shouldValidatePackages = !$authUser || !in_array($authUser->role, ['admin', 'trainer']);
-
-        if ($user && $shouldValidatePackages) {
+        // Skip validation if admin/trainer is creating bookings for customers
+        if ($user && !$isAdminOrTrainer) {
             // NEW APPROACH: Use class type to validate against user packages
             // This prevents issues where class names are too specific (e.g., "Pilates Personal")
             // but the user has a broader package (e.g., "Personal Training")
@@ -425,7 +379,7 @@ class BookingController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Booking $booking)
+    public function show(Booking $booking): JsonResponse
     {
         return response()->json($booking->load('user', 'store', 'service'));
     }
@@ -433,7 +387,7 @@ class BookingController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Booking $booking)
+    public function update(Request $request, Booking $booking): JsonResponse
     {
         $validated = $request->validate([
             'store_id' => 'sometimes|exists:stores,id',
@@ -460,7 +414,7 @@ class BookingController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Booking $booking)
+    public function destroy(Booking $booking): JsonResponse
     {
         DB::transaction(function () use ($booking) {
             // Decrement participants if class exists and booking was confirmed
@@ -485,7 +439,7 @@ class BookingController extends Controller
     /**
      * Complete a booking (mark as attended and deduct session from package)
      */
-    public function complete(Request $request, $bookingId)
+    public function complete(Request $request, $bookingId): JsonResponse
     {
         try {
             // Validate request
@@ -553,7 +507,7 @@ class BookingController extends Controller
     /**
      * Cancel a booking
      */
-    public function cancel(Request $request, Booking $booking)
+    public function cancel(Request $request, Booking $booking): JsonResponse
     {
         // Check if user owns this booking
         $userId = null;
@@ -677,7 +631,7 @@ class BookingController extends Controller
     /**
      * Mark booking as no-show/absent
      */
-    public function markAbsent(Request $request, Booking $booking)
+    public function markAbsent(Request $request, Booking $booking): JsonResponse
     {
         // Validate request
         $validated = $request->validate([
@@ -740,13 +694,18 @@ class BookingController extends Controller
             }
 
             // Log activity
-            ActivityLogger::log('booking_marked_absent', [
-                'booking_id' => $booking->id,
-                'user_id' => $booking->user_id,
-                'with_charge' => $withCharge,
-                'reason' => $reason,
-                'marked_by' => $request->user() ? $request->user()->name : 'System',
-            ]);
+            ActivityLogger::log(
+                'booking_marked_absent',
+                "Booking marked as absent: {$booking->user->name}",
+                $booking,
+                [
+                    'booking_id' => $booking->id,
+                    'user_id' => $booking->user_id,
+                    'with_charge' => $withCharge,
+                    'reason' => $reason,
+                    'marked_by' => $request->user() ? $request->user()->name : 'System',
+                ]
+            );
 
             // If "without charge", notify admins
             if (!$withCharge) {

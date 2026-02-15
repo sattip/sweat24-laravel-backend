@@ -410,4 +410,38 @@ class WaitlistController extends Controller
             return null;
         }
     }
+
+    /**
+     * Get waitlist summary for all classes (admin/trainer batch endpoint)
+     */
+    public function summary(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->isTrainer()) {
+            return response()->json(["message" => "Unauthorized"], 403);
+        }
+
+        $waitlistSummary = GymClass::whereHas("waitlist")
+            ->withCount(["waitlist as waitlist_count"])
+            ->with(["waitlist" => function($query) {
+                $query->with("user:id,name,email,phone")->orderBy("position");
+            }])
+            ->get()
+            ->map(function($class) {
+                return [
+                    "classId" => $class->id,
+                    "className" => $class->name,
+                    "classDate" => $class->date ? $class->date->format("Y-m-d") : null,
+                    "classTime" => $class->time,
+                    "instructor" => $class->instructor,
+                    "location" => $class->location,
+                    "waitlist" => $class->waitlist->toArray(),
+                ];
+            });
+
+        return response()->json([
+            "success" => true,
+            "data" => $waitlistSummary,
+        ]);
+    }
 }

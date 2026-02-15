@@ -7,6 +7,13 @@ use App\Models\User;
 class ReferralService
 {
     /**
+     * Escape special characters for LIKE patterns.
+     */
+    private static function escapeLikePattern(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+    /**
      * Find a referrer by name or email
      * 
      * @param string $searchTerm
@@ -69,9 +76,11 @@ class ReferralService
      */
     public static function findPotentialReferrers(string $searchTerm, int $limit = 5)
     {
-        return User::where(function ($query) use ($searchTerm) {
-                $query->where('name', 'LIKE', '%' . $searchTerm . '%')
-                      ->orWhere('email', 'LIKE', '%' . $searchTerm . '%');
+        $escaped = self::escapeLikePattern($searchTerm);
+
+        return User::where(function ($query) use ($escaped) {
+                $query->where('name', 'LIKE', '%' . $escaped . '%')
+                      ->orWhere('email', 'LIKE', '%' . $escaped . '%');
             })
             ->where('status', 'active')
             ->where('role', '!=', 'admin')

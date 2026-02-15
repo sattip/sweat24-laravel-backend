@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ContactMessage;
 use App\Models\OwnerNotification;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 
 class ContactMessageController extends Controller
 {
+    use SearchableTrait;
     /**
      * Get all contact messages (admin)
      */
@@ -30,12 +32,7 @@ class ContactMessageController extends Controller
 
         // Search
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('message', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'email', 'message'], $request->search);
         }
 
         $messages = $query->orderBy('created_at', 'desc')->paginate(20);

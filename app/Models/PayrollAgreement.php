@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PayrollAgreement extends Model
 {
+    use HasFactory;
     const TYPE_BONUS = 'bonus';
     const TYPE_DEDUCTION = 'deduction';
     const TYPE_SPECIAL_RATE = 'special_rate';

@@ -93,7 +93,7 @@ class ReferralController extends Controller
         return response()->json([
             'stats' => $stats,
             'referrals' => $referrals,
-            'referral_link' => url('/register?ref=' . $user->id),
+            'referral_link' => "https://api.sweat93.gr/invite/" . ReferralService::generateReferralCode($user->id),
             'referral_code' => ReferralService::generateReferralCode($user->id)
         ]);
     }

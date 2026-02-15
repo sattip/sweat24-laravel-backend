@@ -54,6 +54,9 @@ Route::prefix('v1/registration')->group(function () {
 Route::prefix('v1/admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/users/{id}/approve', [RegistrationController::class, 'approveUser']);
     Route::post('/users/{id}/reject', [RegistrationController::class, 'rejectUser']);
+
+    // User package payment update
+    Route::patch('/users/{userId}/packages/{userPackageId}/payment', [\App\Http\Controllers\Admin\UserPackageController::class, 'updatePayment']);
 });
 
 // Admin Panel specific routes (simplified path as requested)
@@ -67,6 +70,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/admin/login', [AuthController::class, 'adminLogin']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
     Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);
@@ -227,10 +231,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/{userPackage}/unfreeze', [UserPackageController::class, 'unfreeze']);
         Route::post('/{userPackage}/renew', [UserPackageController::class, 'renew']);
         Route::post('/{userPackage}/send-notification', [UserPackageController::class, 'sendExpiryNotification']);
+        Route::post("/{userPackage}/toggle-pause", [UserPackageController::class, "togglePause"]);
     });
 
     // Mobile App - Get authenticated user's partial payment summary
     Route::get('/my-partial-payments', [UserPackageController::class, 'myPartialPayments']);
+
+    // Mobile App - Get authenticated user's package history (expired, cancelled, completed)
+    Route::get('/my-packages/history', [UserPackageController::class, 'myPackagesHistory']);
+
+    // Mobile App - Get authenticated user's active packages
+    Route::get('/my-active-packages', [UserPackageController::class, 'myActivePackages']);
 
     // Custom Packages route alias (points to user-packages endpoint)
     Route::get('custom-packages/user/{userId}', [UserPackageController::class, 'userPackages']);
@@ -297,6 +308,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('fitness-classes', [\App\Http\Controllers\Api\FitnessClassesController::class, 'store']);
         Route::put('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'update']);
         Route::delete('fitness-classes/{id}', [\App\Http\Controllers\Api\FitnessClassesController::class, 'destroy']);
+        Route::get('fitness-classes/{id}/participants', [\App\Http\Controllers\Api\FitnessClassesController::class, 'getParticipants']);
+        Route::post('fitness-classes/{id}/attendance', [\App\Http\Controllers\Api\FitnessClassesController::class, 'markAttendance']);
+        Route::post('fitness-classes/{id}/cancel', [\App\Http\Controllers\Api\FitnessClassesController::class, 'cancel']);
     });
 
     // Questionnaires (authenticated routes for admin/trainer)
@@ -325,10 +339,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('classes/{class}/waitlist/decline', [WaitlistController::class, 'decline']);
     Route::get('classes/{class}/waitlist/status', [WaitlistController::class, 'status']);
     Route::get('classes/{class}/waitlist', [WaitlistController::class, 'index'])->middleware('role:admin,trainer');
+    Route::get("waitlists/summary", [WaitlistController::class, "summary"])->middleware("role:admin,trainer");
     
     // Financial Features (Admin and Trainer)
     Route::middleware(['role:admin,trainer'])->group(function () {
         Route::apiResource('payment-installments', PaymentInstallmentController::class);
+        Route::post("payment-installments/{paymentInstallment}/pay", [PaymentInstallmentController::class, "markAsPaid"]);
         Route::apiResource('cash-register', CashRegisterEntryController::class);
         Route::apiResource('business-expenses', BusinessExpenseController::class);
     });
@@ -388,6 +404,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'update']);
         Route::delete('admin/class-types/{id}', [\App\Http\Controllers\Api\ClassTypesController::class, 'destroy']);
         Route::post('admin/class-types/reorder', [\App\Http\Controllers\Api\ClassTypesController::class, 'reorder']);
+
+        // Locations Management
+        Route::get('admin/locations', [\App\Http\Controllers\Api\LocationsController::class, 'index']);
+        Route::post('admin/locations', [\App\Http\Controllers\Api\LocationsController::class, 'store']);
+        Route::get('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'show']);
+        Route::post('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'update']);
+        Route::delete('admin/locations/{id}', [\App\Http\Controllers\Api\LocationsController::class, 'destroy']);
     });
 
     // Admin only routes
@@ -492,19 +515,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('orders/{order}/status', [\App\Http\Controllers\OrderController::class, 'updateStatus']);
     });
     
-    // Dashboard stats
-    Route::get('dashboard/stats', function () {
-        return response()->json([
-            'total_members' => \App\Models\User::count(),
-            'active_members' => \App\Models\User::where('status', 'active')->count(),
-            'total_revenue' => \App\Models\CashRegisterEntry::where('type', 'income')->sum('amount'),
-            'monthly_revenue' => \App\Models\CashRegisterEntry::where('type', 'income')
-                ->whereMonth('created_at', now()->month)
-                ->sum('amount'),
-            'pending_payments' => \App\Models\PaymentInstallment::where('status', 'pending')->count(),
-            'overdue_payments' => \App\Models\PaymentInstallment::where('status', 'overdue')->count(),
-        ]);
-    });
+    // Dashboard stats (role-based) - delegated to DashboardController
+    Route::get('dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
     
     // Evaluation routes (authenticated)
     Route::middleware(['role:admin,trainer'])->group(function () {
