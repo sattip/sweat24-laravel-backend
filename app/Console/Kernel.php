@@ -44,6 +44,13 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->runInBackground();
 
+        // Check for expiring packages and send notifications
+        $schedule->command('packages:check-expiry')
+            ->dailyAt('08:00')
+            ->name('check-package-expiry')
+            ->withoutOverlapping()
+            ->runInBackground();
+
         // Process churn feedback (send surveys, reminders, and follow-ups)
         $schedule->command('churn:process')
             ->dailyAt('10:00')

@@ -27,7 +27,7 @@ return new class extends Migration
                 'booking_request',
                 'contact_message',
                 'general'
-            ])->default('general')->after('id');
+            ])->default('general');
         });
     }
 
@@ -48,7 +48,7 @@ return new class extends Migration
                 'special_price',
                 'booking_request',
                 'general'
-            ])->default('general')->after('id');
+            ])->default('general');
         });
     }
 };

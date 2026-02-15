@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('store_products', function (Blueprint $table) {
-            $table->boolean('is_preorder')->default(false)->after('is_active');
+            $table->boolean('is_preorder')->default(false);
         });
     }
 

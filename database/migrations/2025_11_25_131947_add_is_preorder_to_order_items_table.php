@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('order_items', function (Blueprint $table) {
-            $table->boolean('is_preorder')->default(false)->after('subtotal');
+            $table->boolean('is_preorder')->default(false);
         });
     }
 

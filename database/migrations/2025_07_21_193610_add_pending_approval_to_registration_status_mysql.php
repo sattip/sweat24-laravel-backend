@@ -17,12 +17,12 @@ return new class extends Migration
 
             // Only add approved_at if it doesn't exist
             if (!Schema::hasColumn('users', 'approved_at')) {
-                $table->timestamp('approved_at')->nullable()->after('registration_completed_at');
+                $table->timestamp('approved_at')->nullable();
             }
 
             // Only add approved_by if it doesn't exist
             if (!Schema::hasColumn('users', 'approved_by')) {
-                $table->unsignedBigInteger('approved_by')->nullable()->after('approved_at');
+                $table->unsignedBigInteger('approved_by')->nullable();
                 $table->foreign('approved_by')->references('id')->on('users')->onDelete('set null');
             }
         });

@@ -37,8 +37,7 @@ return new class extends Migration
             $table->index(['status']);
             $table->index(['store_id']);
 
-            // Foreign key constraints
-            $table->foreign('store_id')->references('id')->on('stores')->onDelete('set null');
+            // store_id foreign key added in later migration when stores table exists
         });
     }
 

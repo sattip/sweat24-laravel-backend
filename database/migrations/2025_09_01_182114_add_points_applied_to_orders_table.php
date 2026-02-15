@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->boolean('points_applied')->default(false)->after('completed_at');
-            $table->decimal('points_awarded', 8, 2)->nullable()->after('points_applied');
-            $table->timestamp('points_applied_at')->nullable()->after('points_awarded');
+            $table->boolean('points_applied')->default(false);
+            $table->decimal('points_awarded', 8, 2)->nullable();
+            $table->timestamp('points_applied_at')->nullable();
             
             $table->index('points_applied');
         });

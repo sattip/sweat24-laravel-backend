@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Booking;
 use App\Models\User;
 use App\Models\GymClass;
+use App\Models\Store;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class BookingFactory extends Factory
@@ -16,16 +17,17 @@ class BookingFactory extends Factory
         return [
             'user_id' => User::factory(),
             'class_id' => GymClass::factory(),
+            'store_id' => Store::factory(),
+            'date' => fake()->dateTimeBetween('now', '+30 days')->format('Y-m-d'),
+            'time' => fake()->time('H:i'),
+            'class_name' => fake()->randomElement(['Morning Yoga', 'Evening Pilates', 'HIIT Training']),
+            'instructor' => fake()->name(),
             'customer_name' => fake()->name(),
             'customer_email' => fake()->safeEmail(),
-            'class_name' => fake()->randomElement(['Yoga', 'Pilates', 'HIIT', 'Zumba']),
-            'instructor' => fake()->name(),
-            'date' => fake()->dateTimeBetween('now', '+30 days'),
-            'time' => fake()->time('H:i'),
-            'status' => fake()->randomElement(['confirmed', 'cancelled', 'completed', 'pending']),
             'type' => fake()->randomElement(['group', 'personal']),
-            'booking_time' => fake()->dateTimeBetween('-7 days', 'now'),
+            'status' => fake()->randomElement(['confirmed', 'cancelled', 'completed']),
             'location' => fake()->randomElement(['Studio A', 'Studio B', 'Main Hall']),
+            'booking_time' => now(),
         ];
     }
 }

@@ -21,9 +21,10 @@ class ClientProfileController extends Controller
                 $query->where('status', 'active')->latest();
             },
             'bookings' => function($query) {
-                $query->with(['gymClass.instructor'])
-                      ->whereDate('scheduled_at', '>=', now())
-                      ->orderBy('scheduled_at', 'asc');
+                $query->with(['gymClass'])
+                      ->whereDate('date', '>=', now())
+                      ->orderBy('date', 'asc')
+                      ->orderBy('time', 'asc');
             }
         ]);
 
@@ -31,7 +32,7 @@ class ClientProfileController extends Controller
             'user' => $user,
             'statistics' => [
                 'total_bookings' => $user->bookings()->count(),
-                'upcoming_bookings' => $user->bookings()->whereDate('scheduled_at', '>=', now())->count(),
+                'upcoming_bookings' => $user->bookings()->whereDate('date', '>=', now())->count(),
                 'completed_sessions' => $user->bookings()->where('status', 'completed')->count(),
                 'active_packages' => $user->userPackages()->where('status', 'active')->count(),
             ]
@@ -216,8 +217,9 @@ class ClientProfileController extends Controller
         $user = $request->user();
 
         $bookings = $user->bookings()
-            ->with(['gymClass.instructor'])
-            ->orderBy('scheduled_at', 'desc')
+            ->with(['gymClass'])
+            ->orderBy('date', 'desc')
+            ->orderBy('time', 'desc')
             ->paginate(15);
 
         return response()->json($bookings);

@@ -9,19 +9,9 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\UserPackage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
+use Laravel\Sanctum\Sanctum;
 
-/**
- * NOTE: These tests are for multi-store cash register features that are not yet implemented.
- * The following routes/endpoints do not exist in the current codebase:
- * - POST /api/v1/bookings/{id}/complete
- * - POST /api/v1/expenses
- * - GET /api/v1/stores/{id}/report
- * - GET /api/v1/customers/{id}/packages
- *
- * These tests are skipped until the features are implemented.
- */
 class MultiStoreCashRegisterTest extends TestCase
 {
     use RefreshDatabase;
@@ -30,65 +20,114 @@ class MultiStoreCashRegisterTest extends TestCase
     protected $store1;
     protected $store2;
     protected $user;
-    protected $package;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Create admin user
         $this->admin = User::factory()->create(['role' => 'admin']);
-
-        // Create stores
-        $this->store1 = Store::create(['name' => 'Βάρη', 'is_active' => true]);
-        $this->store2 = Store::create(['name' => 'Λαγονήσι', 'is_active' => true]);
-
-        // Create regular user
+        $this->store1 = Store::create(['name' => 'Store A', 'address' => '123 Test St']);
+        $this->store2 = Store::create(['name' => 'Store B', 'address' => '456 Test Ave']);
         $this->user = User::factory()->create();
+    }
 
-        // Create package using factory to ensure all required fields are set
-        $this->package = Package::factory()->create([
-            'name' => 'Test Package',
-            'price' => 100.00,
-            'sessions' => 3,
-            'duration' => 30,
-            'status' => 'active'
+    /** @test */
+    public function it_can_create_cash_register_entry()
+    {
+        Sanctum::actingAs($this->admin);
+
+        $response = $this->postJson('/api/v1/cash-register', [
+            'type' => 'income',
+            'amount' => 100.00,
+            'store_id' => $this->store1->id,
+            'category' => 'package_usage',
+            'description' => 'Package income test',
+            'payment_method' => 'cash',
+        ]);
+
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('cash_register_entries', [
+            'store_id' => $this->store1->id,
+            'type' => 'income',
         ]);
     }
 
     /** @test */
-    public function it_can_complete_booking_and_record_income()
+    public function it_can_list_cash_register_entries()
     {
-        $this->markTestSkipped('Feature not implemented: POST /api/v1/bookings/{id}/complete endpoint does not exist');
+        Sanctum::actingAs($this->admin);
+
+        CashRegisterEntry::create([
+            'type' => 'income',
+            'amount' => 100.00,
+            'store_id' => $this->store1->id,
+            'user_id' => $this->admin->id,
+            'category' => 'package_usage',
+            'description' => 'Package income',
+            'payment_method' => 'cash',
+        ]);
+
+        $response = $this->getJson('/api/v1/cash-register');
+
+        $response->assertStatus(200);
     }
 
     /** @test */
-    public function it_handles_rounding_correctly_for_last_session()
+    public function it_requires_auth_for_cash_register()
     {
-        $this->markTestSkipped('Feature not implemented: POST /api/v1/bookings/{id}/complete endpoint does not exist');
+        $response = $this->getJson('/api/v1/cash-register');
+        $response->assertStatus(401);
     }
 
     /** @test */
-    public function it_requires_store_assignment_for_booking_completion()
+    public function it_requires_admin_or_trainer_role_for_cash_register()
     {
-        $this->markTestSkipped('Feature not implemented: POST /api/v1/bookings/{id}/complete endpoint does not exist');
+        Sanctum::actingAs($this->user);
+
+        $response = $this->getJson('/api/v1/cash-register');
+        $response->assertStatus(403);
     }
 
     /** @test */
-    public function it_can_record_expenses_per_store()
+    public function stores_are_created_correctly()
     {
-        $this->markTestSkipped('Feature not implemented: POST /api/v1/expenses endpoint does not exist. Use /api/v1/business-expenses instead.');
+        $this->assertDatabaseHas('stores', ['name' => 'Store A']);
+        $this->assertDatabaseHas('stores', ['name' => 'Store B']);
+        $this->assertNotEquals($this->store1->id, $this->store2->id);
     }
 
     /** @test */
-    public function it_can_get_store_financial_report()
+    public function user_package_tracks_sessions_correctly()
     {
-        $this->markTestSkipped('Feature not implemented: GET /api/v1/stores/{id}/report endpoint does not exist');
-    }
+        $package = Package::create([
+            'name' => 'Test Package',
+            'price' => 100.00,
+            'sessions' => 3,
+            'duration' => 30,
+            'status' => 'active',
+        ]);
 
-    /** @test */
-    public function it_can_get_user_packages_with_usage_info()
-    {
-        $this->markTestSkipped('Feature not implemented: GET /api/v1/customers/{id}/packages endpoint does not exist');
+        $userPackage = UserPackage::create([
+            'user_id' => $this->user->id,
+            'package_id' => $package->id,
+            'name' => $package->name,
+            'remaining_sessions' => 3,
+            'total_sessions' => 3,
+            'status' => 'active',
+            'assigned_date' => now()->toDateString(),
+            'expiry_date' => now()->addDays(30)->toDateString(),
+        ]);
+
+        $this->assertEquals(3, $userPackage->remaining_sessions);
+        $this->assertEquals(3, $userPackage->total_sessions);
+
+        // Simulate session usage
+        UserPackage::where('id', $userPackage->id)
+            ->where('remaining_sessions', '>', 0)
+            ->decrement('remaining_sessions');
+
+        $userPackage->refresh();
+        $this->assertEquals(2, $userPackage->remaining_sessions);
     }
 }

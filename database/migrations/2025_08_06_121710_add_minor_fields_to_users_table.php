@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_minor')->default(false)->after('date_of_birth');
-            $table->integer('age_at_registration')->nullable()->after('is_minor');
+            $table->boolean('is_minor')->default(false);
+            $table->integer('age_at_registration')->nullable();
             $table->index('is_minor');
         });
     }

@@ -16,8 +16,8 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'sqlite') {
             // Add approval-related fields first
             Schema::table('users', function (Blueprint $table) {
-                $table->timestamp('approved_at')->nullable()->after('registration_completed_at');
-                $table->unsignedBigInteger('approved_by')->nullable()->after('approved_at');
+                $table->timestamp('approved_at')->nullable();
+                $table->unsignedBigInteger('approved_by')->nullable();
             });
             
             // Add foreign key constraint for approved_by
@@ -33,8 +33,8 @@ return new class extends Migration
             DB::statement("ALTER TABLE users MODIFY COLUMN registration_status ENUM('pending_approval', 'pending_terms', 'pending_signature', 'completed') DEFAULT 'pending_approval'");
             
             Schema::table('users', function (Blueprint $table) {
-                $table->timestamp('approved_at')->nullable()->after('registration_completed_at');
-                $table->unsignedBigInteger('approved_by')->nullable()->after('approved_at');
+                $table->timestamp('approved_at')->nullable();
+                $table->unsignedBigInteger('approved_by')->nullable();
                 $table->foreign('approved_by')->references('id')->on('users')->onDelete('set null');
             });
         }

@@ -51,7 +51,7 @@ Route::prefix('v1/registration')->group(function () {
 });
 
 // Admin-only registration management routes
-Route::prefix('v1/admin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('v1/admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/users/{id}/approve', [RegistrationController::class, 'approveUser']);
     Route::post('/users/{id}/reject', [RegistrationController::class, 'rejectUser']);
 
@@ -69,14 +69,14 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/admin/login', [AuthController::class, 'adminLogin']);
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('/admin/login', [AuthController::class, 'adminLogin'])->middleware('throttle:auth');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:registration');
+    Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent'])->middleware('throttle:registration');
     Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);
-    
+
     // Password reset routes
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail'])->middleware('throttle:password-reset');
     Route::post('/reset-password', [ForgotPasswordController::class, 'reset']);
     Route::post('/validate-reset-token', [ForgotPasswordController::class, 'validateToken']);
     
@@ -191,42 +191,7 @@ Route::prefix('v1')->group(function () {
     // Public events routes
     Route::get('events', [EventController::class, 'index']);
     
-    // Public dashboard stats (basic info for logged-in users)
-    Route::get('dashboard/stats', function () {
-        return response()->json([
-            'bookings_today' => \App\Models\Booking::whereDate('created_at', today())->count(),
-            'total_users' => \App\Models\User::count(),
-            'active_classes' => \App\Models\GymClass::whereDate('date', '>=', today())->count(),
-            'upcoming_classes' => \App\Models\GymClass::whereDate('date', '>=', today())->take(5)->get()
-        ]);
-    });
-
-    // Public dashboard activities (recent activity logs)
-    Route::get('dashboard/activities', function () {
-        $activities = \App\Models\ActivityLog::with(['user:id,name,email'])
-            ->select(['id', 'user_id', 'activity_type', 'action', 'created_at', 'properties'])
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
-            ->get()
-            ->map(function ($activity) {
-                return [
-                    'id' => $activity->id,
-                    'user' => $activity->user ? [
-                        'id' => $activity->user->id,
-                        'name' => $activity->user->name
-                    ] : null,
-                    'activity_type' => $activity->activity_type,
-                    'action' => $activity->action,
-                    'created_at' => $activity->created_at,
-                    'properties' => $activity->properties
-                ];
-            });
-
-        return response()->json([
-            'activities' => $activities,
-            'total_count' => \App\Models\ActivityLog::count()
-        ]);
-    });
+    // Dashboard stats and activities moved to authenticated routes (see below)
 });
 
 // Remove temporary public booking routes - will add at end
@@ -552,6 +517,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     
     // Dashboard stats (role-based) - delegated to DashboardController
     Route::get('dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
+    Route::get('dashboard/activities', [\App\Http\Controllers\Api\DashboardController::class, 'activities']);
     
     // Evaluation routes (authenticated)
     Route::middleware(['role:admin,trainer'])->group(function () {
@@ -844,35 +810,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
 // ============ MOBILE POINTS API ROUTES ============
 
-// Public Points API Routes
-Route::prefix('v1/points')->group(function () {
-    // User points (accessible by admin panel without auth)
-    Route::get('/user', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserPoints']);
-    Route::get('/history', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsHistory']);
-    Route::get('/stats', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getPointsStats']);
-    
-    // Rewards (public access for mobile app)
-    Route::get('/rewards/affordable', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAffordableRewards']);
-    Route::get('/rewards', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getAllRewards']);
-    Route::post('/rewards/{id}/redeem', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'redeemReward']);
-    
-    // User redemptions
-    Route::get('/redemptions', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserRedemptions']);
-    
-    // Test endpoint
-    Route::get('/test-user', function(\Illuminate\Http\Request $request) {
-        $userId = $request->query('user_id', 79);
-        $userPoints = \App\Models\UserPoints::where('user_id', $userId)->first();
-        return response()->json([
-            'success' => true,
-            'test' => true,
-            'data' => [
-                'user_id' => $userId,
-                'points_balance' => $userPoints ? $userPoints->points_balance : 0
-            ]
-        ]);
-    });
-});
+// Points API Routes - moved to authenticated block below (were incorrectly public)
 
 // Mobile Points API Routes (Protected)
 Route::middleware(['auth:sanctum'])->prefix('v1/points')->group(function () {
@@ -889,55 +827,14 @@ Route::middleware(['auth:sanctum'])->prefix('v1/points')->group(function () {
     Route::get('/redemptions', [\App\Http\Controllers\Api\Mobile\PointsController::class, 'getUserRedemptions']);
 });
 
-// Simple test endpoint
-Route::post('v1/bookings/simple', function(\Illuminate\Http\Request $request) {
-    return response()->json([
-        'success' => true,
-        'message' => 'Simple booking endpoint works!',
-        'data' => $request->all()
-    ]);
-});
+// Debug/test endpoints removed for security
 
-
-
-// Debug authentication endpoint
-Route::get('v1/debug/auth', function(\Illuminate\Http\Request $request) {
-    $bearerToken = $request->bearerToken();
-    $headers = $request->headers->all();
-    
-    try {
-        $guard = auth('sanctum');
-        $user = $guard->user();
-        
-        return response()->json([
-            'bearer_token' => $bearerToken,
-            'authorization_header' => $headers['authorization'] ?? null,
-            'user' => $user,
-            'guard_check' => $guard->check(),
-            'auth_check' => auth()->check(),
-            'request_user' => $request->user(),
-        ]);
-    } catch (Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'bearer_token' => $bearerToken,
-            'authorization_header' => $headers['authorization'] ?? null,
-        ]);
-    }
-});
-
-// Public booking routes (must be after protected routes to avoid middleware conflicts)
+// Booking routes - secured with optional auth (allows both authenticated and user_id param)
 Route::prefix('v1')->group(function () {
     Route::get('bookings', [BookingController::class, 'index'])->name('public.bookings.index');
-    Route::get('bookings/history', [BookingController::class, 'testHistory'])->name('public.bookings.history');
     Route::post('bookings', [BookingController::class, 'store'])->name('public.bookings.store');
-    Route::get('bookings/test', [BookingController::class, 'testHistory'])->name('public.bookings.test.history');
-    Route::post('bookings/test', [BookingController::class, 'test'])->name('public.bookings.test');
     Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])->name('public.bookings.cancel');
 });
-
-// Direct route outside all middleware
-Route::get('/test-history', [BookingController::class, 'testHistory']);
 
 // Add policy endpoint under v1 prefix for client app
 Route::prefix('v1')->group(function () {
@@ -950,8 +847,7 @@ Route::prefix('v1')->group(function () {
     });
 });
 
-Route::get('/test-policy/{bookingId}', [CancellationPolicyController::class, 'testPolicy']);
-Route::get('/test-order-notification', [TestController::class, 'createTestOrderNotification']);
+// Test routes removed for security
 
 // Chat routes for client app (with auth)
 Route::prefix('v1/chat')->middleware('auth:sanctum')->group(function () {
@@ -1049,56 +945,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/work-session
     Route::delete('/{id}', [\App\Http\Controllers\Api\WorkSessionController::class, 'adminDestroy']);
 });
 
-// ============ PUBLIC TEST ENDPOINTS (για debugging) ============
-Route::prefix('v1/test')->group(function () {
-    // Public test endpoint για referral tiers
-    Route::get('referral-tiers', function() {
-        $tiers = \App\Models\ReferralRewardTier::all();
-        return response()->json([
-            'success' => true,
-            'count' => $tiers->count(),
-            'data' => $tiers,
-            'message' => 'Public test endpoint - no auth required'
-        ]);
-    });
-    
-    // Public test endpoint για loyalty rewards
-    Route::get('loyalty-rewards', function() {
-        $rewards = \App\Models\LoyaltyReward::all();
-        return response()->json([
-            'success' => true,
-            'count' => $rewards->count(),
-            'data' => $rewards,
-            'message' => 'Public test endpoint - no auth required'
-        ]);
-    });
-    
-    // Public test για admin authentication
-    Route::get('admin-auth', function(\Illuminate\Http\Request $request) {
-        $token = $request->bearerToken();
-        $user = null;
-        $isAdmin = false;
-        
-        if ($token) {
-            try {
-                $user = \Laravel\Sanctum\PersonalAccessToken::findToken($token)?->tokenable;
-                $isAdmin = $user && $user->hasRole('admin');
-            } catch (Exception $e) {
-                // Token invalid
-            }
-        }
-        
-        return response()->json([
-            'has_bearer_token' => !empty($token),
-            'token_preview' => $token ? substr($token, 0, 10) . '...' : null,
-            'user_found' => !empty($user),
-            'is_admin' => $isAdmin,
-            'user_id' => $user?->id,
-            'user_email' => $user?->email,
-            'headers' => $request->headers->all()
-        ]);
-    });
-});
+// Public test endpoints removed for security
 
 // User Referral Routes (extending existing)
 Route::middleware(['auth:sanctum'])->prefix('v1/referrals')->group(function () {
@@ -1111,38 +958,7 @@ Route::prefix('v1/referrals')->group(function () {
     // Available tiers can be public as they don't contain sensitive info
     Route::get('available-tiers', [ReferralController::class, 'getAvailableTiers']);
     
-    // Test endpoint για debugging (να αφαιρεθεί σε production)
-    Route::get('test-dashboard/{userId}', function($userId) {
-        $user = \App\Models\User::find($userId);
-        if (!$user) {
-            return response()->json(['error' => 'User not found'], 404);
-        }
-        
-        $referralCode = \App\Models\ReferralCode::firstOrCreate(['user_id' => $user->id], ['user_id' => $user->id]);
-        $totalReferrals = \App\Models\Referral::where('referrer_id', $user->id)->where('status', 'confirmed')->count();
-        $nextTier = \App\Models\ReferralRewardTier::where('referrals_required', '>', $totalReferrals)
-            ->where('is_active', true)
-            ->orderBy('referrals_required', 'asc')
-            ->first();
-            
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user_name' => $user->name,
-                'referral_code' => $referralCode->code,
-                'referral_link' => "https://api.sweat93.gr/invite/" . $referralCode->code,
-                'total_referrals' => $totalReferrals,
-                'next_tier' => $nextTier ? [
-                    'name' => $nextTier->name,
-                    'referrals_required' => $nextTier->referrals_required,
-                    'reward_name' => $nextTier->reward_description ?? $nextTier->name,
-                ] : null,
-                'earned_rewards' => [],
-                'referred_friends' => [],
-                'tiers_count' => \App\Models\ReferralRewardTier::where('is_active', true)->count(),
-            ]
-        ]);
-    });
+    // Test dashboard endpoint removed for security
 });
 
 // ============ ENHANCED STATISTICS ROUTES ============
@@ -1182,34 +998,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/financial-re
     Route::get('customer-ltv', [\App\Http\Controllers\FinancialReportsController::class, 'customerLTV']);
     Route::get('retention-analysis', [\App\Http\Controllers\FinancialReportsController::class, 'retentionAnalysis']);
 });
-// Debug endpoint to see exactly what the admin panel is sending
-Route::any('/debug/admin-requests', function(Request $request) {
-    return response()->json([
-        'method' => $request->method(),
-        'url' => $request->fullUrl(),
-        'headers' => $request->headers->all(),
-        'body' => $request->all(),
-        'bearer_token' => $request->bearerToken(),
-        'user' => $request->user() ? [
-            'id' => $request->user()->id,
-            'email' => $request->user()->email,
-            'role' => $request->user()->role
-        ] : null,
-        'timestamp' => now()
-    ]);
-});
+// Debug endpoints removed for security
 
-Route::prefix('v1')->group(function () {
-    Route::get('debug/pusher', function(\Illuminate\Http\Request $request) {
-        $message = $request->query('message', 'Hello from Laravel!');
-        event(new \App\Events\TestPusherEvent($message));
-        return response()->json(['ok' => true, 'sent' => $message]);
-    });
-});
-
-// ============ PUBLIC ADMIN POINTS REWARDS ROUTES ============
-// These routes are public to allow admin panel access without Sanctum authentication
-Route::prefix('v1/admin/points')->group(function () {
+// Admin Points Rewards Routes (secured)
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/points')->group(function () {
     Route::apiResource('rewards', \App\Http\Controllers\Api\PointsRewardsController::class);
 });
 
@@ -1238,18 +1030,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/payroll-agre
 
 // ============ CHURN FEEDBACK ROUTES ============
 
-// Mobile App routes (for users to respond to churn surveys)
-Route::prefix('v1/churn-feedback')->group(function () {
-    // Get pending survey for user (supports user_id param or auth token)
+// Mobile App churn feedback routes (secured)
+Route::middleware(['auth:sanctum'])->prefix('v1/churn-feedback')->group(function () {
     Route::get('/pending', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'getPendingSurvey']);
-
-    // Submit quick response (single reason)
     Route::post('/quick-response', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitQuickResponse']);
-
-    // Submit full mini survey
     Route::post('/mini-survey', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'submitMiniSurvey']);
-
-    // Opt-out from surveys
     Route::post('/opt-out', [\App\Http\Controllers\Api\ChurnFeedbackController::class, 'optOut']);
 });
 
@@ -1270,18 +1055,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('v1/admin/churn-feedba
 
 // ============ WELLNESS SCORE ROUTES ============
 
-// Mobile App Wellness Routes (for users to submit daily wellness checks)
-Route::prefix('v1/wellness')->group(function () {
-    // Get today's wellness score (supports user_id param or auth token)
+// Mobile App Wellness Routes (secured)
+Route::middleware(['auth:sanctum'])->prefix('v1/wellness')->group(function () {
     Route::get('/today', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getToday']);
-
-    // Submit daily wellness score
     Route::post('/submit', [\App\Http\Controllers\Api\WellnessScoreController::class, 'submit']);
-
-    // Get wellness history
     Route::get('/history', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getHistory']);
-
-    // Get current threshold settings (for mobile app to show color indicators)
     Route::get('/thresholds', [\App\Http\Controllers\Api\WellnessScoreController::class, 'getThresholds']);
 });
 

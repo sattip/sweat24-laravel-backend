@@ -74,7 +74,8 @@ class CashRegisterService
             return 0;
         }
 
-        return round($userPackage->package->price / $userPackage->total_sessions, 2);
+        $price = $userPackage->custom_price ?? $userPackage->package->price;
+        return round($price / $userPackage->total_sessions, 2);
     }
 
     /**

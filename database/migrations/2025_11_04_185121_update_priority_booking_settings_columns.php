@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::table('priority_booking_settings', function (Blueprint $table) {
             // Add new columns
-            $table->integer('priority_booking_window_days')->default(30)->after('id'); // Priority users can book X days ahead
-            $table->integer('regular_booking_window_days')->default(14)->after('priority_booking_window_days'); // Regular users can book X days ahead
+            $table->integer('priority_booking_window_days')->default(30); // Priority users can book X days ahead
+            $table->integer('regular_booking_window_days')->default(14); // Regular users can book X days ahead
 
             // Rename priority_release_hours to priority_seats_release_hours for clarity
             $table->renameColumn('priority_release_hours', 'priority_seats_release_hours');

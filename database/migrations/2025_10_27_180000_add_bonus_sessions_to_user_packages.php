@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('user_packages', function (Blueprint $table) {
-            $table->integer('bonus_sessions')->default(0)->after('remaining_sessions');
-            $table->integer('bonus_sessions_used')->default(0)->after('bonus_sessions');
+            $table->integer('bonus_sessions')->default(0);
+            $table->integer('bonus_sessions_used')->default(0);
         });
     }
 

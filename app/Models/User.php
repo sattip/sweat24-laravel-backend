@@ -30,16 +30,11 @@ class User extends Authenticatable
         'is_minor',
         'age_at_registration',
         'membership_type',
-        'role',
         'join_date',
         'remaining_sessions',
         'total_sessions',
-        'status',
-        'registration_status',
         'terms_accepted_at',
         'registration_completed_at',
-        'approved_at',
-        'approved_by',
         'last_visit',
         'medical_history',
         'ems_interest',
@@ -52,7 +47,6 @@ class User extends Authenticatable
         'notes',
         'trainer_notes',
         'discontinuation_notes',
-        'has_priority_booking',
         'priority_booking_expires_at',
         'priority_booking_hours_advance',
         'notification_preferences',
@@ -69,6 +63,12 @@ class User extends Authenticatable
         'referral_validated_at',
         'profile_last_updated',
     ];
+
+    /**
+     * Fields that must only be set explicitly (not via mass assignment).
+     * Use $user->role = 'admin'; $user->save(); for these.
+     */
+    protected $guarded_note = 'role, status, registration_status, approved_at, approved_by, has_priority_booking are NOT in $fillable for security';
 
     /**
      * The attributes that should be hidden for serialization.

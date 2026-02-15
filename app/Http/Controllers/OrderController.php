@@ -22,13 +22,13 @@ class OrderController extends Controller
     {
         $query = Order::with(['items.product', 'user'])->latest();
 
-        // Check if request is from admin panel
-        $isAdmin = $request->headers->get('origin') === 'http://localhost:5174' || 
-                   $request->bearerToken() !== null;
+        // Authenticate via Sanctum token
+        $authUser = $request->user('sanctum');
+        $isAdmin = $authUser && in_array($authUser->role, ['admin', 'trainer']);
 
         if (!$isAdmin) {
             // Client sees only their orders
-            $userId = $request->input('user_id') ?? $request->header('X-User-Id');
+            $userId = $authUser ? $authUser->id : $request->input('user_id');
             if (!$userId) {
                 return response()->json(['error' => 'User ID required'], 401);
             }
@@ -93,12 +93,15 @@ class OrderController extends Controller
                     'is_preorder' => $product->is_preorder
                 ];
 
-                // Update stock only for non-preorder products
+                // Atomic stock check-and-decrement to prevent race conditions
                 if (!$product->is_preorder && $product->stock_quantity !== null) {
-                    if ($product->stock_quantity < $item['quantity']) {
+                    $decremented = StoreProduct::where('id', $product->id)
+                        ->where('stock_quantity', '>=', $item['quantity'])
+                        ->decrement('stock_quantity', $item['quantity']);
+
+                    if (!$decremented) {
                         throw new \Exception("Insufficient stock for {$product->name}");
                     }
-                    $product->decrement('stock_quantity', $item['quantity']);
                 }
             }
 
@@ -161,12 +164,12 @@ class OrderController extends Controller
      */
     public function show(Request $request, Order $order)
     {
-        // Check authorization
-        $isAdmin = $request->headers->get('origin') === 'http://localhost:5174' || 
-                   $request->bearerToken() !== null;
+        // Authenticate via Sanctum token
+        $authUser = $request->user('sanctum');
+        $isAdmin = $authUser && in_array($authUser->role, ['admin', 'trainer']);
 
         if (!$isAdmin) {
-            $userId = $request->input('user_id') ?? $request->header('X-User-Id');
+            $userId = $authUser ? $authUser->id : $request->input('user_id');
             if ($order->user_id != $userId) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }

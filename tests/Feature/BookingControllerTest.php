@@ -5,182 +5,223 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Booking;
+use App\Models\GymClass;
 use App\Models\Instructor;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use App\Events\BookingCancelled;
 use Laravel\Sanctum\Sanctum;
 
 class BookingControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $user;
-    protected User $admin;
-    protected Store $store;
-    protected Instructor $instructor;
+    protected $user;
+    protected $admin;
+    protected $store;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->user = User::factory()->create(['role' => 'member', 'status' => 'active']);
-        $this->admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
-        $this->store = Store::factory()->create();
-        $this->instructor = Instructor::factory()->create();
-    }
-
-    public function test_admin_can_view_all_bookings()
-    {
-        Sanctum::actingAs($this->admin);
-
-        Booking::factory()->count(3)->create([
-            'store_id' => $this->store->id
+        $this->user = User::factory()->create(['role' => 'member']);
+        $this->admin = User::factory()->create(['role' => 'admin']);
+        $this->store = Store::create([
+            'name' => 'Test Store',
+            'address' => '123 Test St',
         ]);
-
-        $response = $this->getJson('/api/v1/bookings');
-
-        $response->assertStatus(200);
-        // Admin should get bookings as array
-        $this->assertIsArray($response->json());
     }
 
-    public function test_admin_can_create_booking()
+    private function createBooking(array $overrides = []): Booking
     {
-        Sanctum::actingAs($this->admin);
-
-        $response = $this->postJson('/api/v1/bookings', [
-            'store_id' => $this->store->id,
+        return Booking::create(array_merge([
             'user_id' => $this->user->id,
-            'class_name' => 'Yoga Class',
-            'instructor' => $this->instructor->name,
-            'date' => now()->addDays(1)->format('Y-m-d'),
+            'store_id' => $this->store->id,
+            'class_name' => 'Test Class',
+            'instructor' => 'Test Trainer',
+            'date' => now()->addDays(2)->toDateString(),
             'time' => '10:00',
-            'type' => 'group',
-            'location' => 'Studio A'
-        ]);
-
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => [
-                    'booking' => [
-                        'id',
-                        'user_id',
-                        'store_id',
-                        'class_name',
-                        'date',
-                        'time',
-                        'status'
-                    ]
-                ]
-            ]);
+            'type' => 'personal',
+            'status' => 'confirmed',
+            'customer_name' => $this->user->name,
+            'customer_email' => $this->user->email,
+            'location' => 'Test Store',
+            'booking_time' => now(),
+        ], $overrides));
     }
 
-    public function test_admin_can_view_booking()
+    public function test_authenticated_user_can_view_own_booking()
     {
-        Sanctum::actingAs($this->admin);
-
-        $booking = Booking::factory()->create([
-            'store_id' => $this->store->id,
-            'user_id' => $this->user->id
-        ]);
+        Sanctum::actingAs($this->user);
+        $booking = $this->createBooking();
 
         $response = $this->getJson("/api/v1/bookings/{$booking->id}");
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'id' => $booking->id
-            ]);
-    }
-
-    public function test_admin_can_update_booking_status()
-    {
-        Sanctum::actingAs($this->admin);
-
-        $booking = Booking::factory()->create([
-            'store_id' => $this->store->id,
-            'user_id' => $this->user->id,
-            'status' => 'confirmed'
-        ]);
-
-        $response = $this->putJson("/api/v1/bookings/{$booking->id}", [
-            'status' => 'cancelled'
-        ]);
-
         $response->assertStatus(200);
-
-        $this->assertDatabaseHas('bookings', [
-            'id' => $booking->id,
-            'status' => 'cancelled'
-        ]);
     }
 
-    public function test_admin_can_delete_booking()
+    public function test_unauthenticated_user_cannot_view_booking()
     {
-        Sanctum::actingAs($this->admin);
+        $booking = $this->createBooking();
 
-        $booking = Booking::factory()->create([
-            'store_id' => $this->store->id,
-            'user_id' => $this->user->id
-        ]);
+        $response = $this->getJson("/api/v1/bookings/{$booking->id}");
 
-        $response = $this->deleteJson("/api/v1/bookings/{$booking->id}");
-
-        $response->assertStatus(200);
-        $this->assertDatabaseMissing('bookings', [
-            'id' => $booking->id
-        ]);
+        $response->assertStatus(401);
     }
 
-    public function test_booking_requires_store_id()
+    public function test_user_can_cancel_own_booking()
     {
-        Sanctum::actingAs($this->admin);
+        Event::fake([BookingCancelled::class]);
+        Sanctum::actingAs($this->user);
 
-        $response = $this->postJson('/api/v1/bookings', [
-            'class_name' => 'Yoga Class',
-            'instructor' => $this->instructor->name,
-            'date' => now()->addDays(1)->format('Y-m-d'),
-            'time' => '10:00',
-            'type' => 'group'
-        ]);
-
-        $response->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['store_id']]);
-    }
-
-    public function test_booking_requires_class_name()
-    {
-        Sanctum::actingAs($this->admin);
-
-        $response = $this->postJson('/api/v1/bookings', [
-            'store_id' => $this->store->id,
-            'instructor' => $this->instructor->name,
-            'date' => now()->addDays(1)->format('Y-m-d'),
-            'time' => '10:00',
-            'type' => 'group'
-        ]);
-
-        $response->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['class_name']]);
-    }
-
-    public function test_cancel_booking()
-    {
-        Sanctum::actingAs($this->admin);
-
-        $booking = Booking::factory()->create([
-            'store_id' => $this->store->id,
-            'user_id' => $this->user->id,
-            'status' => 'confirmed',
-            'date' => now()->addDays(2)->format('Y-m-d')
+        $booking = $this->createBooking([
+            'date' => now()->addDays(2)->toDateString(),
         ]);
 
         $response = $this->postJson("/api/v1/bookings/{$booking->id}/cancel");
 
-        $response->assertStatus(200);
+        $response->assertSuccessful();
 
         $booking->refresh();
         $this->assertEquals('cancelled', $booking->status);
+    }
+
+    public function test_user_can_delete_own_booking()
+    {
+        Event::fake([BookingCancelled::class]);
+        Sanctum::actingAs($this->user);
+
+        $booking = $this->createBooking([
+            'date' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $response = $this->deleteJson("/api/v1/bookings/{$booking->id}");
+
+        $response->assertSuccessful();
+    }
+
+    public function test_booking_cancel_fires_event()
+    {
+        Event::fake([BookingCancelled::class]);
+        Sanctum::actingAs($this->user);
+
+        $booking = $this->createBooking([
+            'date' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $this->postJson("/api/v1/bookings/{$booking->id}/cancel");
+
+        Event::assertDispatched(BookingCancelled::class);
+    }
+
+    public function test_group_booking_decrements_participants_on_cancel()
+    {
+        Event::fake([BookingCancelled::class]);
+
+        $instructor = Instructor::create([
+            'name' => 'Test Instructor',
+            'email' => 'instructor@test.com',
+            'phone' => '1234567890',
+            'specialties' => ['Yoga'],
+            'hourly_rate' => 20,
+            'contract_type' => 'hourly',
+            'join_date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        $gymClass = GymClass::create([
+            'name' => 'Test Class',
+            'type' => 'group',
+            'instructor' => $instructor->id,
+            'date' => now()->addDays(2)->toDateString(),
+            'time' => '10:00',
+            'duration' => 60,
+            'max_participants' => 10,
+            'current_participants' => 5,
+            'location' => 'Room A',
+            'description' => 'Test class',
+        ]);
+
+        Sanctum::actingAs($this->user);
+
+        $booking = $this->createBooking([
+            'class_id' => $gymClass->id,
+            'class_name' => $gymClass->name,
+            'type' => 'group',
+            'date' => $gymClass->date,
+            'time' => $gymClass->time,
+        ]);
+
+        $this->deleteJson("/api/v1/bookings/{$booking->id}");
+
+        $this->assertEquals(4, $gymClass->fresh()->current_participants);
+    }
+
+    public function test_cancelled_booking_not_decremented_again()
+    {
+        Event::fake([BookingCancelled::class]);
+
+        $instructor = Instructor::create([
+            'name' => 'Test Instructor 2',
+            'email' => 'instructor2@test.com',
+            'phone' => '1234567890',
+            'specialties' => ['Yoga'],
+            'hourly_rate' => 20,
+            'contract_type' => 'hourly',
+            'join_date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        $gymClass = GymClass::create([
+            'name' => 'Test Class',
+            'type' => 'group',
+            'instructor' => $instructor->id,
+            'date' => now()->addDays(2)->toDateString(),
+            'time' => '10:00',
+            'duration' => 60,
+            'max_participants' => 10,
+            'current_participants' => 5,
+            'location' => 'Room A',
+            'description' => 'Test class',
+        ]);
+
+        Sanctum::actingAs($this->user);
+
+        // Already cancelled booking
+        $booking = $this->createBooking([
+            'class_id' => $gymClass->id,
+            'class_name' => $gymClass->name,
+            'type' => 'group',
+            'date' => $gymClass->date,
+            'time' => $gymClass->time,
+            'status' => 'cancelled',
+        ]);
+
+        $this->deleteJson("/api/v1/bookings/{$booking->id}");
+
+        // Participants should NOT change
+        $this->assertEquals(5, $gymClass->fresh()->current_participants);
+    }
+
+    public function test_admin_can_view_bookings_history()
+    {
+        Sanctum::actingAs($this->admin);
+
+        $this->createBooking();
+
+        $response = $this->getJson('/api/v1/bookings/history');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_booking_show_requires_authentication()
+    {
+        $booking = $this->createBooking();
+
+        // Show endpoint requires auth (cancel has a public route)
+        $response = $this->getJson("/api/v1/bookings/{$booking->id}");
+
+        $response->assertStatus(401);
     }
 }

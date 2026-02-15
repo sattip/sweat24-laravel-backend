@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('liability_declaration_accepted')
                   ->default(false)
-                  ->after('emergency_phone')
+                  
                   ->comment('General liability declaration accepted by user (required for all users)');
         });
     }

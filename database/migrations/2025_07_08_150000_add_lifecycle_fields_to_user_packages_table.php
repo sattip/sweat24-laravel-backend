@@ -13,15 +13,15 @@ return new class extends Migration
     {
         Schema::table('user_packages', function (Blueprint $table) {
             // Add lifecycle tracking fields
-            $table->boolean('is_frozen')->default(false)->after('status');
-            $table->timestamp('frozen_at')->nullable()->after('is_frozen');
-            $table->timestamp('unfrozen_at')->nullable()->after('frozen_at');
-            $table->integer('freeze_duration_days')->nullable()->after('unfrozen_at');
-            $table->timestamp('last_notification_sent_at')->nullable()->after('freeze_duration_days');
-            $table->string('notification_stage')->nullable()->after('last_notification_sent_at');
-            $table->boolean('auto_renew')->default(false)->after('notification_stage');
-            $table->foreignId('renewed_from_package_id')->nullable()->constrained('user_packages')->after('auto_renew');
-            $table->timestamp('renewed_at')->nullable()->after('renewed_from_package_id');
+            $table->boolean('is_frozen')->default(false);
+            $table->timestamp('frozen_at')->nullable();
+            $table->timestamp('unfrozen_at')->nullable();
+            $table->integer('freeze_duration_days')->nullable();
+            $table->timestamp('last_notification_sent_at')->nullable();
+            $table->string('notification_stage')->nullable();
+            $table->boolean('auto_renew')->default(false);
+            $table->foreignId('renewed_from_package_id')->nullable()->constrained('user_packages');
+            $table->timestamp('renewed_at')->nullable();
             
             // Update status enum to include more states
             $table->dropColumn('status');
@@ -29,7 +29,7 @@ return new class extends Migration
         
         // Re-add status with new enum values
         Schema::table('user_packages', function (Blueprint $table) {
-            $table->enum('status', ['active', 'paused', 'expired', 'expiring_soon', 'frozen'])->default('active')->after('total_sessions');
+            $table->enum('status', ['active', 'paused', 'expired', 'expiring_soon', 'frozen'])->default('active');
         });
     }
 
@@ -55,7 +55,7 @@ return new class extends Migration
         });
         
         Schema::table('user_packages', function (Blueprint $table) {
-            $table->enum('status', ['active', 'paused', 'expired'])->default('active')->after('total_sessions');
+            $table->enum('status', ['active', 'paused', 'expired'])->default('active');
         });
     }
 };

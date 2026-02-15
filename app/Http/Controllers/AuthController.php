@@ -327,10 +327,7 @@ class AuthController extends Controller
             'is_minor' => false,
             'age_at_registration' => isset($birthDate) ? $birthDate->age : null,
             'membership_type' => $request->membership_type ?? 'Basic',
-            'role' => 'member',
             'join_date' => now(),
-            'status' => 'pending_approval',
-            'registration_status' => 'pending_approval',
             'remaining_sessions' => 0,
             'total_sessions' => 0,
             'found_us_via' => $request->found_us_via,
@@ -356,6 +353,12 @@ class AuthController extends Controller
         }
 
         $user = User::create($userData);
+
+        // Set guarded fields explicitly (not mass-assignable for security)
+        $user->role = 'member';
+        $user->status = 'pending_approval';
+        $user->registration_status = 'pending_approval';
+        $user->save();
 
         // Process medical history if provided
         if ($request->has('medicalHistory')) {
@@ -589,15 +592,18 @@ class AuthController extends Controller
                 'is_minor' => $isMinor,
                 'age_at_registration' => $age,
                 'membership_type' => 'Basic',
-                'role' => 'member',
                 'join_date' => now(),
-                'status' => 'pending_approval',
-                'registration_status' => 'pending_approval',
                 'remaining_sessions' => 0,
                 'total_sessions' => 0,
                 'medical_history' => null, // Will be processed separately below
                 'profile_last_updated' => now(),
             ]);
+
+            // Set guarded fields explicitly (not mass-assignable for security)
+            $user->role = 'member';
+            $user->status = 'pending_approval';
+            $user->registration_status = 'pending_approval';
+            $user->save();
 
             // Process medical history if provided
             if (isset($validated['medicalHistory'])) {

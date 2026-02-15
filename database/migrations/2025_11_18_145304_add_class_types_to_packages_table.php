@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('packages', function (Blueprint $table) {
             // Add class_types column as JSON to store multiple class types
-            $table->json('class_types')->nullable()->after('class_type');
+            $table->json('class_types')->nullable();
         });
     }
 

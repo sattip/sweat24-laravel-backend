@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('address', 500)->nullable()->after('phone');
-            $table->date('date_of_birth')->nullable()->after('address');
-            $table->string('emergency_contact')->nullable()->after('medical_history');
-            $table->string('emergency_phone', 20)->nullable()->after('emergency_contact');
-            $table->text('notes')->nullable()->after('emergency_phone');
-            $table->json('notification_preferences')->nullable()->after('notes');
-            $table->json('privacy_settings')->nullable()->after('notification_preferences');
+            $table->string('address', 500)->nullable();
+            $table->date('date_of_birth')->nullable();
+            $table->string('emergency_contact')->nullable();
+            $table->string('emergency_phone', 20)->nullable();
+            $table->text('notes')->nullable();
+            $table->json('notification_preferences')->nullable();
+            $table->json('privacy_settings')->nullable();
         });
     }
 

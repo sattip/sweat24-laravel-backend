@@ -40,7 +40,7 @@ class BookingController extends Controller
         $query = Booking::with('user', 'store', 'service', 'gymClass', 'fitnessClass');
 
         // Get authenticated user from Sanctum token
-        $authUser = $request->user();
+        $authUser = $request->user('sanctum');
         $isAdmin = $authUser && in_array($authUser->role, ['admin', 'trainer']);
 
         // For non-admin users, filter by their own user_id
@@ -54,7 +54,7 @@ class BookingController extends Controller
             $query->where('user_id', $authUser->id);
             // Only show active bookings for regular users
             $query->where('status', '!=', 'cancelled');
-            // Only show future bookings (from current date and time) for regular users
+            // Only show future bookings for regular users
             $now = now()->setTimezone(config('app.timezone'));
             $query->where(function($q) use ($now) {
                 $q->where('date', '>', $now->toDateString())
@@ -70,6 +70,7 @@ class BookingController extends Controller
             $query->where('user_id', $request->user_id);
         }
 
+
         if ($request->has('date')) {
             $query->whereDate('date', $request->date);
         }
@@ -82,7 +83,6 @@ class BookingController extends Controller
             $this->addSafeLikeWhere($query, 'instructor', $request->instructor);
         }
 
-        // Filter by store if provided, otherwise show all stores
         if ($request->has('store_id') && $request->store_id) {
             $query->where('store_id', $request->store_id);
         }
@@ -416,7 +416,23 @@ class BookingController extends Controller
      */
     public function destroy(Booking $booking): JsonResponse
     {
-        $booking->delete();
+        DB::transaction(function () use ($booking) {
+            // Decrement participants if class exists and booking was confirmed
+            if ($booking->class_id && in_array($booking->status, ['confirmed', 'waitlist'])) {
+                $gymClass = GymClass::find($booking->class_id);
+                if ($gymClass && $gymClass->current_participants > 0) {
+                    $gymClass->decrement('current_participants');
+                }
+            }
+
+            // Fire cancellation event to handle session refund
+            if ($booking->status === 'confirmed') {
+                event(new BookingCancelled($booking, 'confirmed'));
+            }
+
+            $booking->delete();
+        });
+
         return response()->json(['message' => 'Booking deleted successfully']);
     }
 
