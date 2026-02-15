@@ -148,7 +148,7 @@ class UserControllerTest extends TestCase
                 'id',
                 'name',
                 'email',
-                'packages',
+                'user_packages',
             ]);
     }
 }

@@ -69,14 +69,14 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/admin/login', [AuthController::class, 'adminLogin']);
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('/admin/login', [AuthController::class, 'adminLogin'])->middleware('throttle:auth');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:registration');
+    Route::post('/register-with-consent', [AuthController::class, 'registerWithConsent'])->middleware('throttle:registration');
     Route::match(['get', 'post'], '/check-age', [AuthController::class, 'checkAge']);
-    
+
     // Password reset routes
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail'])->middleware('throttle:password-reset');
     Route::post('/reset-password', [ForgotPasswordController::class, 'reset']);
     Route::post('/validate-reset-token', [ForgotPasswordController::class, 'validateToken']);
     
@@ -517,6 +517,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     
     // Dashboard stats (role-based) - delegated to DashboardController
     Route::get('dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
+    Route::get('dashboard/activities', [\App\Http\Controllers\Api\DashboardController::class, 'activities']);
     
     // Evaluation routes (authenticated)
     Route::middleware(['role:admin,trainer'])->group(function () {

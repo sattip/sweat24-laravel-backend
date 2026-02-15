@@ -190,9 +190,9 @@ class InstructorTest extends TestCase
     public function test_contract_types(): void
     {
         $instructor = Instructor::factory()->create([
-            'contract_type' => 'full-time',
+            'contract_type' => 'hourly',
         ]);
 
-        $this->assertEquals('full-time', $instructor->contract_type);
+        $this->assertEquals('hourly', $instructor->contract_type);
     }
 }

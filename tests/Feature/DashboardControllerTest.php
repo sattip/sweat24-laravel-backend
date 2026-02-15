@@ -120,6 +120,9 @@ class DashboardControllerTest extends TestCase
 
     public function test_activities_returns_correct_structure(): void
     {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
         $response = $this->getJson('/api/v1/dashboard/activities');
 
         $response->assertStatus(200)
@@ -131,10 +134,11 @@ class DashboardControllerTest extends TestCase
 
     public function test_activities_returns_activity_logs_with_user(): void
     {
-        $user = User::factory()->create();
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
 
         ActivityLog::create([
-            'user_id' => $user->id,
+            'user_id' => $admin->id,
             'activity_type' => 'login',
             'action' => 'User logged in',
             'properties' => ['ip' => '127.0.0.1'],
@@ -145,17 +149,18 @@ class DashboardControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonCount(1, 'activities')
             ->assertJsonPath('activities.0.activity_type', 'login')
-            ->assertJsonPath('activities.0.user.id', $user->id);
+            ->assertJsonPath('activities.0.user.id', $admin->id);
     }
 
     public function test_activities_limits_to_50_records(): void
     {
-        $user = User::factory()->create();
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
 
         // Create 60 activity logs
         for ($i = 0; $i < 60; $i++) {
             ActivityLog::create([
-                'user_id' => $user->id,
+                'user_id' => $admin->id,
                 'activity_type' => 'test',
                 'action' => "Action $i",
             ]);
@@ -170,20 +175,21 @@ class DashboardControllerTest extends TestCase
 
     public function test_activities_ordered_by_most_recent(): void
     {
-        $user = User::factory()->create();
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
 
-        ActivityLog::create([
-            'user_id' => $user->id,
+        $first = ActivityLog::create([
+            'user_id' => $admin->id,
             'activity_type' => 'first',
             'action' => 'First action',
-            'created_at' => now()->subHour(),
         ]);
+        // Set created_at directly via query to bypass mass assignment
+        ActivityLog::where('id', $first->id)->update(['created_at' => now()->subHour()]);
 
         ActivityLog::create([
-            'user_id' => $user->id,
+            'user_id' => $admin->id,
             'activity_type' => 'second',
             'action' => 'Second action',
-            'created_at' => now(),
         ]);
 
         $response = $this->getJson('/api/v1/dashboard/activities');
@@ -195,6 +201,9 @@ class DashboardControllerTest extends TestCase
 
     public function test_activities_handles_deleted_user(): void
     {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
         // Create a user, add an activity log, then delete the user
         $user = User::factory()->create();
         $userId = $user->id;

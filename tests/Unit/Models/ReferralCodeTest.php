@@ -98,7 +98,7 @@ class ReferralCodeTest extends TestCase
         ]);
 
         $this->assertNotNull($referralCode->link);
-        $this->assertStringContainsString('sweat24.com/join?ref=', $referralCode->link);
+        $this->assertStringContainsString('api.sweat93.gr/invite/', $referralCode->link);
         $this->assertStringContainsString($referralCode->code, $referralCode->link);
     }
 
