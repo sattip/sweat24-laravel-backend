@@ -141,8 +141,14 @@ class PointsService
     public function awardPointsForOrder(\App\Models\Order $order): bool
     {
         try {
-            // Check if points have already been applied to this order
-            if ($order->points_applied) {
+            // Atomic check-and-set: prevents double-awarding via race condition
+            $updated = \App\Models\Order::where('id', $order->id)
+                ->where(function ($q) {
+                    $q->where('points_applied', false)->orWhereNull('points_applied');
+                })
+                ->update(['points_applied' => true, 'points_applied_at' => now()]);
+
+            if (!$updated) {
                 \Log::info("Points already applied to order {$order->id}");
                 return false;
             }
@@ -150,9 +156,8 @@ class PointsService
             // Calculate points based on order total
             $pointsPerEuro = 1.0; // Default 1 point per euro
             $points = floor($order->total * $pointsPerEuro);
-            
+
             if ($points > 0) {
-                // Award points
                 $newBalance = $this->addPoints(
                     $order->user_id,
                     $points,
@@ -162,12 +167,8 @@ class PointsService
                     'order'
                 );
 
-                // Mark order as points applied
-                $order->update([
-                    'points_applied' => true,
-                    'points_awarded' => $points,
-                    'points_applied_at' => now()
-                ]);
+                // Update points_awarded amount
+                $order->update(['points_awarded' => $points]);
 
                 \Log::info("Awarded {$points} points for order {$order->id}. New balance: {$newBalance}");
                 return true;

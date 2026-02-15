@@ -11,12 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('gym_classes') || !Schema::hasTable('cancellation_policies')) {
+            return;
+        }
+
         Schema::table('gym_classes', function (Blueprint $table) {
-            $table->foreignId('cancellation_policy_id')
-                  ->nullable()
-                  ->after('status')
-                  ->constrained('cancellation_policies')
-                  ->onDelete('set null');
+            if (!Schema::hasColumn('gym_classes', 'cancellation_policy_id')) {
+                $table->foreignId('cancellation_policy_id')
+                      ->nullable()
+                      ->constrained('cancellation_policies')
+                      ->onDelete('set null');
+            }
         });
     }
 

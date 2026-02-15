@@ -15,9 +15,12 @@ class InstructorFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
-            'specialization' => fake()->randomElement(['Yoga', 'Pilates', 'CrossFit', 'Boxing', 'Zumba', 'HIIT']),
+            'specialties' => [fake()->randomElement(['Yoga', 'Pilates', 'CrossFit', 'Boxing', 'Zumba', 'HIIT'])],
             'bio' => fake()->paragraph(),
-            'photo_url' => fake()->imageUrl(),
+            'hourly_rate' => fake()->randomFloat(2, 15, 50),
+            'contract_type' => fake()->randomElement(['hourly', 'salary', 'commission']),
+            'join_date' => fake()->date(),
+            'status' => 'active',
         ];
     }
 }

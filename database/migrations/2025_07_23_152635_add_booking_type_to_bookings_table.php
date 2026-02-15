@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->string('booking_type')->default('regular')->after('type');
+            $table->string('booking_type')->default('regular');
             // 'regular' = Κανονική
             // 'trial' = Δοκιμαστική  
             // 'loyalty_gift' = Δώρο Ανταμοιβής

@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->integer('points_used')->default(0)->after('status');
-            $table->decimal('cash_paid', 10, 2)->default(0)->after('points_used');
-            $table->decimal('total_cost', 10, 2)->nullable()->after('cash_paid');
+            $table->integer('points_used')->default(0);
+            $table->decimal('cash_paid', 10, 2)->default(0);
+            $table->decimal('total_cost', 10, 2)->nullable();
         });
     }
 

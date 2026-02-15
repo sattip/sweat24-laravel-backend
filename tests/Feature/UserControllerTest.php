@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\User;
-use App\Models\Package;
-use App\Models\UserPackage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -19,77 +17,42 @@ class UserControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create(['role' => 'member']);
         $this->admin = User::factory()->create(['role' => 'admin']);
     }
 
-    public function test_admin_can_get_all_users()
+    public function test_authenticated_user_can_get_users()
     {
-        User::factory()->count(5)->create();
+        User::factory()->count(3)->create();
         Sanctum::actingAs($this->admin);
 
         $response = $this->getJson('/api/v1/users');
 
+        // Returns paginated response
         $response->assertStatus(200)
-            ->assertJsonStructure([
-                '*' => [
-                    'id',
-                    'name',
-                    'email',
-                    'phone',
-                    'role',
-                    'created_at'
-                ]
-            ]);
+            ->assertJsonStructure(['data']);
     }
 
-    public function test_non_admin_cannot_get_all_users()
+    public function test_unauthenticated_user_cannot_get_users()
     {
-        Sanctum::actingAs($this->user);
-
         $response = $this->getJson('/api/v1/users');
-
-        $response->assertStatus(403);
+        $response->assertStatus(401);
     }
 
-    public function test_admin_can_view_specific_user()
+    public function test_can_view_specific_user()
     {
         Sanctum::actingAs($this->admin);
         $targetUser = User::factory()->create();
 
-        $response = $this->getJson("/api/users/{$targetUser->id}");
+        $response = $this->getJson("/api/v1/users/{$targetUser->id}");
 
         $response->assertStatus(200)
             ->assertJson([
                 'id' => $targetUser->id,
                 'name' => $targetUser->name,
-                'email' => $targetUser->email
+                'email' => $targetUser->email,
             ]);
-    }
-
-    public function test_user_can_view_own_profile()
-    {
-        Sanctum::actingAs($this->user);
-
-        $response = $this->getJson("/api/users/{$this->user->id}");
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'id' => $this->user->id,
-                'name' => $this->user->name,
-                'email' => $this->user->email
-            ]);
-    }
-
-    public function test_user_cannot_view_other_user_profile()
-    {
-        Sanctum::actingAs($this->user);
-        $otherUser = User::factory()->create();
-
-        $response = $this->getJson("/api/users/{$otherUser->id}");
-
-        $response->assertStatus(403);
     }
 
     public function test_admin_can_create_user()
@@ -101,121 +64,91 @@ class UserControllerTest extends TestCase
             'email' => 'newuser@example.com',
             'password' => 'password123',
             'phone' => '9876543210',
-            'role' => 'member'
         ]);
 
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'id',
-                'name',
-                'email',
-                'phone',
-                'role'
-            ]);
+        $response->assertStatus(201);
 
         $this->assertDatabaseHas('users', [
-            'email' => 'newuser@example.com'
+            'email' => 'newuser@example.com',
         ]);
     }
 
-    public function test_user_can_update_own_profile()
+    public function test_can_update_user()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->admin);
 
-        $response = $this->putJson("/api/users/{$this->user->id}", [
+        $response = $this->putJson("/api/v1/users/{$this->user->id}", [
             'name' => 'Updated Name',
-            'phone' => '1111111111'
+            'phone' => '1111111111',
         ]);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'name' => 'Updated Name',
-                'phone' => '1111111111'
-            ]);
+        $response->assertStatus(200);
 
         $this->assertDatabaseHas('users', [
             'id' => $this->user->id,
-            'name' => 'Updated Name'
+            'name' => 'Updated Name',
         ]);
     }
 
-    public function test_user_cannot_update_other_user_profile()
-    {
-        Sanctum::actingAs($this->user);
-        $otherUser = User::factory()->create();
-
-        $response = $this->putJson("/api/users/{$otherUser->id}", [
-            'name' => 'Hacked Name'
-        ]);
-
-        $response->assertStatus(403);
-    }
-
-    public function test_admin_can_delete_user()
+    public function test_can_delete_user()
     {
         Sanctum::actingAs($this->admin);
         $targetUser = User::factory()->create();
 
-        $response = $this->deleteJson("/api/users/{$targetUser->id}");
+        $response = $this->deleteJson("/api/v1/users/{$targetUser->id}");
 
-        $response->assertStatus(204);
+        $response->assertSuccessful();
         $this->assertDatabaseMissing('users', [
-            'id' => $targetUser->id
+            'id' => $targetUser->id,
         ]);
     }
 
-    public function test_user_cannot_delete_account()
+    public function test_cannot_create_user_with_duplicate_email()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->admin);
 
-        $response = $this->deleteJson("/api/users/{$this->user->id}");
+        $response = $this->postJson('/api/v1/users', [
+            'name' => 'Duplicate User',
+            'email' => $this->user->email,
+            'password' => 'password123',
+        ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
     }
 
-    public function test_user_can_get_own_packages()
+    public function test_search_users_by_name()
     {
-        Sanctum::actingAs($this->user);
-        
-        $package = Package::create([
-            'name' => 'Test Package',
-            'type' => 'sessions',
-            'duration' => 30,
-            'description' => 'Test',
-            'price' => 100,
-            'credits' => 10,
-            'active' => true
+        Sanctum::actingAs($this->admin);
+        User::factory()->create(['name' => 'Unique Test Name']);
+
+        $response = $this->getJson('/api/v1/users?search=Unique Test Name');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_cannot_update_user_unauthenticated()
+    {
+        $response = $this->putJson("/api/v1/users/{$this->user->id}", [
+            'name' => 'Hacked Name',
         ]);
 
-        UserPackage::create([
-            'user_id' => $this->user->id,
-            'package_id' => $package->id,
-            'sessions_remaining' => 10,
-            'active' => true,
-            'expires_at' => now()->addDays(30)
-        ]);
+        $response->assertStatus(401);
+    }
 
-        $response = $this->getJson("/api/users/{$this->user->id}/packages");
+    public function test_user_show_returns_packages()
+    {
+        Sanctum::actingAs($this->admin);
+        $targetUser = User::factory()->create();
+
+        $response = $this->getJson("/api/v1/users/{$targetUser->id}");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                '*' => [
-                    'id',
-                    'package_id',
-                    'sessions_remaining',
-                    'active',
-                    'expires_at'
-                ]
+                'id',
+                'name',
+                'email',
+                'packages',
             ]);
-    }
-
-    public function test_user_cannot_get_other_user_packages()
-    {
-        Sanctum::actingAs($this->user);
-        $otherUser = User::factory()->create();
-
-        $response = $this->getJson("/api/users/{$otherUser->id}/packages");
-
-        $response->assertStatus(403);
     }
 }

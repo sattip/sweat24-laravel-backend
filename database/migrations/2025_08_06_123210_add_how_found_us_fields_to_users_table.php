@@ -12,12 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('found_us_via')->nullable()->after('password');
-            $table->unsignedBigInteger('referrer_id')->nullable()->after('found_us_via');
-            $table->string('social_platform')->nullable()->after('referrer_id');
-            $table->string('referral_code_or_name')->nullable()->after('social_platform');
-            $table->boolean('referral_validated')->default(false)->after('referral_code_or_name');
-            $table->timestamp('referral_validated_at')->nullable()->after('referral_validated');
+            $table->string('found_us_via')->nullable();
+            $table->unsignedBigInteger('referrer_id')->nullable();
+            $table->string('social_platform')->nullable();
+            $table->string('referral_code_or_name')->nullable();
+            $table->boolean('referral_validated')->default(false);
+            $table->timestamp('referral_validated_at')->nullable();
             
             $table->foreign('referrer_id')->references('id')->on('users')->onDelete('set null');
             $table->index('found_us_via');

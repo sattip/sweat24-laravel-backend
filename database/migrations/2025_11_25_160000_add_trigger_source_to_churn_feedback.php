@@ -15,7 +15,7 @@ return new class extends Migration
         // For SQLite, we need to recreate the table to change the nullable constraint
         // First add the trigger_source column
         Schema::table('churn_feedback', function (Blueprint $table) {
-            $table->string('trigger_source')->nullable()->after('survey_type');
+            $table->string('trigger_source')->nullable();
         });
 
         // SQLite doesn't support modifying columns, so we just add the column

@@ -85,7 +85,7 @@ class PushNotificationService
             );
 
             // Deactivate invalid tokens
-            if (!$result['success'] && str_contains($result['message'], 'invalid') || str_contains($result['message'], 'not registered')) {
+            if (!$result['success'] && (str_contains($result['message'], 'invalid') || str_contains($result['message'], 'not registered'))) {
                 $tokenModel->deactivate();
                 Log::info('Deactivated invalid push token', [
                     'user_id' => $userId,

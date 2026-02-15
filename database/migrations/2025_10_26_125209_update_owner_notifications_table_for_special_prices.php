@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::table('owner_notifications', function (Blueprint $table) {
             // Add user_id to track which admin should see the notification
-            $table->unsignedBigInteger('user_id')->nullable()->after('id');
+            $table->unsignedBigInteger('user_id')->nullable();
 
             // Add related model fields for polymorphic relationships
-            $table->string('related_model_type')->nullable()->after('package_id');
-            $table->unsignedBigInteger('related_model_id')->nullable()->after('related_model_type');
+            $table->string('related_model_type')->nullable();
+            $table->unsignedBigInteger('related_model_id')->nullable();
 
             // Add metadata field for storing additional structured data
-            $table->json('metadata')->nullable()->after('related_model_id');
+            $table->json('metadata')->nullable();
 
             // Update type enum to include new types
             $table->dropColumn('type');
@@ -28,7 +28,7 @@ return new class extends Migration
 
         // Re-add type with updated enum values
         Schema::table('owner_notifications', function (Blueprint $table) {
-            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'general'])->after('id');
+            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'general']);
         });
 
         // Make trainer_name and customer_name nullable (not always needed)
@@ -55,7 +55,7 @@ return new class extends Migration
         });
 
         Schema::table('owner_notifications', function (Blueprint $table) {
-            $table->enum('type', ['graceful_cancellation', 'package_extension', 'general'])->after('id');
+            $table->enum('type', ['graceful_cancellation', 'package_extension', 'general']);
         });
     }
 };

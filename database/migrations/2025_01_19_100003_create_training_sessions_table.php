@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('trainer_id')->nullable()->constrained('users')->onDelete('set null');
-            $table->foreignId('booking_id')->nullable()->constrained()->onDelete('set null');
+            $table->unsignedBigInteger('booking_id')->nullable();
             $table->date('session_date');
             $table->integer('duration_minutes')->default(60);
             $table->enum('session_type', ['personal', 'semi_personal', 'group'])->default('personal');

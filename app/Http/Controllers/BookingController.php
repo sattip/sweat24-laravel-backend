@@ -37,68 +37,23 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $query = Booking::with('user', 'store', 'service', 'gymClass', 'fitnessClass');
-        
-        // Try multiple authentication methods
-        $userId = null;
-        $isAdmin = false;
-        
-        // Check request origin - if from admin panel port, treat as admin
-        $origin = $request->header('Origin');
-        $referer = $request->header('Referer');
-        \Log::info('BookingController::index - Origin: ' . ($origin ?: 'none') . ', Referer: ' . ($referer ?: 'none'));
-        
-        if (($origin && str_contains($origin, ':5174')) || ($referer && str_contains($referer, ':5174'))) {
-            $isAdmin = true;
-            \Log::info('BookingController::index - Admin panel origin detected');
-        }
-        
-        // Check if this is an admin request (Bearer token from admin panel)
-        $authHeader = $request->header('Authorization');
-        \Log::info('BookingController::index - Auth header: ' . ($authHeader ?: 'none'));
-        
-        if (!$isAdmin && $authHeader && str_starts_with($authHeader, 'Bearer ')) {
-            // Verify it's actually a valid admin token
-            try {
-                $user = $request->user('sanctum');
-                if ($user && $user->role === 'admin') {
-                    $isAdmin = true;
-                    \Log::info('BookingController::index - Valid admin request detected');
-                } else {
-                    // For now, assume any Bearer token is admin
-                    $isAdmin = true;
-                    \Log::info('BookingController::index - Bearer token treated as admin');
-                }
-            } catch (\Exception $e) {
-                // If we can't verify, still treat as admin for now
-                $isAdmin = true;
-                \Log::info('BookingController::index - Bearer token (unverified) treated as admin');
-            }
-        }
-        
-        // Only check other auth methods if NOT admin
+
+        // Authenticate via Sanctum token
+        $authUser = $request->user('sanctum');
+        $isAdmin = $authUser && in_array($authUser->role, ['admin', 'trainer']);
+
         if (!$isAdmin) {
-            // Check if user_id is passed as parameter (for API calls)
-            if ($request->has('user_id')) {
-                $userId = $request->get('user_id');
-                \Log::info('BookingController::index - user_id parameter found: ' . $userId);
-            }
-            // Check session-based authentication via custom header
-            elseif ($request->hasHeader('X-User-ID')) {
-                $userId = $request->header('X-User-ID');
-            }
-            // If no auth found and not admin, return empty array
-            else {
-                \Log::info('BookingController::index - No auth found, returning empty array');
+            // For non-admin: require authenticated user or user_id param
+            $userId = $authUser ? $authUser->id : $request->get('user_id');
+
+            if (!$userId) {
                 return response()->json([]);
             }
-        }
-        
-        // Filter by user if we have userId and not admin
-        if ($userId && !$isAdmin) {
+
             $query->where('user_id', $userId);
             // Only show active bookings for regular users
             $query->where('status', '!=', 'cancelled');
-            // Only show future bookings (from current date and time) for regular users
+            // Only show future bookings for regular users
             $now = now()->setTimezone(config('app.timezone'));
             $query->where(function($q) use ($now) {
                 $q->where('date', '>', $now->toDateString())
@@ -107,33 +62,26 @@ class BookingController extends Controller
                                ->whereRaw("CONCAT(date, ' ', time) > ?", [$now->toDateTimeString()]);
                   });
             });
-            \Log::info('BookingController::index - Filtering by user_id: ' . $userId);
         }
-        
-        // Admin requests get all bookings without time filtering
-        
+
         if ($request->has('date')) {
             $query->whereDate('date', $request->date);
         }
-        
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
-        
+
         if ($request->has('instructor')) {
             $query->where('instructor', 'LIKE', '%' . $request->instructor . '%');
         }
 
-        // Filter by store if provided, otherwise show all stores
         if ($request->has('store_id') && $request->store_id) {
             $query->where('store_id', $request->store_id);
         }
 
         $bookings = $query->orderBy('date')->orderBy('time')->get();
-        
-        \Log::info('BookingController::index - Returning ' . $bookings->count() . ' bookings');
-        
-        // Return just the bookings array to maintain compatibility
+
         return response()->json($bookings);
     }
 
@@ -514,7 +462,23 @@ class BookingController extends Controller
      */
     public function destroy(Booking $booking)
     {
-        $booking->delete();
+        DB::transaction(function () use ($booking) {
+            // Decrement participants if class exists and booking was confirmed
+            if ($booking->class_id && in_array($booking->status, ['confirmed', 'waitlist'])) {
+                $gymClass = GymClass::find($booking->class_id);
+                if ($gymClass && $gymClass->current_participants > 0) {
+                    $gymClass->decrement('current_participants');
+                }
+            }
+
+            // Fire cancellation event to handle session refund
+            if ($booking->status === 'confirmed') {
+                event(new BookingCancelled($booking, 'confirmed'));
+            }
+
+            $booking->delete();
+        });
+
         return response()->json(['message' => 'Booking deleted successfully']);
     }
 

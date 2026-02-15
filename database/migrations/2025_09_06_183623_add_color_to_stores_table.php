@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('stores') || Schema::hasColumn('stores', 'color')) {
+            return;
+        }
+
         Schema::table('stores', function (Blueprint $table) {
-            $table->string('color', 7)->default('#3B82F6')->after('address'); // Hex color code
+            $table->string('color', 7)->default('#3B82F6'); // Hex color code
         });
     }
 

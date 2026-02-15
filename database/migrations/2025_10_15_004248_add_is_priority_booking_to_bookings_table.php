@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->boolean('is_priority_booking')->default(false)->after('attended');
+            $table->boolean('is_priority_booking')->default(false);
             $table->index('is_priority_booking');
         });
     }

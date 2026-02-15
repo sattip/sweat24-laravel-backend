@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('has_priority_booking')->default(false)->after('role');
-            $table->timestamp('priority_booking_expires_at')->nullable()->after('has_priority_booking');
-            $table->integer('priority_booking_hours_advance')->default(48)->after('priority_booking_expires_at');
+            $table->boolean('has_priority_booking')->default(false);
+            $table->timestamp('priority_booking_expires_at')->nullable();
+            $table->integer('priority_booking_hours_advance')->default(48);
             $table->index('has_priority_booking');
             $table->index('priority_booking_expires_at');
         });

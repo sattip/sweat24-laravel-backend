@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::table('user_packages', function (Blueprint $table) {
             // Custom package fields for personalized pricing and terms
-            $table->boolean('is_custom_package')->default(false)->after('auto_renew');
-            $table->decimal('custom_price', 10, 2)->nullable()->after('is_custom_package');
-            $table->integer('custom_sessions')->nullable()->after('custom_price');
-            $table->integer('custom_duration_days')->nullable()->after('custom_sessions');
-            $table->text('custom_notes')->nullable()->after('custom_duration_days');
-            $table->string('assigned_by')->nullable()->after('custom_notes'); // Admin who assigned the custom package
-            $table->timestamp('custom_assigned_at')->nullable()->after('assigned_by');
+            $table->boolean('is_custom_package')->default(false);
+            $table->decimal('custom_price', 10, 2)->nullable();
+            $table->integer('custom_sessions')->nullable();
+            $table->integer('custom_duration_days')->nullable();
+            $table->text('custom_notes')->nullable();
+            $table->string('assigned_by')->nullable(); // Admin who assigned the custom package
+            $table->timestamp('custom_assigned_at')->nullable();
         });
     }
 

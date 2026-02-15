@@ -9,9 +9,9 @@ return new class extends Migration
     public function up()
     {
         Schema::table('partner_offers', function (Blueprint $table) {
-            $table->decimal('discount_percentage', 5, 2)->nullable()->after('discount_unit');
-            $table->integer('usage_limit')->default(0)->after('usage_limit_per_user');
-            $table->integer('used_count')->default(0)->after('current_usage_count');
+            $table->decimal('discount_percentage', 5, 2)->nullable();
+            $table->integer('usage_limit')->default(0);
+            $table->integer('used_count')->default(0);
         });
     }
 

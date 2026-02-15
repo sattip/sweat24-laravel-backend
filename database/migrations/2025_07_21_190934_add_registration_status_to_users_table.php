@@ -17,13 +17,13 @@ return new class extends Migration
                 'pending_terms', 
                 'pending_signature', 
                 'completed'
-            ])->default('pending_terms')->after('status');
+            ])->default('pending_terms');
             
             // Add terms acceptance timestamp
-            $table->timestamp('terms_accepted_at')->nullable()->after('registration_status');
+            $table->timestamp('terms_accepted_at')->nullable();
             
             // Add registration completion timestamp
-            $table->timestamp('registration_completed_at')->nullable()->after('terms_accepted_at');
+            $table->timestamp('registration_completed_at')->nullable();
         });
     }
 
