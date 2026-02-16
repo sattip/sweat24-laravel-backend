@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\DatabaseHelper;
 use App\Models\Booking;
 use App\Models\User;
 use App\Models\LoyaltyPoint;
@@ -55,10 +56,7 @@ class StatisticsService
      */
     public function getMonthlyBookingTrends($months = 12)
     {
-        // Use strftime for SQLite compatibility, or DATE_FORMAT for MySQL
-        $dateFormat = DB::getDriverName() === 'sqlite' 
-            ? "strftime('%Y-%m', created_at) as month"
-            : "DATE_FORMAT(created_at, '%Y-%m') as month";
+        $dateFormat = DatabaseHelper::dateFormat('created_at', 'month', 'month');
             
         $results = Booking::selectRaw("
                 {$dateFormat},

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\DatabaseHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\ChurnFeedbackSurvey;
 use App\Models\ChurnFeedback;
@@ -337,7 +338,7 @@ class ChurnFeedbackController extends Controller
 
         // Monthly trends (last 6 months)
         $monthlyTrends = ChurnFeedback::select(
-            DB::raw("DATE_FORMAT(expired_at, '%Y-%m') as month"),
+            DB::raw(DatabaseHelper::dateFormat('expired_at', 'month', 'month')),
             DB::raw('COUNT(*) as total'),
             DB::raw("SUM(CASE WHEN status = 'churn' THEN 1 ELSE 0 END) as churned"),
             DB::raw("SUM(CASE WHEN status = 'pause' THEN 1 ELSE 0 END) as paused"),

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\DatabaseHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -349,13 +350,7 @@ class FinancialReportsController extends Controller
 
     private function getTotalRevenueGrouped($startDate, $endDate, $storeId = null, $groupBy = 'month')
     {
-        $dateFormat = match($groupBy) {
-            'day' => "DATE_FORMAT(created_at, '%Y-%m-%d')",
-            'week' => "DATE_FORMAT(created_at, '%x-%v')",
-            'month' => "DATE_FORMAT(created_at, '%Y-%m')",
-            'year' => "DATE_FORMAT(created_at, '%Y')",
-            default => "DATE_FORMAT(created_at, '%Y-%m')"
-        };
+        $dateFormat = DatabaseHelper::dateFormatExpr('created_at', $groupBy);
 
         $query = DB::table('cash_register_entries')
             ->select(
@@ -741,7 +736,7 @@ class FinancialReportsController extends Controller
 
         $query = DB::table('cash_register_entries')
             ->select(
-                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw(DatabaseHelper::dateFormat('created_at', 'month', 'month')),
                 DB::raw('SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as revenue'),
                 DB::raw('SUM(CASE WHEN type = "expense" THEN amount ELSE 0 END) as expenses')
             )
@@ -1094,12 +1089,14 @@ class FinancialReportsController extends Controller
 
     private function getCohortGroupBy($period, $dateColumn)
     {
-        return match($period) {
-            'monthly' => "DATE_FORMAT({$dateColumn}, '%Y-%m')",
-            'quarterly' => "CONCAT(YEAR({$dateColumn}), '-Q', QUARTER({$dateColumn}))",
-            'yearly' => "DATE_FORMAT({$dateColumn}, '%Y')",
-            default => "DATE_FORMAT({$dateColumn}, '%Y-%m')"
+        $groupBy = match($period) {
+            'monthly' => 'month',
+            'quarterly' => 'quarterly',
+            'yearly' => 'year',
+            default => 'month',
         };
+
+        return DatabaseHelper::dateFormatExpr($dateColumn, $groupBy);
     }
 
     private function getCustomerJourneyForDashboard($startDate, $endDate, $storeId = null)

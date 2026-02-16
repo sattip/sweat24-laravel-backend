@@ -54,27 +54,27 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
-        // Strict rate limiter for authentication endpoints - 5 attempts per minute
+        // Rate limiter for authentication endpoints - 30 attempts per minute
         RateLimiter::for('auth', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip())->response(function () {
+            return Limit::perMinute(30)->by($request->ip())->response(function () {
                 return response()->json([
                     'message' => 'Too many login attempts. Please try again later.',
                 ], 429);
             });
         });
 
-        // Rate limiter for password reset - 3 attempts per minute
+        // Rate limiter for password reset - 10 attempts per minute
         RateLimiter::for('password-reset', function (Request $request) {
-            return Limit::perMinute(3)->by($request->ip())->response(function () {
+            return Limit::perMinute(10)->by($request->ip())->response(function () {
                 return response()->json([
                     'message' => 'Too many password reset attempts. Please try again later.',
                 ], 429);
             });
         });
 
-        // Rate limiter for registration - 5 attempts per minute
+        // Rate limiter for registration - 15 attempts per minute
         RateLimiter::for('registration', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip())->response(function () {
+            return Limit::perMinute(15)->by($request->ip())->response(function () {
                 return response()->json([
                     'message' => 'Too many registration attempts. Please try again later.',
                 ], 429);
