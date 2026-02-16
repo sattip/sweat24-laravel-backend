@@ -28,15 +28,15 @@ class RateLimitingTest extends TestCase
     /** @test */
     public function login_endpoint_is_rate_limited(): void
     {
-        // Make 6 requests (limit is 5 per minute)
-        for ($i = 0; $i < 5; $i++) {
+        // Make 30 requests (limit is 30 per minute)
+        for ($i = 0; $i < 30; $i++) {
             $this->postJson('/api/v1/auth/login', [
                 'email' => 'test@example.com',
                 'password' => 'wrong-password',
             ]);
         }
 
-        // 6th request should be rate limited
+        // 31st request should be rate limited
         $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'test@example.com',
             'password' => 'wrong-password',
@@ -51,8 +51,8 @@ class RateLimitingTest extends TestCase
     /** @test */
     public function registration_endpoint_is_rate_limited(): void
     {
-        // Make 6 requests (limit is 5 per minute)
-        for ($i = 0; $i < 5; $i++) {
+        // Make 15 requests (limit is 15 per minute)
+        for ($i = 0; $i < 15; $i++) {
             $this->postJson('/api/v1/auth/register', [
                 'name' => 'Test User',
                 'email' => "test{$i}@example.com",
@@ -61,10 +61,10 @@ class RateLimitingTest extends TestCase
             ]);
         }
 
-        // 6th request should be rate limited
+        // 16th request should be rate limited
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'Test User',
-            'email' => 'test6@example.com',
+            'email' => 'test16@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -78,14 +78,14 @@ class RateLimitingTest extends TestCase
     /** @test */
     public function password_reset_endpoint_is_rate_limited(): void
     {
-        // Make 4 requests (limit is 3 per minute)
-        for ($i = 0; $i < 3; $i++) {
+        // Make 10 requests (limit is 10 per minute)
+        for ($i = 0; $i < 10; $i++) {
             $this->postJson('/api/v1/auth/forgot-password', [
                 'email' => 'test@example.com',
             ]);
         }
 
-        // 4th request should be rate limited
+        // 11th request should be rate limited
         $response = $this->postJson('/api/v1/auth/forgot-password', [
             'email' => 'test@example.com',
         ]);
@@ -117,15 +117,15 @@ class RateLimitingTest extends TestCase
     /** @test */
     public function admin_login_endpoint_is_rate_limited(): void
     {
-        // Make 6 requests (limit is 5 per minute)
-        for ($i = 0; $i < 5; $i++) {
+        // Make 30 requests (limit is 30 per minute)
+        for ($i = 0; $i < 30; $i++) {
             $this->postJson('/api/v1/auth/admin/login', [
                 'email' => 'admin@example.com',
                 'password' => 'wrong-password',
             ]);
         }
 
-        // 6th request should be rate limited
+        // 31st request should be rate limited
         $response = $this->postJson('/api/v1/auth/admin/login', [
             'email' => 'admin@example.com',
             'password' => 'wrong-password',

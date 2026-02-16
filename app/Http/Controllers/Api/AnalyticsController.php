@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\DatabaseHelper;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Booking;
@@ -72,7 +73,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = User::whereDate('created_at', '>=', $startDate)
             ->whereDate('created_at', '<=', $endDate)
             ->whereNotNull('found_us_via')
-            ->selectRaw("strftime('%Y-%m', created_at) as month, found_us_via, COUNT(*) as count")
+            ->selectRaw(DatabaseHelper::dateFormatExpr('created_at', 'month') . " as month, found_us_via, COUNT(*) as count")
             ->groupBy('month', 'found_us_via')
             ->orderBy('month')
             ->get()
@@ -121,11 +122,7 @@ class AnalyticsController extends Controller
             ->count();
 
         // Group by time period
-        $dateFormat = match ($groupBy) {
-            'week' => "strftime('%Y-%W', date)",
-            'month' => "strftime('%Y-%m', date)",
-            default => "strftime('%Y-%m-%d', date)",
-        };
+        $dateFormat = DatabaseHelper::dateFormatExpr('date', $groupBy);
 
         $timeline = Booking::whereDate('date', '>=', $startDate)
             ->whereDate('date', '<=', $endDate)
@@ -269,11 +266,7 @@ class AnalyticsController extends Controller
             ->count();
 
         // Timeline by group_by
-        $dateFormat = match ($groupBy) {
-            'month' => "strftime('%Y-%m', date)",
-            'year' => "strftime('%Y', date)",
-            default => "strftime('%Y-%W', date)",
-        };
+        $dateFormat = DatabaseHelper::dateFormatExpr('date', $groupBy);
 
         $timeline = GymClass::whereDate('date', '>=', $startDate)
             ->whereDate('date', '<=', $endDate)
@@ -429,8 +422,7 @@ class AnalyticsController extends Controller
         foreach ($ageGroups as $group) {
             $count = (clone $query)
                 ->whereNotNull('date_of_birth')
-                ->whereRaw("(strftime('%Y', 'now') - strftime('%Y', date_of_birth)) BETWEEN ? AND ?",
-                    [$group['min'], $group['max']])
+                ->whereRaw(...DatabaseHelper::ageBetween('date_of_birth', $group['min'], $group['max']))
                 ->count();
             $ageData[] = [
                 'range' => $group['label'],
@@ -638,7 +630,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = UserPackage::whereDate('expiry_date', '>=', $startDate)
             ->whereDate('expiry_date', '<=', $endDate)
             ->selectRaw("
-                strftime('%Y-%m', expiry_date) as month,
+                " . DatabaseHelper::dateFormatExpr('expiry_date', 'month') . " as month,
                 COUNT(*) as expired,
                 SUM(CASE WHEN renewed_at IS NOT NULL THEN 1 ELSE 0 END) as renewed
             ")
@@ -735,7 +727,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = TrialAppointment::whereDate('appointment_date', '>=', $startDate)
             ->whereDate('appointment_date', '<=', $endDate)
             ->selectRaw("
-                strftime('%Y-%m', appointment_date) as month,
+                " . DatabaseHelper::dateFormatExpr('appointment_date', 'month') . " as month,
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
             ")
