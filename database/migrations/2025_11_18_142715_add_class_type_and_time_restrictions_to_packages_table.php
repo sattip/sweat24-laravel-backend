@@ -13,12 +13,12 @@ return new class extends Migration
     {
         Schema::table('packages', function (Blueprint $table) {
             // Class/lesson type this package is for
-            $table->string('class_type')->nullable()->after('description');
+            $table->string('class_type')->nullable();
 
             // Time restriction settings
-            $table->boolean('time_restriction_enabled')->default(false)->after('class_type');
-            $table->time('booking_start_time')->nullable()->after('time_restriction_enabled');
-            $table->time('booking_end_time')->nullable()->after('booking_start_time');
+            $table->boolean('time_restriction_enabled')->default(false);
+            $table->time('booking_start_time')->nullable();
+            $table->time('booking_end_time')->nullable();
         });
     }
 

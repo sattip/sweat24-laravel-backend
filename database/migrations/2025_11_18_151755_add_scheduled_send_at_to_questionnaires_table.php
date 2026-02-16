@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('questionnaires', function (Blueprint $table) {
             // Add scheduled send datetime field
-            $table->dateTime('scheduled_send_at')->nullable()->after('is_active');
+            $table->dateTime('scheduled_send_at')->nullable();
         });
     }
 

@@ -20,7 +20,7 @@ return new class extends Migration
 
         // Add type column with the new booking_request value
         Schema::table('owner_notifications', function (Blueprint $table) {
-            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'booking_request', 'general'])->default('general')->after('id');
+            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'booking_request', 'general'])->default('general');
         });
     }
 
@@ -35,7 +35,7 @@ return new class extends Migration
         });
 
         Schema::table('owner_notifications', function (Blueprint $table) {
-            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'general'])->after('id');
+            $table->enum('type', ['graceful_cancellation', 'package_extension', 'special_price', 'general']);
         });
     }
 };

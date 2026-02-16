@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fitness_classes', function (Blueprint $table) {
-            $table->integer('priority_seats')->default(0)->after('capacity'); // Number of seats reserved for priority booking users
+            $table->integer('priority_seats')->default(0); // Number of seats reserved for priority booking users
         });
     }
 

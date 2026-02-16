@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('referral_phone', 20)->nullable()->comment('Κινητό συστήσαντος')->after('found_us_via');
-            $table->integer('referral_points')->default(0)->comment('Πόντοι από συστάσεις')->after('referral_phone');
+            $table->string('referral_phone', 20)->nullable()->comment('Κινητό συστήσαντος');
+            $table->integer('referral_points')->default(0)->comment('Πόντοι από συστάσεις');
             
             // Add index for better performance
             $table->index('referral_phone');

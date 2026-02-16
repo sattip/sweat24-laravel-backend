@@ -57,8 +57,9 @@ class BookingCompletionService
                 $standardAmount = $this->cashRegisterService->calculatePerTrainingCost($userPackage);
                 $amount = $this->cashRegisterService->handleRoundingAdjustment($userPackage, $standardAmount);
 
-                // Decrement package sessions
-                $userPackage->decrement('remaining_sessions');
+                // NOTE: Session deduction is handled by ProcessSessionDeduction listener
+                // on BookingCreated event at booking creation time. Do NOT decrement here
+                // to avoid double deduction (BUG-03).
 
                 // Record income
                 $cashEntry = $this->cashRegisterService->recordPackageIncome($booking, $userPackage);
@@ -122,7 +123,12 @@ class BookingCompletionService
     {
         return UserPackage::where('user_id', $userId)
             ->where('status', 'active')
+            ->where('is_frozen', false)
             ->where('remaining_sessions', '>', 0)
+            ->where(function ($query) {
+                $query->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', now()->toDateString());
+            })
             ->orderBy('expiry_date', 'desc')
             ->first();
     }

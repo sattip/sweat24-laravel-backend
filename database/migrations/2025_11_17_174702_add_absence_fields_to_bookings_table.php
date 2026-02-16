@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->string('absence_reason')->nullable()->after('cancellation_reason');
-            $table->boolean('absence_with_charge')->nullable()->after('absence_reason');
-            $table->timestamp('absence_marked_at')->nullable()->after('absence_with_charge');
-            $table->unsignedBigInteger('absence_marked_by')->nullable()->after('absence_marked_at');
+            $table->string('absence_reason')->nullable();
+            $table->boolean('absence_with_charge')->nullable();
+            $table->timestamp('absence_marked_at')->nullable();
+            $table->unsignedBigInteger('absence_marked_by')->nullable();
 
             // Add foreign key for absence_marked_by
             $table->foreign('absence_marked_by')->references('id')->on('users')->onDelete('set null');

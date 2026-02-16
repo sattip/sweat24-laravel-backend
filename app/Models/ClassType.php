@@ -17,11 +17,13 @@ class ClassType extends Model
         'image',
         'is_active',
         'sort_order',
+        'locations',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'locations' => 'array',
     ];
 
     /**

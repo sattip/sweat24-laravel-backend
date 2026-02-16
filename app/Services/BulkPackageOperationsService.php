@@ -14,6 +14,13 @@ use Exception;
 class BulkPackageOperationsService
 {
     /**
+     * Escape special characters for LIKE patterns.
+     */
+    private function escapeLikePattern(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+    /**
      * Preview bulk package extension operation
      */
     public function previewExtension(array $filters, array $extensionData)
@@ -223,9 +230,10 @@ class BulkPackageOperationsService
         
         // User search filter
         if (!empty($filters['user_search'])) {
-            $query->whereHas('user', function ($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['user_search'] . '%')
-                  ->orWhere('email', 'like', '%' . $filters['user_search'] . '%');
+            $escaped = $this->escapeLikePattern($filters['user_search']);
+            $query->whereHas('user', function ($q) use ($escaped) {
+                $q->where('name', 'like', '%' . $escaped . '%')
+                  ->orWhere('email', 'like', '%' . $escaped . '%');
             });
         }
         

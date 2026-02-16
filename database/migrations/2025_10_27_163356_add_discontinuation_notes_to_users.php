@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'discontinuation_notes')) {
-                $table->text('discontinuation_notes')->nullable()->after('trainer_notes');
+                $table->text('discontinuation_notes')->nullable();
             }
         });
     }

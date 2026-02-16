@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Notification;
 use App\Models\NotificationRecipient;
 use App\Services\NotificationService;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
+    use SearchableTrait;
     protected $notificationService;
 
     public function __construct(NotificationService $notificationService)
@@ -38,11 +40,7 @@ class NotificationController extends Controller
 
         // Search
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('message', 'like', "%{$search}%");
-            });
+            $this->addSafeMultiColumnSearch($query, ['title', 'message'], $request->search);
         }
 
         $notifications = $query->paginate($request->get('per_page', 15));

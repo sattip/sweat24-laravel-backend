@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('stores', function (Blueprint $table) {
-            $table->string('phone')->nullable()->after('address');
-            $table->text('description')->nullable()->after('phone');
-            $table->string('email')->nullable()->after('description');
+            $table->string('phone')->nullable();
+            $table->text('description')->nullable();
+            $table->string('email')->nullable();
             
             // Add index for email for faster searches
             $table->index(['email']);

@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('gym_classes', function (Blueprint $table) {
-            $table->integer('priority_seats')->default(0)->after('capacity');
-            $table->integer('priority_seats_booked')->default(0)->after('priority_seats');
-            $table->timestamp('priority_seats_release_at')->nullable()->after('priority_seats_booked');
-            $table->boolean('priority_booking_enabled')->default(true)->after('priority_seats_release_at');
+            $table->integer('priority_seats')->default(0);
+            $table->integer('priority_seats_booked')->default(0);
+            $table->timestamp('priority_seats_release_at')->nullable();
+            $table->boolean('priority_booking_enabled')->default(true);
             $table->index('priority_seats_release_at');
             $table->index('priority_booking_enabled');
         });

@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class StoreManagementController extends Controller
 {
+    use SearchableTrait;
     /**
      * Display a listing of stores.
      */
@@ -23,10 +25,7 @@ class StoreManagementController extends Controller
 
         // Search by name or email if specified
         if ($request->has('search')) {
-            $query->where(function($q) use ($request) {
-                $q->where('name', 'LIKE', '%' . $request->search . '%')
-                  ->orWhere('email', 'LIKE', '%' . $request->search . '%');
-            });
+            $this->addSafeMultiColumnSearch($query, ['name', 'email'], $request->search);
         }
 
         $stores = $query->orderBy('name')->paginate($request->get('per_page', 15));

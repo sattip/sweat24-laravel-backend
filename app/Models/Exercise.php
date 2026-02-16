@@ -91,9 +91,12 @@ class Exercise extends Model
      */
     public function scopeSearch($query, $term)
     {
-        return $query->where(function ($query) use ($term) {
-            $query->where('name_en', 'like', "%{$term}%")
-                  ->orWhere('name_gr', 'like', "%{$term}%");
+        // Escape LIKE special characters to prevent pattern manipulation
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
+
+        return $query->where(function ($query) use ($escaped) {
+            $query->where('name_en', 'like', '%' . $escaped . '%')
+                  ->orWhere('name_gr', 'like', '%' . $escaped . '%');
         });
     }
 }

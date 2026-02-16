@@ -16,7 +16,7 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'sqlite') {
             // For SQLite, we need to recreate the table
             Schema::table('users', function (Blueprint $table) {
-                $table->string('status_temp')->default('pending_approval')->after('status');
+                $table->string('status_temp')->default('pending_approval');
             });
             
             // Copy data
@@ -59,7 +59,7 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'sqlite') {
             // For SQLite, recreate without pending_approval
             Schema::table('users', function (Blueprint $table) {
-                $table->string('status_temp')->default('inactive')->after('status');
+                $table->string('status_temp')->default('inactive');
             });
             
             DB::statement("UPDATE users SET status_temp = CASE 

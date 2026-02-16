@@ -61,7 +61,7 @@ class ReferralCode extends Model
                 }
             }
             if (!$referralCode->link) {
-                $referralCode->link = "sweat24.com/join?ref=" . $referralCode->code;
+                $referralCode->link = "https://api.sweat93.gr/invite/" . $referralCode->code;
             }
         });
     }

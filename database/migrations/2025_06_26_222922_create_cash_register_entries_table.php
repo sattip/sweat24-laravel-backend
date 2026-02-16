@@ -18,9 +18,9 @@ return new class extends Migration
             $table->text('description');
             $table->string('category');
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // admin who made the entry
-            $table->enum('payment_method', ['cash', 'card', 'transfer'])->nullable();
+            $table->string('payment_method')->nullable();
             $table->string('related_entity_id')->nullable();
-            $table->enum('related_entity_type', ['customer', 'package', 'expense', 'other'])->nullable();
+            $table->enum('related_entity_type', ['customer', 'package', 'user_package', 'expense', 'other'])->nullable();
             $table->timestamps();
         });
     }

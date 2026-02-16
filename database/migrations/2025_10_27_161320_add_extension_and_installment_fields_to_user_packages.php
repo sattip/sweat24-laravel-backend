@@ -14,26 +14,26 @@ return new class extends Migration
         Schema::table('user_packages', function (Blueprint $table) {
             // Installment tracking fields
             if (!Schema::hasColumn('user_packages', 'installments_paid')) {
-                $table->integer('installments_paid')->default(0)->after('installments');
+                $table->integer('installments_paid')->default(0);
             }
             if (!Schema::hasColumn('user_packages', 'installment_frequency')) {
-                $table->string('installment_frequency', 20)->nullable()->after('installments_paid');
+                $table->string('installment_frequency', 20)->nullable();
             }
 
             // Extension tracking fields
             if (!Schema::hasColumn('user_packages', 'extension_notes')) {
-                $table->text('extension_notes')->nullable()->after('payment_notes');
+                $table->text('extension_notes')->nullable();
             }
             if (!Schema::hasColumn('user_packages', 'extension_from')) {
-                $table->date('extension_from')->nullable()->after('extension_notes');
+                $table->date('extension_from')->nullable();
             }
             if (!Schema::hasColumn('user_packages', 'extension_to')) {
-                $table->date('extension_to')->nullable()->after('extension_from');
+                $table->date('extension_to')->nullable();
             }
 
             // Pause tracking field
             if (!Schema::hasColumn('user_packages', 'pause_reason')) {
-                $table->text('pause_reason')->nullable()->after('status');
+                $table->text('pause_reason')->nullable();
             }
         });
     }

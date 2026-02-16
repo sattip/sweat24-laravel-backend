@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('ems_interest')->default(false)->after('medical_history');
-            $table->json('ems_contraindications')->nullable()->after('ems_interest');
-            $table->boolean('ems_liability_accepted')->nullable()->after('ems_contraindications');
+            $table->boolean('ems_interest')->default(false);
+            $table->json('ems_contraindications')->nullable();
+            $table->boolean('ems_liability_accepted')->nullable();
         });
     }
 

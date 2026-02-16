@@ -7,11 +7,13 @@ use App\Models\User;
 use App\Models\Package;
 use App\Models\PackageHistory;
 use App\Services\PackageNotificationService;
+use App\Traits\SearchableTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdminPackageController extends Controller
 {
+    use SearchableTrait;
     protected $notificationService;
 
     public function __construct(PackageNotificationService $notificationService)
@@ -32,10 +34,10 @@ class AdminPackageController extends Controller
         }
 
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+            $escaped = $this->escapeLikePattern($request->search);
+            $query->whereHas('user', function ($q) use ($escaped) {
+                $q->where('name', 'like', '%' . $escaped . '%')
+                  ->orWhere('email', 'like', '%' . $escaped . '%');
             });
         }
 

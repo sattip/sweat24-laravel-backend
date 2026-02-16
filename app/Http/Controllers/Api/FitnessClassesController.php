@@ -26,10 +26,10 @@ class FitnessClassesController extends Controller
         // Filter by date range
         if ($request->has('date_from') || $request->has('date_to')) {
             if ($request->date_from) {
-                $query->where('date', '>=', $request->date_from);
+                $query->whereDate('date', '>=', $request->date_from);
             }
             if ($request->date_to) {
-                $query->where('date', '<=', $request->date_to);
+                $query->whereDate('date', '<=', $request->date_to);
             }
         }
 
@@ -58,10 +58,19 @@ class FitnessClassesController extends Controller
                          ->orderBy('time', 'asc')
                          ->get();
 
+        // Get all instructors for name lookup
+        $instructors = \App\Models\Instructor::pluck('name', 'id')->toArray();
+
         // Transform data to include frontend-expected fields
-        $transformedClasses = $classes->map(function ($class) {
+        $transformedClasses = $classes->map(function ($class) use ($instructors) {
             $startTime = Carbon::parse($class->time);
             $endTime = $startTime->copy()->addMinutes($class->duration);
+
+            // Get trainer ID and name - instructor field may be numeric ID or name string
+            $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+            $trainerName = $trainerId && isset($instructors[$trainerId])
+                ? $instructors[$trainerId]
+                : $class->instructor; // Fall back to raw value if name not found
 
             return [
                 'id' => $class->id,
@@ -69,8 +78,8 @@ class FitnessClassesController extends Controller
                 'type' => $class->type,
                 'class_type' => $class->name, // Alias for frontend
                 'instructor' => $class->instructor,
-                'trainer_name' => $class->instructor, // Alias for frontend
-                'trainer_id' => null, // Not using numeric IDs yet
+                'trainer_name' => $trainerName,
+                'trainer_id' => $trainerId,
                 'date' => $class->date ? $class->date->format('Y-m-d') : null,
                 'time' => $startTime->format('H:i'),
                 'start_time' => $startTime->format('H:i'),
@@ -172,14 +181,24 @@ class FitnessClassesController extends Controller
         $startTime = Carbon::parse($class->time);
         $endTime = $startTime->copy()->addMinutes($class->duration);
 
+        // Get trainer info
+        $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+        $trainerName = $class->instructor;
+        if ($trainerId) {
+            $instructor = \App\Models\Instructor::find($trainerId);
+            if ($instructor) {
+                $trainerName = $instructor->name;
+            }
+        }
+
         $transformedClass = [
             'id' => $class->id,
             'name' => $class->name,
             'type' => $class->type,
             'class_type' => $class->name,
             'instructor' => $class->instructor,
-            'trainer_name' => $class->instructor,
-            'trainer_id' => null,
+            'trainer_name' => $trainerName,
+            'trainer_id' => $trainerId,
             'date' => $class->date ? $class->date->format('Y-m-d') : null,
             'time' => $startTime->format('H:i'),
             'start_time' => $startTime->format('H:i'),
@@ -213,18 +232,25 @@ class FitnessClassesController extends Controller
     {
         $class = FitnessClass::findOrFail($id);
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|string|max:255',
-            'instructor' => 'required|string|max:255',
-            'date' => 'required|date',
-            'time' => 'required|date_format:H:i',
-            'duration' => 'required|integer|min:15|max:480',
-            'max_participants' => 'required|integer|min:1|max:100',
+            'name' => 'sometimes|string|max:255',
+            'type' => 'sometimes|string|max:255',
+            'instructor' => 'sometimes|string|max:255',
+            'date' => 'sometimes|date',
+            'time' => 'sometimes|date_format:H:i',
+            'start_time' => 'sometimes|date_format:H:i', // Accept start_time as alias for time
+            'duration' => 'sometimes|integer|min:15|max:480',
+            'max_participants' => 'sometimes|integer|min:1|max:100',
             'store_id' => 'nullable|exists:stores,id',
             'location' => 'nullable|string|max:500',
             'description' => 'nullable|string|max:1000',
-            'status' => 'in:active,cancelled,completed'
+            'status' => 'sometimes|in:active,cancelled,completed'
         ]);
+
+        // Map start_time to time if provided
+        if (isset($validated['start_time']) && !isset($validated['time'])) {
+            $validated['time'] = $validated['start_time'];
+            unset($validated['start_time']);
+        }
 
         $class->update($validated);
         $class->load('store:id,name,color');
@@ -353,6 +379,221 @@ class FitnessClassesController extends Controller
         return response()->json([
             'success' => true,
             'data' => $types
+        ]);
+    }
+
+    /**
+     * Get participants for a fitness class
+     */
+    public function getParticipants($id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        // Get bookings for this class that are not cancelled
+        $bookings = \App\Models\Booking::where('class_id', $id)
+            ->whereIn('status', ['confirmed', 'pending', 'completed', 'absent'])
+            ->with('user:id,name,email,phone')
+            ->get();
+
+        // Eager-load user packages to avoid N+1 queries
+        $userIds = $bookings->pluck('user_id')->filter()->unique();
+        $userPackages = \App\Models\UserPackage::whereIn('user_id', $userIds)
+            ->where('status', 'active')
+            ->with('package:id,name')
+            ->get()
+            ->keyBy('user_id');
+
+        $participants = $bookings->map(function ($booking) use ($userPackages) {
+            $userPackage = $booking->user_id ? $userPackages->get($booking->user_id) : null;
+
+            return [
+                'id' => $booking->id,
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
+                'user_name' => $booking->customer_name ?? $booking->user?->name ?? 'Άγνωστος',
+                'user_email' => $booking->customer_email ?? $booking->user?->email ?? '',
+                'user_phone' => $booking->user?->phone ?? null,
+                'status' => $booking->status,
+                'checked_in' => $booking->status === 'completed' || $booking->attended,
+                'package_name' => $userPackage?->package?->name ?? null,
+                'remaining_sessions' => $userPackage?->remaining_sessions ?? null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'participants' => $participants
+        ]);
+    }
+
+    /**
+     * Mark attendance for a participant in a fitness class
+     */
+    public function markAttendance(Request $request, $id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        $validated = $request->validate([
+            'booking_id' => 'required|integer|exists:bookings,id',
+            'status' => 'required|in:present,absent',
+            'with_charge' => 'boolean',
+        ]);
+
+        $booking = \App\Models\Booking::findOrFail($validated['booking_id']);
+
+        // Verify booking belongs to this class
+        if ($booking->class_id != $id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Η κράτηση δεν ανήκει σε αυτό το μάθημα'
+            ], 422);
+        }
+
+        if ($validated['status'] === 'present') {
+            $booking->update([
+                'status' => 'completed',
+                'attended' => true,
+            ]);
+
+            $this->deductSessionFromPackage($booking);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Η παρουσία καταχωρήθηκε επιτυχώς'
+            ]);
+        } else {
+            $withCharge = $validated['with_charge'] ?? true;
+
+            $booking->update([
+                'status' => 'absent',
+                'attended' => false,
+                'absence_reason' => 'Απουσία από ομαδικό μάθημα',
+                'absence_with_charge' => $withCharge,
+                'absence_marked_at' => now(),
+                'absence_marked_by' => auth()->id(),
+            ]);
+
+            if ($withCharge) {
+                $this->deductSessionFromPackage($booking);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $withCharge
+                    ? 'Η απουσία καταχωρήθηκε με χρέωση'
+                    : 'Η απουσία καταχωρήθηκε χωρίς χρέωση'
+            ]);
+        }
+    }
+
+    /**
+     * Deduct a session from the user's active package.
+     */
+    private function deductSessionFromPackage(\App\Models\Booking $booking): void
+    {
+        if (!$booking->user_id) {
+            return;
+        }
+
+        $userPackage = \App\Models\UserPackage::where('user_id', $booking->user_id)
+            ->where('status', 'active')
+            ->where('remaining_sessions', '>', 0)
+            ->first();
+
+        if ($userPackage) {
+            $userPackage->decrement('remaining_sessions');
+
+            if ($userPackage->remaining_sessions <= 0) {
+                $userPackage->update(['status' => 'completed']);
+            }
+        }
+    }
+
+    /**
+     * Cancel a fitness class and notify all participants and instructor
+     */
+    public function cancel($id): JsonResponse
+    {
+        $class = FitnessClass::findOrFail($id);
+
+        if ($class->status === "cancelled") {
+            return response()->json([
+                "success" => false,
+                "message" => "Το μάθημα είναι ήδη ακυρωμένο"
+            ], 422);
+        }
+
+        // Update class status
+        $class->update(["status" => "cancelled"]);
+
+        // Find all confirmed/pending bookings for this class
+        $bookings = \App\Models\Booking::where("class_id", $id)
+            ->whereIn("status", ["confirmed", "pending"])
+            ->get();
+
+        $notifiedUsers = 0;
+
+        foreach ($bookings as $booking) {
+            // Cancel the booking
+            $booking->update([
+                "status" => "cancelled",
+                "cancellation_reason" => "Ακύρωση μαθήματος",
+            ]);
+
+            // Notify the user if they exist
+            if ($booking->user_id) {
+                $user = \App\Models\User::find($booking->user_id);
+                if ($user) {
+                    try {
+                        $user->notify(new \App\Notifications\Bookings\BookingCancelledNotification(
+                            $booking,
+                            "Ακύρωση μαθήματος από τη διοίκηση",
+                            "admin"
+                        ));
+                        $notifiedUsers++;
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify user about class cancellation", [
+                            "user_id" => $user->id,
+                            "booking_id" => $booking->id,
+                            "error" => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // Notify the instructor/trainer via email
+        $trainerId = is_numeric($class->instructor) ? (int)$class->instructor : null;
+        if ($trainerId) {
+            $instructor = \App\Models\Instructor::find($trainerId);
+            if ($instructor && $instructor->email) {
+                try {
+                    \Illuminate\Support\Facades\Mail::send("emails.class-cancelled-trainer", [
+                        "instructor" => $instructor,
+                        "class" => $class,
+                        "bookingsCount" => $bookings->count(),
+                    ], function ($message) use ($instructor, $class) {
+                        $message->to($instructor->email, $instructor->name)
+                                 ->subject("Ακύρωση Μαθήματος: " . $class->name . " - " . $class->date->format("d/m/Y"));
+                    });
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify instructor about class cancellation", [
+                        "instructor_id" => $instructor->id,
+                        "class_id" => $class->id,
+                        "error" => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            "success" => true,
+            "message" => "Το μάθημα ακυρώθηκε επιτυχώς. Ειδοποιήθηκαν {$notifiedUsers} χρήστες.",
+            "data" => [
+                "class_id" => $class->id,
+                "cancelled_bookings" => $bookings->count(),
+                "notified_users" => $notifiedUsers,
+            ]
         ]);
     }
 }

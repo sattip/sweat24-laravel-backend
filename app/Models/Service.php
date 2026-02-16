@@ -110,7 +110,9 @@ class Service extends Model
         // Έλεγχος αν ο χρήστης έχει ενεργή συνδρομή για αυτή την υπηρεσία
         $hasActiveSubscription = $user->userPackages()
             ->whereHas('package', function($query) {
-                $query->where('service_id', $this->id);
+                $query->whereHas('services', function($q) {
+                    $q->where('services.id', $this->id);
+                });
             })
             ->where('status', 'active')
             ->where('is_frozen', false)
