@@ -72,7 +72,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = User::whereDate('created_at', '>=', $startDate)
             ->whereDate('created_at', '<=', $endDate)
             ->whereNotNull('found_us_via')
-            ->selectRaw("strftime('%Y-%m', created_at) as month, found_us_via, COUNT(*) as count")
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, found_us_via, COUNT(*) as count")
             ->groupBy('month', 'found_us_via')
             ->orderBy('month')
             ->get()
@@ -122,9 +122,9 @@ class AnalyticsController extends Controller
 
         // Group by time period
         $dateFormat = match ($groupBy) {
-            'week' => "strftime('%Y-%W', date)",
-            'month' => "strftime('%Y-%m', date)",
-            default => "strftime('%Y-%m-%d', date)",
+            'week' => "DATE_FORMAT(date, '%x-%v')",
+            'month' => "DATE_FORMAT(date, '%Y-%m')",
+            default => "DATE_FORMAT(date, '%Y-%m-%d')",
         };
 
         $timeline = Booking::whereDate('date', '>=', $startDate)
@@ -270,9 +270,9 @@ class AnalyticsController extends Controller
 
         // Timeline by group_by
         $dateFormat = match ($groupBy) {
-            'month' => "strftime('%Y-%m', date)",
-            'year' => "strftime('%Y', date)",
-            default => "strftime('%Y-%W', date)",
+            'month' => "DATE_FORMAT(date, '%Y-%m')",
+            'year' => "DATE_FORMAT(date, '%Y')",
+            default => "DATE_FORMAT(date, '%x-%v')",
         };
 
         $timeline = GymClass::whereDate('date', '>=', $startDate)
@@ -429,7 +429,7 @@ class AnalyticsController extends Controller
         foreach ($ageGroups as $group) {
             $count = (clone $query)
                 ->whereNotNull('date_of_birth')
-                ->whereRaw("(strftime('%Y', 'now') - strftime('%Y', date_of_birth)) BETWEEN ? AND ?",
+                ->whereRaw("TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN ? AND ?",
                     [$group['min'], $group['max']])
                 ->count();
             $ageData[] = [
@@ -638,7 +638,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = UserPackage::whereDate('expiry_date', '>=', $startDate)
             ->whereDate('expiry_date', '<=', $endDate)
             ->selectRaw("
-                strftime('%Y-%m', expiry_date) as month,
+                DATE_FORMAT(expiry_date, '%Y-%m') as month,
                 COUNT(*) as expired,
                 SUM(CASE WHEN renewed_at IS NOT NULL THEN 1 ELSE 0 END) as renewed
             ")
@@ -735,7 +735,7 @@ class AnalyticsController extends Controller
         $monthlyTrend = TrialAppointment::whereDate('appointment_date', '>=', $startDate)
             ->whereDate('appointment_date', '<=', $endDate)
             ->selectRaw("
-                strftime('%Y-%m', appointment_date) as month,
+                DATE_FORMAT(appointment_date, '%Y-%m') as month,
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
             ")

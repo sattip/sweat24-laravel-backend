@@ -335,9 +335,9 @@ class ChurnFeedbackController extends Controller
                 return $item;
             });
 
-        // Monthly trends (last 6 months) - use strftime for SQLite compatibility
+        // Monthly trends (last 6 months)
         $monthlyTrends = ChurnFeedback::select(
-            DB::raw("strftime('%Y-%m', expired_at) as month"),
+            DB::raw("DATE_FORMAT(expired_at, '%Y-%m') as month"),
             DB::raw('COUNT(*) as total'),
             DB::raw("SUM(CASE WHEN status = 'churn' THEN 1 ELSE 0 END) as churned"),
             DB::raw("SUM(CASE WHEN status = 'pause' THEN 1 ELSE 0 END) as paused"),
