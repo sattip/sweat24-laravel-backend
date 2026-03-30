@@ -38,8 +38,8 @@
 <p>Μπορείτε να ακυρώσετε την κράτησή σας μέχρι {{ config('app.cancellation_hours', 2) }} ώρες πριν αρχίσει το μάθημα χωρίς ποινή.</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/bookings/{{ $booking->id }}" class="btn">Προβολή Λεπτομερειών Κράτησης</a>
-    <a href="{{ config('app.url') }}/bookings/{{ $booking->id }}/cancel" class="btn btn-secondary">Ακύρωση Κράτησης</a>
+    <a href="https://sweat93.gr/bookings/{{ $booking->id }}" class="btn">Προβολή Λεπτομερειών Κράτησης</a>
+    <a href="https://sweat93.gr/bookings/{{ $booking->id }}/cancel" class="btn btn-secondary">Ακύρωση Κράτησης</a>
 </div>
 
 <table class="details-table">
@@ -68,8 +68,8 @@
 <h2>Χρειάζεστε Βοήθεια;</h2>
 <p>Αν έχετε ερωτήσεις σχετικά με την κράτησή σας ή το μάθημα, παρακαλούμε επικοινωνήστε μαζί μας:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:bookings@sweat93.gr">bookings@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
 </ul>
 
 <p>Ανυπομονούμε να σας δούμε στο μάθημα!</p>

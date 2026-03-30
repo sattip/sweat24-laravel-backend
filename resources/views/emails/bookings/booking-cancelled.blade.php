@@ -34,8 +34,8 @@
 <p>Μην αφήσετε αυτό να σας σταματήσει στο ταξίδι της φυσικής σας κατάστασης! Δείτε τα επερχόμενα μαθήματά μας και βρείτε άλλη συνεδρία που ταιριάζει στο πρόγραμμά σας.</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/classes" class="btn">Περιήγηση Μαθημάτων</a>
-    <a href="{{ config('app.url') }}/bookings" class="btn btn-secondary">Οι Κρατήσεις μου</a>
+    <a href="https://sweat93.gr/classes" class="btn">Περιήγηση Μαθημάτων</a>
+    <a href="https://sweat93.gr/bookings" class="btn btn-secondary">Οι Κρατήσεις μου</a>
 </div>
 
 <h2>Δημοφιλή Μαθήματα αυτής της Εβδομάδας</h2>
@@ -61,8 +61,8 @@
 <h2>Χρειάζεστε Βοήθεια;</h2>
 <p>Αν ακυρώσατε κατά λάθος ή χρειάζεστε βοήθεια με επανακράτηση, παρακαλούμε επικοινωνήστε μαζί μας άμεσα:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:bookings@sweat93.gr">bookings@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
 </ul>
 
 <p>Η ομάδα μας είναι εδώ για να σας βοηθήσει να διατηρήσετε τη ρουτίνα γυμναστικής σας!</p>

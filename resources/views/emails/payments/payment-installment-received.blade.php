@@ -103,7 +103,7 @@
 </div>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/payments" 
+    <a href="https://sweat93.gr/payments" 
        style="display: inline-block; padding: 12px 30px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
         Δείτε το Ιστορικό Πληρωμών
     </a>

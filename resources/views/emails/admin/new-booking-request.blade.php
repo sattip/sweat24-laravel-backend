@@ -162,9 +162,9 @@
 <p>Παρακαλώ εξετάστε αυτό το booking request και αναλάβετε την κατάλληλη ενέργεια:</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/admin/bookings/{{ $booking->id }}/schedule" class="btn">Προγραμμάτισε Session</a>
-    <a href="{{ config('app.url') }}/admin/bookings/{{ $booking->id }}/assign-trainer" class="btn" style="background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);">Assign Trainer</a>
-    <a href="{{ config('app.url') }}/admin/bookings/{{ $booking->id }}" class="btn btn-secondary">Προβολή Πλήρων Στοιχείων</a>
+    <a href="https://panel.sweat93.gr/admin/bookings/{{ $booking->id }}/schedule" class="btn">Προγραμμάτισε Session</a>
+    <a href="https://panel.sweat93.gr/admin/bookings/{{ $booking->id }}/assign-trainer" class="btn" style="background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);">Assign Trainer</a>
+    <a href="https://panel.sweat93.gr/admin/bookings/{{ $booking->id }}" class="btn btn-secondary">Προβολή Πλήρων Στοιχείων</a>
 </div>
 
 <h2>Επικοινωνία με τον Πελάτη</h2>
@@ -209,5 +209,5 @@
 
 <p>Παρακαλώ επεξεργαστείτε αυτό το booking request άμεσα για να διατηρήσετε την ικανοποίηση του πελάτη.</p>
 
-<p>Admin Panel: <a href="{{ config('app.url') }}/admin/bookings">{{ config('app.url') }}/admin/bookings</a></p>
+<p>Admin Panel: <a href="https://panel.sweat93.gr/admin/bookings">https://panel.sweat93.gr/admin/bookings</a></p>
 @endsection

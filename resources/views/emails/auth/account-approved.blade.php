@@ -30,8 +30,8 @@
 </ul>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/login" class="btn">Σύνδεση στον Λογαριασμό σας</a>
-    <a href="{{ config('app.url') }}/classes" class="btn btn-secondary">Περιήγηση Μαθημάτων</a>
+    <a href="https://sweat93.gr/login" class="btn">Σύνδεση στον Λογαριασμό σας</a>
+    <a href="https://sweat93.gr/classes" class="btn btn-secondary">Περιήγηση Μαθημάτων</a>
 </div>
 
 <h2>Προνόμια Νέου Μέλους</h2>
@@ -55,7 +55,7 @@
     <li>Το πώς να αξιοποιήσετε στο έπακρο τη συνδρομή σας</li>
 </ul>
 
-<p>Μη διστάσετε να επικοινωνήσετε μαζί μας στο <a href="mailto:info@sweat93.gr">info@sweat93.gr</a> ή καλέστε στο <a href="tel:+306980912176">698 091 2176</a>.</p>
+<p>Μη διστάσετε να επικοινωνήσετε μαζί μας στο <a href="mailto:info@sweat93.com">info@sweat93.com</a> ή καλέστε στο <a href="tel:+302101234567">+30 210 123 4567</a>.</p>
 
 <p>Είμαστε ενθουσιασμένοι που θα είμαστε μέρος του ταξιδιού της φυσικής σας κατάστασης!</p>
 

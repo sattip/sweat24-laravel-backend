@@ -57,7 +57,7 @@
 </div>
 
 <div style="text-align: center; margin: 40px 0;">
-    <a href="{{ config('app.url') }}/book-now?class={{ $gymClass->id }}" 
+    <a href="https://sweat93.gr/book-now?class={{ $gymClass->id }}" 
        style="display: inline-block; padding: 15px 40px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 18px;">
         Κράτηση Τώρα
     </a>

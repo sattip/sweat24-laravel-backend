@@ -83,8 +83,8 @@
 <p>Παρακαλούμε σημειώστε ότι τα ραντεβού {{ $appointment->type === 'ems' ? 'EMS' : 'προσωπικής προπόνησης' }} απαιτούν τουλάχιστον 24 ώρες προειδοποίηση για ακύρωση ώστε να αποφευχθούν χρεώσεις.</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/appointments/{{ $appointment->id }}" class="btn">Προβολή Ραντεβού</a>
-    <a href="{{ config('app.url') }}/appointments/{{ $appointment->id }}/reschedule" class="btn btn-secondary">Αναπρογραμματισμός</a>
+    <a href="https://sweat93.gr/appointments/{{ $appointment->id }}" class="btn">Προβολή Ραντεβού</a>
+    <a href="https://sweat93.gr/appointments/{{ $appointment->id }}/reschedule" class="btn btn-secondary">Αναπρογραμματισμός</a>
 </div>
 
 <table class="details-table">
@@ -113,8 +113,8 @@
 <h2>Ερωτήσεις ή Ανησυχίες;</h2>
 <p>Αν έχετε ερωτήσεις σχετικά με το ραντεβού σας ή χρειάζεστε να κάνετε αλλαγές, παρακαλούμε επικοινωνήστε μαζί μας:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:appointments@sweat93.gr">appointments@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
     <li><strong>Απευθείας στον Προπονητή:</strong> Διαθέσιμο μέσω της πύλης μελών</li>
 </ul>
 

@@ -108,11 +108,11 @@
 
 <div style="text-align: center; margin: 30px 0;">
     @if($order->delivery_type === 'pickup')
-    <a href="{{ config('app.url') }}/orders/{{ $order->id }}" class="btn">Προβολή Στοιχείων Παραγγελίας</a>
-    <a href="tel:+306980912176" class="btn btn-secondary">Κλήση για Βοήθεια</a>
+    <a href="https://sweat93.gr/orders/{{ $order->id }}" class="btn">Προβολή Στοιχείων Παραγγελίας</a>
+    <a href="tel:+302101234567" class="btn btn-secondary">Κλήση για Βοήθεια</a>
     @else
-    <a href="{{ config('app.url') }}/orders/{{ $order->id }}/track" class="btn">Παρακολούθηση Παράδοσης</a>
-    <a href="{{ config('app.url') }}/orders/{{ $order->id }}" class="btn btn-secondary">Στοιχεία Παραγγελίας</a>
+    <a href="https://sweat93.gr/orders/{{ $order->id }}/track" class="btn">Παρακολούθηση Παράδοσης</a>
+    <a href="https://sweat93.gr/orders/{{ $order->id }}" class="btn btn-secondary">Στοιχεία Παραγγελίας</a>
     @endif
 </div>
 
@@ -144,8 +144,8 @@
 <h2>Χρειάζεστε Βοήθεια;</h2>
 <p>Για οποιεσδήποτε ερωτήσεις ή προβλήματα με την παραγγελία σας:</p>
 <ul>
-    <li><strong>Email:</strong> <a href="mailto:orders@sweat93.gr">orders@sweat93.gr</a></li>
-    <li><strong>Τηλέφωνο:</strong> <a href="tel:+306980912176">698 091 2176</a></li>
+    <li><strong>Email:</strong> <a href="mailto:info@sweat93.com">info@sweat93.com</a></li>
+    <li><strong>Τηλέφωνο:</strong> <a href="tel:+302101234567">+30 210 123 4567</a></li>
     <li><strong>WhatsApp:</strong> Γρήγορες ενημερώσεις και υποστήριξη</li>
     <li><strong>Προσωπικά:</strong> Επισκεφθείτε τη ρεσεψιόν του γυμναστηρίου</li>
 </ul>

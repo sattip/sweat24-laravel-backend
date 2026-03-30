@@ -115,9 +115,9 @@
 <p>Παρακαλώ εξετάστε αυτή την εγγραφή και αναλάβετε μία από τις ακόλουθες ενέργειες:</p>
 
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ config('app.url') }}/admin/users/{{ $user->id }}/approve" class="btn" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">Έγκριση Εγγραφής</a>
-    <a href="{{ config('app.url') }}/admin/users/{{ $user->id }}/reject" class="btn" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">Aπόρριψη Εγγραφής</a>
-    <a href="{{ config('app.url') }}/admin/users/{{ $user->id }}" class="btn btn-secondary">Προβολή Πλήρους Προφίλ</a>
+    <a href="https://panel.sweat93.gr/admin/users/{{ $user->id }}/approve" class="btn" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">Έγκριση Εγγραφής</a>
+    <a href="https://panel.sweat93.gr/admin/users/{{ $user->id }}/reject" class="btn" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">Aπόρριψη Εγγραφής</a>
+    <a href="https://panel.sweat93.gr/admin/users/{{ $user->id }}" class="btn btn-secondary">Προβολή Πλήρους Προφίλ</a>
 </div>
 
 <h2>Οδηγίες Έγκρισης</h2>
@@ -161,5 +161,5 @@
     <p><strong>Υπενθύμιση:</strong> Ο χρήστης θα λάβει αυτόματη ειδοποίηση email όταν εγκρίνετε ή απορρίψετε την εγγραφή τους.</p>
 </div>
 
-<p>Admin Panel: <a href="{{ config('app.url') }}/admin">{{ config('app.url') }}/admin</a></p>
+<p>Admin Panel: <a href="https://panel.sweat93.gr/admin">https://panel.sweat93.gr/admin</a></p>
 @endsection
